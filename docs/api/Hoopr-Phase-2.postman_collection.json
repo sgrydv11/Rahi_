@@ -1,0 +1,1307 @@
+{
+  "info": {
+    "name": "Hoopr — Phase 2 Authentication",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run all folders once, in order, against a local/test Hoopr backend. Creates two test accounts per run. Explicit Cookie headers and disabled cookie jars keep replay scenarios deterministic. Runtime tokens/passwords use collection variables: do not export their populated values. See docs/api/README.md. Health needs no auth; auth POSTs require trusted Origin plus matching CSRF cookie/header."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "serverUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "frontendOrigin",
+      "value": "http://localhost:5173",
+      "type": "string"
+    },
+    {
+      "key": "expectedCookieSecure",
+      "value": "false",
+      "type": "string"
+    },
+    {
+      "key": "expectedSameSite",
+      "value": "Lax",
+      "type": "string"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "upperEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "beforeRotationToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "loggedOutRefreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 — Happy path (run first)",
+      "item": [
+        {
+          "name": "01 — API health (public)",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/health",
+            "description": "Expected HTTP 200. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Health is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 — Actuator health (public)",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/actuator/health",
+            "description": "Expected HTTP 200. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Health is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 — Initialize test account and get CSRF",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/csrf",
+            "description": "Expected HTTP 200. Run this once before the remaining requests. It generates a new email/password and resets token variables. Does not register yet."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Only generated throwaway credentials; never use a real account for this run.",
+                  "const id = pm.variables.replaceIn(\"{{$guid}}\");",
+                  "pm.collectionVariables.set(\"testEmail\", \"hoopr-api-\" + id + \"@example.test\");",
+                  "pm.collectionVariables.set(\"upperEmail\", pm.collectionVariables.get(\"testEmail\").toUpperCase());",
+                  "pm.collectionVariables.set(\"testPassword\", \"Hoopr-test-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "[\"csrfToken\", \"userId\", \"accessToken\", \"refreshToken\", \"beforeRotationToken\", \"loggedOutRefreshToken\"].forEach(k => pm.collectionVariables.set(k, \"\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  pm.test(\"CSRF token and expected header returned\", function () {",
+                  "    pm.expect(typeof data.token === \"string\" && data.token.length > 0).to.eql(true);",
+                  "    pm.expect(data.headerName).to.eql(\"X-XSRF-TOKEN\");",
+                  "  });",
+                  "  pm.collectionVariables.set(\"csrfToken\", data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 — Register USER",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/register",
+            "description": "Expected HTTP 201. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"Hoopr API Test\",\n  \"travelPreference\": \"BOTH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) { const data = pm.response.json();",
+                  "pm.test(\"Registration creates USER without password fields\", function () {",
+                  "  pm.expect(data.role).to.eql(\"USER\");",
+                  "  pm.expect(data.travelPreference).to.eql(\"BOTH\");",
+                  "  pm.expect(data.email === pm.collectionVariables.get(\"testEmail\")).to.eql(true);",
+                  "  pm.expect(!(\"password\" in data) && !(\"passwordHash\" in data)).to.eql(true);",
+                  "}); pm.collectionVariables.set(\"userId\", data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 — Login and capture tokens",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/login",
+            "description": "Expected HTTP 200. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  const cookies = pm.response.headers.all().filter(h => h.key.toLowerCase() === \"set-cookie\");",
+                  "  const refresh = cookies.map(h => /^hoopr_refresh=([^;]*)/.exec(h.value)).find(Boolean);",
+                  "  pm.test(\"Access token lasts 15 minutes; refresh stays out of JSON\", function () {",
+                  "    pm.expect(typeof data.accessToken === \"string\" && data.accessToken.length > 0).to.eql(true);",
+                  "    pm.expect(data.expiresIn).to.eql(900); pm.expect(data.tokenType).to.eql(\"Bearer\");",
+                  "    pm.expect(!Object.prototype.hasOwnProperty.call(data, \"refreshToken\")).to.eql(true);",
+                  "  });",
+                  "  pm.test(\"Refresh cookie attributes match configured expectations\", function () {",
+                  "    pm.expect(Boolean(refresh)).to.eql(true);",
+                  "    const header = cookies.find(h => h.value.startsWith(\"hoopr_refresh=\")).value;",
+                  "    pm.expect(/;\\s*HttpOnly(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Path=\\/api\\/v1\\/auth(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Secure(?:;|$)/i.test(header)).to.eql(pm.variables.get(\"expectedCookieSecure\") === \"true\");",
+                  "    pm.expect(header.includes(\"SameSite=\" + pm.variables.get(\"expectedSameSite\"))).to.eql(true);",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\");",
+                  "  });",
+                  "  if (refresh) pm.collectionVariables.set(\"refreshToken\", refresh[1]);",
+                  "  pm.collectionVariables.set(\"accessToken\", data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 — My profile (Bearer)",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/users/me",
+            "description": "Expected HTTP 200. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Profile belongs to the registered USER\", function () { const data = pm.response.json();",
+                  "pm.expect(data.id === pm.collectionVariables.get(\"userId\")).to.eql(true); pm.expect(data.role).to.eql(\"USER\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 — Rotate refresh token",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/refresh",
+            "description": "Expected HTTP 200. "
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"beforeRotationToken\", pm.collectionVariables.get(\"refreshToken\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  const cookies = pm.response.headers.all().filter(h => h.key.toLowerCase() === \"set-cookie\");",
+                  "  const refresh = cookies.map(h => /^hoopr_refresh=([^;]*)/.exec(h.value)).find(Boolean);",
+                  "  pm.test(\"Access token lasts 15 minutes; refresh stays out of JSON\", function () {",
+                  "    pm.expect(typeof data.accessToken === \"string\" && data.accessToken.length > 0).to.eql(true);",
+                  "    pm.expect(data.expiresIn).to.eql(900); pm.expect(data.tokenType).to.eql(\"Bearer\");",
+                  "    pm.expect(!Object.prototype.hasOwnProperty.call(data, \"refreshToken\")).to.eql(true);",
+                  "  });",
+                  "  pm.test(\"Refresh cookie attributes match configured expectations\", function () {",
+                  "    pm.expect(Boolean(refresh)).to.eql(true);",
+                  "    const header = cookies.find(h => h.value.startsWith(\"hoopr_refresh=\")).value;",
+                  "    pm.expect(/;\\s*HttpOnly(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Path=\\/api\\/v1\\/auth(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Secure(?:;|$)/i.test(header)).to.eql(pm.variables.get(\"expectedCookieSecure\") === \"true\");",
+                  "    pm.expect(header.includes(\"SameSite=\" + pm.variables.get(\"expectedSameSite\"))).to.eql(true);",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\");",
+                  "  });",
+                  "  if (refresh) pm.collectionVariables.set(\"refreshToken\", refresh[1]);",
+                  "  pm.collectionVariables.set(\"accessToken\", data.accessToken);",
+                  "}",
+                  "if (pm.response.code === 200) pm.test(\"Refresh token rotated\", function () {",
+                  "pm.expect(pm.collectionVariables.get(\"refreshToken\") !== pm.collectionVariables.get(\"beforeRotationToken\")).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 — My profile with refreshed access token",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/users/me",
+            "description": "Expected HTTP 200. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 — Validation and security",
+      "item": [
+        {
+          "name": "09 — Duplicate email with different case",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/register",
+            "description": "Expected HTTP 409. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{upperEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"Hoopr API Test\",\n  \"travelPreference\": \"BOTH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 — Invalid email",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/register",
+            "description": "Expected HTTP 400. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"Hoopr API Test\",\n  \"travelPreference\": \"BOTH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 — Short password",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/register",
+            "description": "Expected HTTP 400. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"short\",\n  \"fullName\": \"Hoopr API Test\",\n  \"travelPreference\": \"BOTH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 — Incorrect login password",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/login",
+            "description": "Expected HTTP 401. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"incorrect-test-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 — My profile without Bearer",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/users/me",
+            "description": "Expected HTTP 401. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 — Refresh without CSRF header",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/refresh",
+            "description": "Expected HTTP 403. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 — Refresh from untrusted Origin",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://untrusted.example.test"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/refresh",
+            "description": "Expected HTTP 403. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 — Unfinished bookings API stays forbidden",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/bookings",
+            "description": "Expected HTTP 403. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 — Public registration cannot assign ADMIN",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/register",
+            "description": "Expected HTTP 201. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"role-{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"Hoopr API Test\",\n  \"role\": \"ADMIN\",\n  \"travelPreference\": \"DRIVER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Requested ADMIN is ignored and USER is assigned\", function () { pm.expect(pm.response.json().role).to.eql(\"USER\"); });",
+                  "pm.test(\"Driver preference is saved independently of security role\", function () { pm.expect(pm.response.json().travelPreference).to.eql(\"DRIVER\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 — Reuse detection and logout (run last)",
+      "item": [
+        {
+          "name": "18 — Replay consumed refresh token",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{beforeRotationToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/refresh",
+            "description": "Expected HTTP 401. Intentionally invalidates the entire current family. Run after 07."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 — Rotated token is revoked after replay",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/refresh",
+            "description": "Expected HTTP 401. Sends the replacement token from 07 and proves family revocation, not merely rejection of the old token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 — Login for a fresh logout session",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/login",
+            "description": "Expected HTTP 200. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  const cookies = pm.response.headers.all().filter(h => h.key.toLowerCase() === \"set-cookie\");",
+                  "  const refresh = cookies.map(h => /^hoopr_refresh=([^;]*)/.exec(h.value)).find(Boolean);",
+                  "  pm.test(\"Access token lasts 15 minutes; refresh stays out of JSON\", function () {",
+                  "    pm.expect(typeof data.accessToken === \"string\" && data.accessToken.length > 0).to.eql(true);",
+                  "    pm.expect(data.expiresIn).to.eql(900); pm.expect(data.tokenType).to.eql(\"Bearer\");",
+                  "    pm.expect(!Object.prototype.hasOwnProperty.call(data, \"refreshToken\")).to.eql(true);",
+                  "  });",
+                  "  pm.test(\"Refresh cookie attributes match configured expectations\", function () {",
+                  "    pm.expect(Boolean(refresh)).to.eql(true);",
+                  "    const header = cookies.find(h => h.value.startsWith(\"hoopr_refresh=\")).value;",
+                  "    pm.expect(/;\\s*HttpOnly(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Path=\\/api\\/v1\\/auth(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Secure(?:;|$)/i.test(header)).to.eql(pm.variables.get(\"expectedCookieSecure\") === \"true\");",
+                  "    pm.expect(header.includes(\"SameSite=\" + pm.variables.get(\"expectedSameSite\"))).to.eql(true);",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\");",
+                  "  });",
+                  "  if (refresh) pm.collectionVariables.set(\"refreshToken\", refresh[1]);",
+                  "  pm.collectionVariables.set(\"accessToken\", data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "21 — Logout and revoke current family",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/logout",
+            "description": "Expected HTTP 204. "
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"loggedOutRefreshToken\", pm.collectionVariables.get(\"refreshToken\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Refresh cookie expires on logout\", function () {",
+                  "  const header = pm.response.headers.all().find(h => h.key.toLowerCase() === \"set-cookie\" && h.value.startsWith(\"hoopr_refresh=\"));",
+                  "  pm.expect(Boolean(header) && /Max-Age=0/i.test(header.value)).to.eql(true);",
+                  "});",
+                  "pm.collectionVariables.set(\"accessToken\", \"\"); pm.collectionVariables.set(\"refreshToken\", \"\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "22 — Logged-out refresh token cannot be reused",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{loggedOutRefreshToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/refresh",
+            "description": "Expected HTTP 401. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "23 — No authentication after logout; clear test secrets",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/users/me",
+            "description": "Expected HTTP 401. Uses no Bearer header. Old access JWTs remain valid until expiry; logout revokes refresh sessions. Clears generated credential/token variables when finished."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Structured error without credentials\", function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data.status === pm.response.code).to.eql(true);",
+                  "  pm.expect(typeof data.detail === \"string\").to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"password\")).to.eql(true);",
+                  "  pm.expect(!Object.prototype.hasOwnProperty.call(data, \"accessToken\")).to.eql(true);",
+                  "});",
+                  "[\"csrfToken\", \"testPassword\", \"accessToken\", \"refreshToken\", \"beforeRotationToken\", \"loggedOutRefreshToken\"].forEach(k => pm.collectionVariables.set(k, \"\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,936 @@
+{
+  "info": {
+    "name": "Hoopr — Phase 3 Rides",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run in order against a local/test backend. Creates one throwaway account and one ride, then cancels the ride and logs out. No booking or payment operations. Explicit cookies are for auth only. See docs/phase-3-rides.md."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "serverUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "frontendOrigin",
+      "value": "http://localhost:5173",
+      "type": "string"
+    },
+    {
+      "key": "expectedCookieSecure",
+      "value": "false",
+      "type": "string"
+    },
+    {
+      "key": "expectedSameSite",
+      "value": "Lax",
+      "type": "string"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "upperEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "beforeRotationToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "loggedOutRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rideId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "initialRideVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rideVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "departureAt",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "origin",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "destination",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Phase 3 — Run in order",
+      "item": [
+        {
+          "name": "01 — Public health",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/health",
+            "description": "Expected HTTP 200. "
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Health is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 — Initialize credentials and CSRF",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/csrf",
+            "description": "Expected HTTP 200. Run this once before the remaining requests. It generates a new email/password and resets token variables. Does not register yet."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Only generated throwaway credentials; never use a real account for this run.",
+                  "const id = pm.variables.replaceIn(\"{{$guid}}\");",
+                  "pm.collectionVariables.set(\"testEmail\", \"hoopr-api-\" + id + \"@example.test\");",
+                  "pm.collectionVariables.set(\"upperEmail\", pm.collectionVariables.get(\"testEmail\").toUpperCase());",
+                  "pm.collectionVariables.set(\"testPassword\", \"Hoopr-test-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "[\"csrfToken\", \"userId\", \"accessToken\", \"refreshToken\", \"beforeRotationToken\", \"loggedOutRefreshToken\"].forEach(k => pm.collectionVariables.set(k, \"\"));",
+                  "pm.collectionVariables.set(\"departureAt\", new Date(Date.now() + 7 * 86400000).toISOString());",
+                  "pm.collectionVariables.set(\"origin\", \"HooprOrigin-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.collectionVariables.set(\"destination\", \"HooprDestination-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "[\"rideId\", \"rideVersion\", \"initialRideVersion\"].forEach(k => pm.collectionVariables.set(k, \"\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  pm.test(\"CSRF token and expected header returned\", function () {",
+                  "    pm.expect(typeof data.token === \"string\" && data.token.length > 0).to.eql(true);",
+                  "    pm.expect(data.headerName).to.eql(\"X-XSRF-TOKEN\");",
+                  "  });",
+                  "  pm.collectionVariables.set(\"csrfToken\", data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 — Register test driver",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/register",
+            "description": "Expected HTTP 201. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"Hoopr API Test\",\n  \"travelPreference\": \"BOTH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) { const data = pm.response.json();",
+                  "pm.test(\"Registration creates USER without password fields\", function () {",
+                  "  pm.expect(data.role).to.eql(\"USER\");",
+                  "  pm.expect(data.travelPreference).to.eql(\"BOTH\");",
+                  "  pm.expect(data.email === pm.collectionVariables.get(\"testEmail\")).to.eql(true);",
+                  "  pm.expect(!(\"password\" in data) && !(\"passwordHash\" in data)).to.eql(true);",
+                  "}); pm.collectionVariables.set(\"userId\", data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 — Login",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{serverUrl}}/api/v1/auth/login",
+            "description": "Expected HTTP 200. ",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  const cookies = pm.response.headers.all().filter(h => h.key.toLowerCase() === \"set-cookie\");",
+                  "  const refresh = cookies.map(h => /^hoopr_refresh=([^;]*)/.exec(h.value)).find(Boolean);",
+                  "  pm.test(\"Access token lasts 15 minutes; refresh stays out of JSON\", function () {",
+                  "    pm.expect(typeof data.accessToken === \"string\" && data.accessToken.length > 0).to.eql(true);",
+                  "    pm.expect(data.expiresIn).to.eql(900); pm.expect(data.tokenType).to.eql(\"Bearer\");",
+                  "    pm.expect(!Object.prototype.hasOwnProperty.call(data, \"refreshToken\")).to.eql(true);",
+                  "  });",
+                  "  pm.test(\"Refresh cookie attributes match configured expectations\", function () {",
+                  "    pm.expect(Boolean(refresh)).to.eql(true);",
+                  "    const header = cookies.find(h => h.value.startsWith(\"hoopr_refresh=\")).value;",
+                  "    pm.expect(/;\\s*HttpOnly(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Path=\\/api\\/v1\\/auth(?:;|$)/i.test(header)).to.eql(true);",
+                  "    pm.expect(/;\\s*Secure(?:;|$)/i.test(header)).to.eql(pm.variables.get(\"expectedCookieSecure\") === \"true\");",
+                  "    pm.expect(header.includes(\"SameSite=\" + pm.variables.get(\"expectedSameSite\"))).to.eql(true);",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\");",
+                  "  });",
+                  "  if (refresh) pm.collectionVariables.set(\"refreshToken\", refresh[1]);",
+                  "  pm.collectionVariables.set(\"accessToken\", data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 — Create a scheduled ride",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": \"{{origin}}\",\n  \"destination\": \"{{destination}}\",\n  \"departureAt\": \"{{departureAt}}\",\n  \"timeZone\": \"Asia/Kolkata\",\n  \"totalSeats\": 3,\n  \"pricePerSeat\": 125.5,\n  \"currency\": \"INR\",\n  \"pickupDescription\": \"Station entrance\",\n  \"dropoffDescription\": \"City centre\",\n  \"vehicleDetails\": \"Blue hatchback\",\n  \"notes\": \"Generated Phase 3 API test offer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) { const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"rideId\", data.id); pm.collectionVariables.set(\"initialRideVersion\", String(data.version));",
+                  "pm.collectionVariables.set(\"rideVersion\", String(data.version));",
+                  "pm.test(\"Ride belongs to JWT user and starts with all seats\", function () { pm.expect(data.driver.id === pm.collectionVariables.get(\"userId\")).to.eql(true); pm.expect(data.availableSeats).to.eql(3); pm.expect(data.status).to.eql(\"SCHEDULED\"); }); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 — Public ride details",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides/{{rideId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Safe driver details only\", function () { const data = pm.response.json(); pm.expect(!(\"email\" in data.driver) && !(\"phoneNumber\" in data.driver)).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 — Public filtered paginated search",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides?origin={{origin}}&destination={{destination}}&minimumSeats=2&maximumPrice=200&page=0&size=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Created ride is found\", function () { const data = pm.response.json(); pm.expect(data.totalElements).to.eql(1); pm.expect(data.content[0].id === pm.collectionVariables.get(\"rideId\")).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 — My rides",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Owner list includes the offer\", function () { pm.expect(pm.response.json().totalElements).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 — Update owned ride",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides/{{rideId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{rideVersion}},\n  \"totalSeats\": 4,\n  \"notes\": \"Updated offer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code < 300) { const data = pm.response.json(); pm.collectionVariables.set(\"rideVersion\", String(data.version)); }",
+                  "pm.test(\"Availability tracks unbooked capacity\", function () { pm.expect(pm.response.json().availableSeats).to.eql(4); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 — Stale update is rejected",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides/{{rideId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{initialRideVersion}},\n  \"totalSeats\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 — Unauthenticated creation is rejected",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": \"{{origin}}\",\n  \"destination\": \"{{destination}}\",\n  \"departureAt\": \"{{departureAt}}\",\n  \"timeZone\": \"Asia/Kolkata\",\n  \"totalSeats\": 3,\n  \"pricePerSeat\": 125.5,\n  \"currency\": \"INR\",\n  \"pickupDescription\": \"Station entrance\",\n  \"dropoffDescription\": \"City centre\",\n  \"vehicleDetails\": \"Blue hatchback\",\n  \"notes\": \"Generated Phase 3 API test offer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 — Invalid seat count",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": \"{{origin}}\",\n  \"destination\": \"{{destination}}\",\n  \"departureAt\": \"{{departureAt}}\",\n  \"timeZone\": \"Asia/Kolkata\",\n  \"totalSeats\": 7,\n  \"pricePerSeat\": 125.5,\n  \"currency\": \"INR\",\n  \"pickupDescription\": \"Station entrance\",\n  \"dropoffDescription\": \"City centre\",\n  \"vehicleDetails\": \"Blue hatchback\",\n  \"notes\": \"Generated Phase 3 API test offer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 — Arbitrary driver ID is rejected",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": \"{{origin}}\",\n  \"destination\": \"{{destination}}\",\n  \"departureAt\": \"{{departureAt}}\",\n  \"timeZone\": \"Asia/Kolkata\",\n  \"totalSeats\": 3,\n  \"pricePerSeat\": 125.5,\n  \"currency\": \"INR\",\n  \"pickupDescription\": \"Station entrance\",\n  \"dropoffDescription\": \"City centre\",\n  \"vehicleDetails\": \"Blue hatchback\",\n  \"notes\": \"Generated Phase 3 API test offer\",\n  \"driverId\": \"00000000-0000-0000-0000-000000000001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 — Cancel owned ride",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides/{{rideId}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{rideVersion}},\n  \"reason\": \"API test completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code < 300) { const data = pm.response.json(); pm.collectionVariables.set(\"rideVersion\", String(data.version)); }",
+                  "pm.test(\"Cancelled history is retained\", function () { const data = pm.response.json(); pm.expect(data.status).to.eql(\"CANCELLED\"); pm.expect(typeof data.cancelledAt === \"string\").to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 — Cancelled ride leaves search",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides?origin={{origin}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"No cancelled offer returned\", function () { pm.expect(pm.response.json().totalElements).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 — Cancelled ride cannot be edited",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/rides/{{rideId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{rideVersion}},\n  \"notes\": \"Should not change\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 — Health remains public",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{serverUrl}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 — Logout and clear test credentials",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Cookie",
+                "value": "XSRF-TOKEN={{csrfToken}}; hoopr_refresh={{refreshToken}}"
+              }
+            ],
+            "url": "{{serverUrl}}/api/v1/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });",
+                  "[\"csrfToken\", \"testPassword\", \"accessToken\", \"refreshToken\", \"beforeRotationToken\", \"loggedOutRefreshToken\"].forEach(k => pm.collectionVariables.set(k, \"\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
