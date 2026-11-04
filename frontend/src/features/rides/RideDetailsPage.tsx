@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { errorMessage } from '../auth/auth';
 import { canManage, departureLabel, money, ridesApi, type Ride } from './api';
 import { CancelRideDialog } from './CancelRideDialog';
+import { BookSeats } from '../bookings/BookSeats';
 export function RideDetailsPage() {
   const { id = '' } = useParams();
   const { user } = useAuth();
@@ -35,11 +36,13 @@ export function RideDetailsPage() {
         {ride.notes && <><dt>Notes</dt><dd className="preserve-lines">{ride.notes}</dd></>}
         {ride.cancelledAt && <><dt>Cancelled</dt><dd>{new Date(ride.cancelledAt).toLocaleString()}</dd></>}
         {ride.cancellationReason && <><dt>Cancellation reason</dt><dd>{ride.cancellationReason}</dd></>}
-      </dl><p className="notice">Seat booking is not available yet.</p></div>
+      </dl></div>
+      <BookSeats key={ride.id} ride={ride} />
       {user?.id === ride.driver.id && <div className="ride-actions">
         <Link to="/rides/mine">My rides</Link>
-        {canManage(ride) && ride.availableSeats === ride.totalSeats && <>
-          <Link className="button" to={`/rides/${ride.id}/edit`}>Edit ride</Link>
+        <Link to={`/rides/${ride.id}/bookings`}>View passenger bookings</Link>
+        {canManage(ride) && <>
+          {ride.availableSeats === ride.totalSeats && <Link className="button" to={`/rides/${ride.id}/edit`}>Edit ride</Link>}
           <CancelRideDialog ride={ride} cancelled={result => { setRide(result); setMessage('Your ride has been cancelled.'); }} />
         </>}
         <button className="button button-secondary" onClick={() => setRevision(value => value + 1)}>Reload ride</button>

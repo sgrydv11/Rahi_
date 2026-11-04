@@ -1,5 +1,7 @@
 # Test Hoopr Phase 2
 
+Phase 4 is implemented. Use the [booking guide](../phase-4-bookings.md) and [26-request booking collection](Hoopr-Phase-4.postman_collection.json) for seat allocation, retries and both cancellation paths. It creates disposable local accounts and preserves their history. Existing collections remain useful regressions. The bare `/bookings` path remains denied; implemented routes are `/bookings/me`, `/bookings/{id}` and ride-scoped operations.
+
 Phase 3 ride search and management now have a separate [testing guide](../phase-3-rides.md) and `Hoopr-Phase-3.postman_collection.json`. The Phase 2 collection's unfinished-API check now uses `/bookings`, since `/rides` is public. Integration tests now require the dedicated `hoopr_test` database; the former development-schema alternative below is historical and is rejected by the current test guard.
 
 ## What was built
@@ -18,7 +20,7 @@ Phase 3 ride search and management now have a separate [testing guide](../phase-
 | Frontend | Working registration/login forms, validation, profile route, loading/errors, session restoration, and logout |
 | Travel preference | Choose Offer a seat (Driver), Find a seat (Passenger), or Both during registration; profile shows the saved choice |
 
-V2 only adds the role column and refresh-session/token tables. Password hashes and normalized email uniqueness reuse V1. Access tokens stay in frontend memory; refresh tokens stay in HttpOnly cookies, with only hashes in PostgreSQL. The home and ride-preview UI remain available. There is no ride booking/search backend yet, no admin-assignment API, and no password-reset feature.
+V2 only adds the role column and refresh-session/token tables. Password hashes and normalized email uniqueness reuse V1. Access tokens stay in frontend memory; refresh tokens stay in HttpOnly cookies, with only hashes in PostgreSQL. Later phases add ride search and booking APIs; no admin-assignment API or password-reset feature exists.
 
 V3 adds `user_profiles.travel_preference`. Registration accepts `travelPreference` with `DRIVER`, `PASSENGER`, or `BOTH`; login, refresh, registration and `/users/me` return it in the user/profile object. Existing profiles and requests omitting this field default to `BOTH`. Invalid or explicit null values return 400. This describes how someone wants to use Hoopr; all three choices retain the USER security role. The collection registers its first account as BOTH and its second account as DRIVER. To test Passenger manually, use a fresh email and `"travelPreference": "PASSENGER"` in request 04.
 

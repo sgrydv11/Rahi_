@@ -16,6 +16,7 @@ class RideServiceTest {
     UserRepository users = mock(UserRepository.class);
     ProfileRepository profiles = mock(ProfileRepository.class);
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    com.hoopr.booking.BookingService bookings = mock(com.hoopr.booking.BookingService.class);
     UUID owner = UUID.randomUUID();
     Instant now = Instant.parse("2026-01-01T00:00:00Z");
     RideService service;
@@ -23,7 +24,7 @@ class RideServiceTest {
     Create body() { return new Create("Mumbai", "Pune", null, null, now.plusSeconds(86400), "Asia/Kolkata", 3, new BigDecimal("250.00"), "INR", "Blue car", null); }
     Update seats(long version, int seats) { return new Update(version, null, null, null, null, null, null, seats, null, null, null, null); }
     @BeforeEach void setup() {
-        service = new RideService(rides, users, jdbc, Clock.fixed(now, ZoneOffset.UTC), profiles);
+        service = new RideService(rides, users, jdbc, Clock.fixed(now, ZoneOffset.UTC), profiles, bookings);
         UserAccount account = new UserAccount(); account.id = owner; account.status = "ACTIVE";
         when(users.findById(owner)).thenReturn(Optional.of(account));
         ride = new Ride(); ride.id = UUID.randomUUID(); ride.driverId = owner; ride.origin = "Mumbai";
@@ -31,6 +32,7 @@ class RideServiceTest {
         ride.departureAt = now.plusSeconds(86400); ride.totalSeats = ride.availableSeats = 3;
         ride.currency = "INR"; ride.pricePerSeat = new BigDecimal("250.00");
         when(rides.findById(ride.id)).thenReturn(Optional.of(ride));
+        when(rides.lockById(ride.id)).thenReturn(Optional.of(ride));
     }
     @Test void creationDerivesDriverAndInitialAvailability() {
         var result = service.create(owner, body());
@@ -61,7 +63,8 @@ class RideServiceTest {
     @Test void reservedSeatsCannotBeReset() {
         ride.availableSeats = 1;
         assertEquals(409, assertThrows(RideFailure.class, () -> service.update(ride.id, owner, seats(0, 4))).status);
-        assertEquals(409, assertThrows(RideFailure.class, () -> service.cancel(ride.id, owner, new Cancel(0L, null))).status);
+        service.cancel(ride.id, owner, new Cancel(0L, null));
+        verify(bookings).cancelForDriver(ride, owner, null);
     }
     @Test void confirmedBookingAlsoBlocksEditsEvenIfAvailabilityWasInconsistent() {
         when(jdbc.queryForObject(anyString(), eq(Long.class), eq(ride.id))).thenReturn(1L);

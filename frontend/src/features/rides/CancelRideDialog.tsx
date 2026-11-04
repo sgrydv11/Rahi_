@@ -19,6 +19,7 @@ export function CancelRideDialog({ ride, cancelled }: { ride: Ride; cancelled: (
     <dialog ref={dialog} aria-labelledby="cancel-ride-title" onCancel={event => { if (busy) event.preventDefault(); else setOpen(false); }}>
       <h2 id="cancel-ride-title">Cancel this ride?</h2><p>{ride.origin} → {ride.destination}</p>
       <p>The ride will leave search results. Its history and cancellation reason will remain visible on the ride.</p>
+      <p>All active passenger bookings will also be cancelled. {ride.totalSeats - ride.availableSeats} reserved seats will be released.</p>
       <form className="auth-form" onSubmit={submit} aria-busy={busy}>
         <label>Reason (optional)<textarea name="reason" maxLength={500} rows={3} disabled={busy} /></label>
         {error && <p role="alert">{error}</p>}

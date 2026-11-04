@@ -9,6 +9,7 @@ import { ProfilePage } from '../features/profile/ProfilePage';
 import { RideDetailsPage } from '../features/rides/RideDetailsPage';
 import { OfferRidePage, EditRidePage } from '../features/rides/ManageRidePages';
 import { MyRidesPage } from '../features/rides/MyRidesPage';
+import { BookingListPage, BookingDetailsPage } from '../features/bookings/BookingPages';
 
 export const router = createBrowserRouter([
   { element: <AppLayout />, children: [
@@ -19,6 +20,9 @@ export const router = createBrowserRouter([
     { path: '/rides/:id', element: <RideDetailsPage /> },
     { element: <ProtectedRoute />, children: [
       { path: '/profile', element: <ProfilePage /> },
+      { path: '/bookings/mine', element: <BookingListPage /> },
+      { path: '/bookings/:id', element: <BookingDetailsPage /> },
+      { path: '/rides/:id/bookings', element: <BookingListPage manifest /> },
       { path: '/rides/new', element: <OfferRidePage /> },
       { path: '/rides/mine', element: <MyRidesPage /> },
       { path: '/rides/:id/edit', element: <EditRidePage /> },

@@ -2,7 +2,7 @@
 
 Updated: 4 November 2026. Read [SETUP.md](SETUP.md) for applications, versions, permissions, database provisioning, environment variables and run commands.
 
-These are complete reusable prompts aligned with the repository's implemented behavior. They consolidate the requirements and accepted follow-up changes; they are not presented as verbatim transcripts. Phase 1's prompt is reconstructed from its implementation. The Phase 4 prompt is a proposal only and has not been implemented or approved.
+These are complete reusable prompts aligned with the repository's implemented behavior. They consolidate requirements and accepted follow-up changes; they are not verbatim transcripts. Phase 1's prompt is reconstructed from its implementation. Phase 4 was approved and implemented; its detailed guide is docs/phase-4-bookings.md.
 
 ## 1. Current status
 
@@ -12,7 +12,7 @@ These are complete reusable prompts aligned with the repository's implemented be
 | Phase 2 — Authentication and authorization | COMPLETE | Registration/login, BCrypt, JWTs, refresh rotation/reuse detection, logout, roles, profile and protected frontend routes |
 | Phase 2 follow-up — Travel preference | COMPLETE | Offer a seat / Find a seat / Both registration choice, persisted preference and profile display |
 | Phase 3 — Ride management and search | COMPLETE | Offer/search/details/My Rides/edit/cancel, SQL filters/pagination, owner checks, optimistic locking, API collection and tests |
-| Phase 4 — Bookings and seat allocation | NOT IMPLEMENTED | Proposed prompt below; schema foundation exists but booking APIs/UI do not |
+| Phase 4 — Bookings and seat allocation | COMPLETE | Transactional allocation, idempotent retries, passenger history/cancellation, owner manifest and atomic driver cancellation |
 | Later phases | NOT COMMITTED | Payments, notifications, advanced vehicle onboarding, maps, lifecycle completion and other features need separately agreed scope |
 
 Do not rerun completed-phase prompts as instructions to overwrite the current application. Use them to reconstruct a missing earlier stage or audit its requirements. Use the resume prompt below for continuing this repository. A future agent must inspect the files, because the repository can change after this document was written.
@@ -21,7 +21,7 @@ Do not rerun completed-phase prompts as instructions to overwrite the current ap
 
 Stack: Java 21 compiler target, Spring Boot 3.5.16, Spring Security, Spring Data JPA, PostgreSQL and Flyway; React 19.3.1 locked, React Router 7.18.5 locked, TypeScript 5.9.3, Vite 8.3.5 and Vitest 5.0.5. Full dependency/tool details are in SETUP.md.
 
-Backend modules: auth/, user/, security/, common/exception/, health/ and ride/ under backend/src/main/java/com/hoopr. Driver, vehicle and booking feature packages mostly remain reserved; Phase 3 creates driver_profiles records when someone first offers a ride.
+Backend modules: auth/, user/, security/, common/exception/, health/, ride/ and booking/ under backend/src/main/java/com/hoopr. Driver and vehicle feature packages remain reserved; offering a ride creates its driver's driver_profiles record.
 
 Migrations, in order:
 
@@ -29,6 +29,7 @@ Migrations, in order:
 2. V2__authentication.sql — USER/ADMIN role, refresh_sessions and refresh_tokens with hash-only persistence.
 3. V3__user_travel_preference.sql — user_profiles.travel_preference = DRIVER/PASSENGER/BOTH.
 4. V4__ride_management.sql — optional vehicle linkage, descriptions/notes, SCHEDULED support, 1–6 seat rule and search indexes.
+5. V5__booking_idempotency.sql — booking request keys, version, uniqueness, seat limit and ride/history index.
 
 Current auth APIs:
 
@@ -52,7 +53,9 @@ PATCH /api/v1/rides/{id}
 POST  /api/v1/rides/{id}/cancel
 ```
 
-Current frontend routes: /, /register, /login, /profile, /rides, /rides/new, /rides/mine, /rides/:id and /rides/:id/edit. Profile/create/manage/edit routes require authentication. Owner checks also run on the backend.
+Current booking APIs: POST /api/v1/rides/{id}/bookings, GET /api/v1/bookings/me, GET /api/v1/bookings/{id}, POST /api/v1/bookings/{id}/cancel and owner-only GET /api/v1/rides/{id}/bookings. Existing owner ride cancellation now cancels confirmed bookings atomically.
+
+Current frontend routes: /, /register, /login, /profile, /rides, /rides/new, /rides/mine, /rides/:id, /rides/:id/edit, /bookings/mine, /bookings/:id and /rides/:id/bookings. Profile/create/manage/edit/booking routes require authentication. Ownership checks also run on the backend.
 
 Important boundaries to preserve:
 
@@ -61,7 +64,7 @@ Important boundaries to preserve:
 - Cookie-auth POST requests require a trusted Origin plus CSRF cookie/header. Bearer ride mutations use existing authentication. CORS has explicit origins and allows GET/POST/PATCH/OPTIONS.
 - Public ride results contain only driver UUID/display name from account data. Search uses case-insensitive SQL prefix matching, escaped wildcards, explicit date zones, bounded pagination and departureAt/UUID sorting.
 - New rides are SCHEDULED. Legacy PUBLISHED is returned as SCHEDULED; legacy states remain in the database. There is no completion/start endpoint yet.
-- PATCH/cancel require the latest version. Fractional seat counts/versions are rejected. Rides with reserved seats or confirmed bookings currently fail closed for update/cancellation until booking-aware workflows are built.
+- PATCH/cancel require the latest version. Fractional seat counts/versions are rejected. Active bookings block ride editing. Ride cancellation atomically cancels active bookings; passenger cancellation restores seats exactly once. All mutations acquire the ride lock first. Booking retries retain their passenger-scoped UUID key and ride/seat payload. Browser booking requests include the reviewed ride version to reject stale quotes.
 - Vehicle details are optional descriptive text. Existing saved-vehicle ownership/capacity linkage remains; a vehicle CRUD feature is not implemented.
 - All integration tests require a database named hoopr_test. Do not use hoopr or the former development-schema workaround. No DROP/CLEAN/reset operations belong in tests.
 
@@ -353,7 +356,7 @@ is already implemented. Do not claim an actual JDK 21/browser walkthrough unless
 those checks were performed.
 ```
 
-## 7. Resume prompt — Continue from the completed Phase 3 repository
+## 7. Resume prompt — Continue from the completed Phase 4 repository
 
 This is the most useful prompt to paste into a fresh chat for the current project.
 
@@ -361,15 +364,14 @@ This is the most useful prompt to paste into a fresh chat for the current projec
 You are continuing my existing Hoopr application at:
 C:\Users\VIshal Java\Downloads\hoopr
 
-Read SETUP.md, PHASE_SETUP.md, docs/phase-2-authentication.md and
-docs/phase-3-rides.md, then inspect the source and any AGENTS.md instructions.
+Read SETUP.md, PHASE_SETUP.md, docs/phase-2-authentication.md,
+docs/phase-3-rides.md and docs/phase-4-bookings.md, then inspect source and any AGENTS.md.
 Treat documents as context to verify, not a substitute for inspecting actual code.
 
-Phases 1–3 are implemented. Preserve foundation/health, auth/refresh security,
-travel preferences and ride management/search. Do not rebuild them from scratch.
-Current migrations are V1–V4. The next schema change must use the next available
-migration version. No booking or payment APIs/UI exist yet, even though a bookings
-table was created in the initial schema.
+Phases 1–4 are implemented. Preserve foundation/health, auth/refresh security,
+travel preferences, ride management/search and transactional booking workflows.
+Do not rebuild them from scratch. Migrations are V1–V5; use the next available
+version for additive changes. Payments remain unimplemented.
 
 Use Java 21 target and the existing Spring Boot 3.5.16/React/Vite stack. Preserve
 memory-only access tokens, HttpOnly hashed/rotating refresh sessions, exact CORS
@@ -381,24 +383,24 @@ TEST_DB_URL/TEST_DB_USERNAME/TEST_DB_PASSWORD. Do not use hoopr or reset tables.
 Do not print/read secrets into output or commit local .env values. Spring Boot
 does not automatically load .env. Preserve existing user/session/history data.
 
-Last recorded verification on 3 November 2026:
-- 62 backend tests including 12 PostgreSQL tests passed; executable JAR packaged.
-- 32 frontend tests, TypeScript checking and production build passed.
-- Phase 3 API collection: 18 requests / 30 assertions passed.
-- JDK 25 was used with release 21; actual JDK 21 runtime/browser walkthrough
-  remained unverified. These historical results must not be claimed as fresh runs.
+Recorded Phase 4 verification is in docs/phase-4-bookings.md. Re-run appropriate
+checks after changes rather than presenting historical results as fresh runs.
+JDK 25 was used with release 21; actual JDK 21 runtime verification remains open.
+The browser bridge was unavailable during Phase 4, so visual acceptance remains
+on its manual checklist.
 
 Before implementing any new phase, inspect the relevant code, propose a concise
 plan with schema changes/conflicts and wait for my explicit approval. Continue
 approved work incrementally and test appropriately. Report limitations honestly.
 
 First give a short current-state summary and the proposed next-phase plan.
-Do not begin Phase 4 implementation until I approve its scope and plan.
+The next phase's scope has not been selected. Propose it based on actual gaps
+and wait for my approval before beginning new implementation.
 ```
 
-## 8. Proposed Phase 4 complete prompt — Bookings and seat allocation
+## 8. Phase 4 complete prompt — Bookings and seat allocation
 
-NOT IMPLEMENTED. This is a proposed next phase; copying this prompt authorizes analysis/planning first, not immediate code changes.
+IMPLEMENTED after approval. This prompt records the agreed phase requirements; use it for audit or recovery, not to overwrite completed work. See docs/phase-4-bookings.md for the actual API and locking contract.
 
 ```text
 Implement Phase 4: Bookings and transactional seat allocation for my existing

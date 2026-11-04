@@ -20,8 +20,10 @@ public class RideService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final ProfileRepository profiles;
-    public RideService(RideRepository rides, UserRepository users, JdbcTemplate jdbc, Clock clock, ProfileRepository profiles) {
+    private final com.hoopr.booking.BookingService bookings;
+    public RideService(RideRepository rides, UserRepository users, JdbcTemplate jdbc, Clock clock, ProfileRepository profiles, com.hoopr.booking.BookingService bookings) {
         this.rides = rides; this.users = users; this.jdbc = jdbc; this.clock = clock; this.profiles = profiles;
+        this.bookings = bookings;
     }
     @Transactional
     public View create(UUID driver, Create body) {
@@ -65,6 +67,9 @@ public class RideService {
     public View update(UUID id, UUID owner, Update body) {
         active(owner);
         Ride ride = editable(id, owner, body.version());
+        Long reserved = jdbc.queryForObject("SELECT count(*) FROM bookings WHERE ride_id = ? AND status = 'CONFIRMED'", Long.class, id);
+        if (ride.availableSeats != ride.totalSeats || (reserved != null && reserved > 0))
+            throw new RideFailure(409, "Cancel active bookings before editing this ride.");
         if (body.origin() != null) { ride.origin = body.origin().strip(); ride.originKey = locationKey(ride.origin); }
         if (body.destination() != null) { ride.destination = body.destination().strip(); ride.destinationKey = locationKey(ride.destination); }
         validateLocations(ride.origin, ride.destination);
@@ -91,19 +96,17 @@ public class RideService {
     public View cancel(UUID id, UUID owner, Cancel body) {
         active(owner);
         Ride ride = editable(id, owner, body.version());
+        bookings.cancelForDriver(ride, owner, body.reason());
         ride.status = "CANCELLED"; ride.cancellationReason = optional(body.reason());
         ride.cancelledAt = ride.updatedAt = clock.instant(); rides.flush();
         return view(ride);
     }
     private Ride editable(UUID id, UUID owner, long version) {
-        Ride ride = find(id);
+        Ride ride = rides.lockById(id).orElseThrow(() -> new RideFailure(404, "Ride not found."));
         if (!ride.driverId.equals(owner)) throw new RideFailure(403, "Only the ride owner can manage this ride.");
         if (ride.version != version) throw new RideFailure(409, "Ride changed. Reload before trying again.");
         if (!List.of("SCHEDULED", "PUBLISHED").contains(ride.status) || !ride.departureAt.isAfter(clock.instant()))
             throw new RideFailure(409, "Only future scheduled rides can be changed.");
-        Long bookings = jdbc.queryForObject("SELECT count(*) FROM bookings WHERE ride_id = ? AND status = 'CONFIRMED'", Long.class, id);
-        if (ride.availableSeats != ride.totalSeats || (bookings != null && bookings > 0))
-            throw new RideFailure(409, "Rides with reserved seats need booking-aware management, which is not available yet.");
         return ride;
     }
     private void active(UUID user) {

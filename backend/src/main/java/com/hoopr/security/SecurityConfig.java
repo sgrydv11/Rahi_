@@ -37,7 +37,7 @@ public class SecurityConfig {
         var cors = new CorsConfiguration();
         cors.setAllowedOrigins(settings.origins()); cors.setAllowCredentials(true);
         cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN"));
+        cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN", "Idempotency-Key"));
         var source = new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**", cors);
         var filter = new CorsFilter(source);
         filter.setCorsProcessor(new DefaultCorsProcessor() {
@@ -111,6 +111,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/rides/me").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/me", "/api/v1/bookings/{id}", "/api/v1/rides/{id}/bookings").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/rides/{id}/bookings", "/api/v1/bookings/{id}/cancel").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/rides", "/api/v1/rides/{id}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/rides", "/api/v1/rides/{id}/cancel").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/rides/{id}").hasAnyRole("USER", "ADMIN")

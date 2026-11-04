@@ -123,6 +123,7 @@ Do not run separate CREATE TABLE scripts. Flyway creates and upgrades tables usi
 | V2__authentication.sql | USER/ADMIN roles, refresh-session families and hashed refresh tokens |
 | V3__user_travel_preference.sql | DRIVER / PASSENGER / BOTH profile preference; existing profiles default to BOTH |
 | V4__ride_management.sql | Optional saved vehicle, ride descriptions/notes, SCHEDULED status, seat limit and search indexes |
+| V5__booking_idempotency.sql | Booking keys, unique passenger/request index, version, seat limit and ride/history index |
 
 Applied migration files must stay unchanged. Add the next version for future schema changes. Hibernate remains in validate mode. V4 intentionally fails if existing rides exceed six seats; investigate those records instead of deleting history or changing applied migrations.
 
@@ -243,6 +244,9 @@ Current pages:
 | /rides/new | Authenticated offer form |
 | /rides/mine | Authenticated owner history |
 | /rides/:id/edit | Authenticated owner edit form |
+| /bookings/mine | Authenticated passenger booking history |
+| /bookings/:id | Passenger or ride owner booking details |
+| /rides/:id/bookings | Owner passenger manifest |
 
 ## 8. Health and first manual check
 
@@ -253,7 +257,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/health'
 Invoke-RestMethod 'http://localhost:8080/actuator/health'
 ```
 
-Both should return status UP and HTTP 200. Actuator includes database health without internal details. Then register a fresh account, choose Driver/Passenger/Both, log in, offer a future ride, find it through search, edit it, and cancel it after confirmation. Booking is not implemented yet.
+Both should return status UP and HTTP 200. Actuator includes database health without internal details. Register a fresh account, log in, offer a future ride, find it through search and edit it. As a second passenger, review/book seats and cancel a booking; as driver, inspect passenger bookings and cancel the ride. See [Phase 4's testing guide](docs/phase-4-bookings.md). No new environment variables are required for bookings.
 
 The travel preference is informational. All new accounts have USER security role; preference does not assign ADMIN or restrict offering a ride. Log in with the password you registered. Registration requires 12 characters minimum and at most 72 UTF-8 password bytes. Access JWTs last 15 minutes and stay in frontend memory. Refresh cookies restore sessions after reload.
 
@@ -294,7 +298,7 @@ mvn -B '-Dmaven.repo.local=../.maven-repository' '-Dtest=DatabaseMigrationIT' te
 
 That test invokes Flyway and rolls back its own sample row. Other integration tests create UUID-scoped fixtures and remove only those fixtures; they never clean/drop the database. Avoid running multiple integration-test processes concurrently or using hoopr_test for unrelated data while a suite runs.
 
-Last recorded checks, 3 November 2026: **62 backend tests**, **32 frontend tests**, backend executable packaging, TypeScript checking and frontend build passed. The Phase 3 collection passed **18 HTTP requests / 30 assertions**. These are historical verified results, not a claim that tests were rerun for this documentation update. An interactive browser walkthrough and actual JDK 21 runtime verification remain outstanding.
+Phase 4 checks on 4 November 2026: **73 backend tests**, **36 frontend tests**, executable packaging, TypeScript checking and frontend build passed. HTTP collections passed: Phase 4 **26 requests / 42 assertions**, Phase 3 **18 / 30**, Phase 2 **23 / 50**. See [the results and limitations](docs/phase-4-bookings.md). JDK 25 compiled release 21; actual JDK 21 runtime and a fresh Phase 4 interactive browser walkthrough remain unverified because the browser bridge was unavailable.
 
 ## 10. Postman / Thunder Client
 
@@ -323,7 +327,7 @@ psql -h localhost -p 5432 -U hoopr -d hoopr_test -W -c '\dt'
 psql -h localhost -p 5432 -U hoopr -d hoopr_test -W -c 'SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;'
 ```
 
-After current code has started/migrated each database, versions 1–4 should be successful. Application tables are users, user_profiles, driver_profiles, vehicles, rides, bookings, refresh_sessions and refresh_tokens, plus flyway_schema_history. A bookings table exists as foundation only; there is no booking API/UI yet.
+After current code has started/migrated each database, versions 1–5 should be successful. Application tables are users, user_profiles, driver_profiles, vehicles, rides, bookings, refresh_sessions and refresh_tokens, plus flyway_schema_history. Booking APIs/UI now use the existing bookings table with additive V5 metadata.
 
 ## 12. Running packaged output
 

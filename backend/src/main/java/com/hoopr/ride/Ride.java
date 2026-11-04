@@ -8,6 +8,13 @@ import com.hoopr.user.UserProfile;
 
 @Entity @Table(name = "rides")
 public class Ride {
+    public UUID getId() { return id; }
+    public UUID getDriverId() { return driverId; }
+    public String getOrigin() { return origin; }
+    public String getDestination() { return destination; }
+    public Instant getDepartureAt() { return departureAt; }
+    public String getTimeZone() { return timeZone; }
+    public String getStatus() { return status; }
     @Id public UUID id;
     @Column(name = "driver_id", nullable = false) public UUID driverId;
     @ManyToOne(fetch = FetchType.LAZY)

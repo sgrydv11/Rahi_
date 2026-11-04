@@ -19,6 +19,16 @@ import jakarta.validation.ConstraintViolationException;
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(com.hoopr.booking.BookingFailure.class)
+    ProblemDetail handleBooking(com.hoopr.booking.BookingFailure exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatusCode.valueOf(exception.status), exception.getMessage());
+    }
+
+    @ExceptionHandler(org.springframework.dao.PessimisticLockingFailureException.class)
+    ProblemDetail handleBusy(org.springframework.dao.PessimisticLockingFailureException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Ride is busy. Reload before trying again.");
+    }
+
     @ExceptionHandler(com.hoopr.ride.RideFailure.class)
     ProblemDetail handleRide(com.hoopr.ride.RideFailure exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatusCode.valueOf(exception.status), exception.getMessage());

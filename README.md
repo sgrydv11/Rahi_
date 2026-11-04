@@ -2,11 +2,13 @@
 
 Start with [SETUP.md](SETUP.md) for prerequisites, versions, permissions, database setup and run/test commands. See [PHASE_SETUP.md](PHASE_SETUP.md) for completed phases, complete reusable prompts and the proposed next-phase prompt.
 
-Hoopr carpooling application with authentication, ride management and search: React + Vite + TypeScript, a Java 21 Spring Boot modular monolith, and PostgreSQL. Booking and payment logic remain deferred. See [Phase 2 setup, API examples, tests and file inventory](docs/phase-2-authentication.md).
+Hoopr carpooling application with authentication, ride management/search and transactional seat bookings: React + Vite + TypeScript, a Java 21 Spring Boot modular monolith, and PostgreSQL. Payments remain deferred. See [Phase 2 setup, API examples, tests and file inventory](docs/phase-2-authentication.md).
 
 To test the APIs, import the [Postman collection](docs/api/Hoopr-Phase-2.postman_collection.json) and follow the [API testing guide](docs/api/README.md), including manual Thunder Client instructions.
 
 Phase 3 adds ride offers, public search/details and owner management. See the [Phase 3 guide](docs/phase-3-rides.md) and [ride API collection](docs/api/Hoopr-Phase-3.postman_collection.json). PostgreSQL integration tests now require the dedicated `hoopr_test` database.
+
+Phase 4 adds seat confirmation, My Bookings, passenger cancellation, owner manifests and atomic driver cancellation. See the [Phase 4 guide and file inventory](docs/phase-4-bookings.md) and [booking API collection](docs/api/Hoopr-Phase-4.postman_collection.json).
 
 ## Prerequisites
 
@@ -77,7 +79,7 @@ npm run preview
 ```text
 frontend/src/
   app/              Router and responsive application layout
-  features/         Home, auth, profile, rides; reserved vehicles/bookings/history modules
+  features/         Home, auth, profile, rides, bookings; reserved vehicles/history modules
   components/       Shared presentation
   lib/api/          Centralized fetch client and typed errors
   styles/           Responsive global styles
@@ -87,7 +89,8 @@ backend/src/main/
     health/         Health REST endpoint
     common/         Global problem-detail exception handling
     auth/ user/       Authentication, sessions and current-user profile
-    driver/ vehicle/ ride/ booking/  Reserved feature packages
+    ride/ booking/  Ride management, search and transactional bookings
+    driver/ vehicle/  Reserved feature packages
   resources/
     db/migration/   Versioned PostgreSQL schema
 ```
@@ -98,7 +101,7 @@ Feature modules will gain controller, service, repository, entity, and DTO packa
 
 `users` has one personal profile and an optional driver profile. Drivers own vehicles and rides; passengers own bookings against rides. All resource keys are UUIDs, with profile keys referencing the user's UUID. PostgreSQL native UUIDs require no extension; later application services will generate IDs. Event timestamps use `TIMESTAMPTZ`; departure time zones are retained separately.
 
-The migration adds normalized unique emails, foreign keys, vehicle ownership linkage, positive capacities, available-seat bounds, nonnegative prices, currency/status checks, cancellation consistency, a unique confirmed booking per passenger/ride, and search/history indexes. Deletes are restricted to preserve history. `updated_at` will be maintained by future mutation services. Capacity versus vehicle size, booking ownership, valid IANA time zones, lifecycle transitions, and atomic seat allocation need service transactions in later phases. There is no seat-allocation logic or database trigger implementing it now. Phase 2 adds refresh-token families and hashes through V2; V1 is unchanged.
+The initial migration adds normalized unique emails, foreign keys, vehicle ownership linkage, capacities, availability bounds, price/currency/status checks, cancellation consistency, a unique confirmed booking per passenger/ride, and search/history indexes. Deletes are restricted to preserve history. Mutation services maintain timestamps, ownership, time zones and lifecycle rules. V2 adds authentication, V3 travel preferences, V4 ride management and V5 booking idempotency/version metadata. Phase 4 allocates seats atomically in application transactions. Applied migrations remain unchanged.
 
 ## Tests
 
@@ -119,7 +122,7 @@ This explicit integration test is excluded from the default unit-test naming pat
 
 ## Scope
 
-Phases 1–3: foundation, authentication, profile reading, ride offers/search/details and owner updates/cancellation/history. Booking, payments, seat reservation, account/profile editing, and booking-aware ride lifecycle management remain deferred.
+Phases 1–4: foundation, authentication, profile reading, ride offers/search/details, owner management/history and transactional bookings/seat allocation. Payments, account/profile editing, notifications and ride start/completion remain deferred.
 
 ## Phase 1 verification in this workspace
 
