@@ -133,3 +133,4 @@ Phases 1–3: foundation, authentication, profile reading, ride offers/search/de
 - Initial sandboxed npm/Maven network requests and Vite execution were denied; approved reruns succeeded. An initial older Vitest dependency audit failed; patched tooling now passes. A response-reuse error in a test fixture was corrected before the final passing run.
 
 
+# Rahi_
