@@ -81,7 +81,8 @@ function HoldCard({ hold, update, back, openBooking, restored }: {
   hold: SeatHold; update: (hold: SeatHold) => void; back: () => Promise<void>; openBooking: (id: string) => void; restored: boolean;
 }) {
   const checkoutKey = useRef<string | undefined>(undefined);
-  const [started, setStarted] = useState(restored || hold.status === 'PAYMENT_PENDING');
+  const walletKey = useRef<string | undefined>(undefined);
+  const [started, setStarted] = useState(hold.status === 'PAYMENT_PENDING');
   const [now, setNow] = useState(Date.now);
   const action = useAction();
   useEffect(() => {
@@ -96,6 +97,11 @@ function HoldCard({ hold, update, back, openBooking, restored }: {
     <Copy>{message}</Copy>
     <Copy>{hold.seats} seat(s). INR {(hold.quote.totalPaise / 100).toFixed(2)} total.</Copy>
     {active && <Copy>{remaining} seconds left.</Copy>}
+    {active && !started && <Button label="Pay from wallet" disabled={action.busy} onPress={() => action.run(async () => {
+      walletKey.current ??= randomUUID();
+      const result = await groupWalletApi.checkout(hold.id, 'WALLET', walletKey.current);
+      update(result.hold);
+    })} />}
     {active && <Button label="Pay test fare" disabled={action.busy} onPress={() => action.run(async () => {
       checkoutKey.current ??= randomUUID();
       const result = await groupWalletApi.checkout(hold.id, 'PROVIDER', checkoutKey.current);
@@ -119,7 +125,7 @@ function HoldCard({ hold, update, back, openBooking, restored }: {
     })} />}
     {started && payable && <Copy>After checkout, return here and check payment status.</Copy>}
     {hold.status === 'REFUND_PENDING' && <Copy>The payment arrived after the seats were released. Check payment status to process the refund.</Copy>}
-    {started && !hold.bookingId && hold.status !== 'REFUNDED' &&
+    {(started || restored) && !hold.bookingId && hold.status !== 'REFUNDED' &&
       <Button label="Check payment status" disabled={action.busy}
         onPress={() => action.run(async () => update(await groupWalletApi.sync(hold.id)))} />}
     <Button label="Check hold status" disabled={action.busy}

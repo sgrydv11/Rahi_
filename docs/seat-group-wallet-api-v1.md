@@ -1,6 +1,6 @@
 # Open Ride Group and wallet API contract
 
-Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. Authenticated group offers, holds, provider checkout and reconciliation are available. Wallet balance, transaction history and sandbox top-ups are available. Wallet spending, withdrawals and discount endpoints are reserved.
+Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. Authenticated group offers, holds, provider checkout and reconciliation are available. Wallet balance, transaction history and sandbox top-ups are available. Group checkout accepts wallet funds and returns cancelled fares to the original wallet. Sandbox withdrawals reserve funds and settle asynchronously. Discount endpoints are reserved.
 
 Mobile authentication uses JSON requests to `POST /api/v1/mobile/auth/register` with `email`, `password`, `fullName` and optional `travelPreference`, and to `POST /api/v1/mobile/auth/login` with `email` and `password`. Login returns `accessToken`, `expiresIn`, `refreshToken` and `user`. The `refresh` and `logout` endpoints under the same prefix accept the current `refreshToken` in the body. Refresh rotates the token and returns a new session. Logout revokes it and returns 204. The native app stores the refresh token in device secure storage. These endpoints do not set session cookies and reject browser-origin requests.
 
@@ -28,3 +28,7 @@ Paged results use `content`, `page` and `totalPages`. Hold states are `HELD`, `P
 Checkout details use the existing provider shapes. Stripe returns `provider: "stripe"` and `checkoutUrl`. Razorpay returns `provider: "razorpay"`, `keyId` and `orderId`. Group sync uses the stored provider order or session to verify capture server-side. The background reconciliation job also checks unresolved orders. A late capture enters `REFUND_PENDING` and becomes `REFUNDED` after the provider confirms the refund. Wallet operations use `PENDING`, `SUCCEEDED` or `FAILED`.
 
 Use problem JSON with `status`, `detail` and stable `code`. Expected cases include `400 INVALID_REQUEST`, `401 UNAUTHENTICATED`, `404 NOT_FOUND` for missing or non-owned operations, `409 SOLD_OUT`, `409 HOLD_EXPIRED`, `409 INSUFFICIENT_FUNDS`, and `503 PROVIDER_UNAVAILABLE`. Repeat sync and cancel requests are safe. Only a confirmed hold has a booking ID, even if a late capture requires a refund.
+
+Wallet amounts are INR paise. Sandbox top-ups and withdrawals accept 100 to 1,000,000 paise per request. Top-ups use the existing test-provider environment variables and credit the ledger on sync after the provider confirms capture. Group wallet checkout confirms the booking and debits the wallet in one transaction. Cancelling a wallet-paid booking returns the fare to that wallet.
+
+Withdrawals simulate payouts. The server reserves funds at request time and settles pending requests in the background. Set Spring property `hoopr.wallet.sandbox-withdrawals-succeed=false` to simulate rejection and release the reservation. Set `hoopr.wallet.sandbox-withdrawals-enabled=false` to suspend new withdrawal requests and background settlement.

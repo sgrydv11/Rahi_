@@ -4,14 +4,24 @@ import { randomUUID } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import RazorpayCheckout from 'react-native-razorpay';
 import { groupWalletApi } from './api';
-import { parseTopUpPaise } from './groupWallet';
+import { parseTopUpPaise, type WalletOperation } from './groupWallet';
 import { Button, Card, Copy, ErrorText, Field, QueryState, date, useAction, useQuery } from './ui';
 
 const rupees = (paise: number) => 'INR ' + (paise / 100).toFixed(2);
 
 export function Wallet({ userId }: { userId: string }) {
   const storageKey = 'hoopr.wallet-top-up.' + userId;
+  const withdrawalKey = 'hoopr.wallet-withdrawal.' + userId;
   const [input, setInput] = useState('');
+  const [withdrawInput, setWithdrawInput] = useState('');
+  const [withdrawal, setWithdrawal] = useState<WalletOperation>();
+  const recoveredWithdrawal = useQuery(withdrawalKey, async () => {
+    const id = await SecureStore.getItemAsync(withdrawalKey);
+    return { operation: id ? await groupWalletApi.withdrawal(id) : undefined };
+  });
+  const currentWithdrawal = withdrawal ?? recoveredWithdrawal.data?.operation;
+  const withdrawRequest = useRef<{ amount: number; key: string } | undefined>(undefined);
+  const withdrawalAction = useAction();
   const [message, setMessage] = useState('');
   const [page, setPage] = useState(0);
   const pending = useQuery(storageKey, () => SecureStore.getItemAsync(storageKey).then(id => ({ id })));
@@ -22,6 +32,7 @@ export function Wallet({ userId }: { userId: string }) {
   const balance = useQuery('balance', groupWalletApi.wallet);
   const history = useQuery(String(page), () => groupWalletApi.transactions(page));
   const amount = parseTopUpPaise(input);
+  const withdrawalAmount = parseTopUpPaise(withdrawInput);
 
   async function sync(id: string) {
     const operation = await groupWalletApi.syncTopUp(id);
@@ -55,7 +66,7 @@ export function Wallet({ userId }: { userId: string }) {
   return <>
     <Card>
       <Copy>Wallet balance</Copy>
-      {balance.data ? <Copy>{rupees(balance.data.availablePaise)} available</Copy> :
+      {balance.data ? <Copy>{rupees(balance.data.availablePaise)} available · {rupees(balance.data.reservedPaise)} reserved</Copy> :
         <QueryState error={balance.error} reload={balance.reload} />}
       <Copy>Test-mode top-ups</Copy>
       <Field label="Amount in INR (1 to 10,000)" value={input} change={setInput} numeric />
@@ -78,6 +89,33 @@ export function Wallet({ userId }: { userId: string }) {
         onPress={() => action.run(() => sync(activeId))} />}
       {message && <Copy>{message}</Copy>}
       <ErrorText message={action.error || pending.error} />
+    </Card>
+    <Card>
+      <Copy>Sandbox withdrawal</Copy>
+      <Copy>This simulates a payout from the test balance.</Copy>
+      <Field label="Withdrawal amount in INR" value={withdrawInput} change={setWithdrawInput} numeric />
+      <Button label="Request test withdrawal" disabled={withdrawalAction.busy || !recoveredWithdrawal.data ||
+        withdrawalAmount === null || currentWithdrawal?.status === 'PENDING'}
+        onPress={() => withdrawalAction.run(async () => {
+          if (withdrawalAmount === null) return;
+          if (withdrawRequest.current?.amount !== withdrawalAmount) {
+            withdrawRequest.current = { amount: withdrawalAmount, key: randomUUID() };
+          }
+          const next = await groupWalletApi.withdraw(withdrawalAmount, withdrawRequest.current.key);
+          await SecureStore.setItemAsync(withdrawalKey, next.id);
+          withdrawRequest.current = undefined;
+          setWithdrawal(next);
+          balance.reload();
+          history.reload();
+        })} />
+      {currentWithdrawal && <Copy>{rupees(currentWithdrawal.amountPaise)} · {currentWithdrawal.status.toLowerCase()}</Copy>}
+      {currentWithdrawal?.status === 'PENDING' && <Button label="Check withdrawal status" disabled={withdrawalAction.busy}
+        onPress={() => withdrawalAction.run(async () => {
+          setWithdrawal(await groupWalletApi.withdrawal(currentWithdrawal.id));
+          balance.reload();
+          history.reload();
+        })} />}
+      <ErrorText message={withdrawalAction.error || recoveredWithdrawal.error} />
     </Card>
     <Card>
       <Copy>Wallet activity</Copy>

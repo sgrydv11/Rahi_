@@ -40,7 +40,7 @@ export function createGroupWalletClient(send: Send) {
       send<SeatHold>('/group/holds', { method: 'POST', body: { rideId, seats }, key }),
     getHold: (id: string) => send<SeatHold>(holdPath(id)),
     checkout: (id: string, method: 'PROVIDER' | 'WALLET', key: string) =>
-      send<{ hold: SeatHold; checkout?: Checkout }>(`${holdPath(id)}/checkout`, { method: 'POST', body: { method }, key }),
+      send<{ hold: SeatHold; checkout?: Checkout | null }>(`${holdPath(id)}/checkout`, { method: 'POST', body: { method }, key }),
     sync: (id: string, body?: Verification) => send<SeatHold>(`${holdPath(id)}/sync`, { method: 'POST', body }),
     cancel: (id: string) => send<SeatHold>(`${holdPath(id)}/cancel`, { method: 'POST' }),
     wallet: () => send<WalletBalance>('/wallet'),

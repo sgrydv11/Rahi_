@@ -29,6 +29,7 @@ function PaymentPanel({ booking }: { booking: Booking }) {
   const action = useAction();
   if (!result.data) return <QueryState {...result} />;
   const payment = result.data;
+  if (payment.provider === 'wallet') return <Card><Copy>{booking.status.startsWith('CANCELLED_') ? 'Refunded to wallet' : 'Paid from wallet'}</Copy></Card>;
   function update(kind: 'sync' | 'refund') {
     void action.run(async () => {
       await api(`${path}/${kind}`, { method: 'POST' });

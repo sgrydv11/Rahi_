@@ -23,7 +23,7 @@ export interface Vehicle {
 }
 export interface Payment {
   enabled: boolean; canPay: boolean; canRefund: boolean; amount: number; currency: string;
-  provider: 'stripe' | 'razorpay'; checkoutUrl?: string; keyId?: string; orderId?: string;
+  provider: 'stripe' | 'razorpay' | 'wallet'; checkoutUrl?: string; keyId?: string; orderId?: string;
   paymentId?: string; paidAt?: string; refundId?: string; refundStatus?: string;
 }
 export interface Notice { id: string; kind: string; origin: string; destination: string; time: string; link: string }

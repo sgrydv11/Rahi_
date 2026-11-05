@@ -83,3 +83,13 @@ test('converts wallet input to exact paise and rejects unsupported amounts', () 
     assert.equal(parseTopUpPaise(invalid), null);
   }
 });
+
+test('checks the status of the exact withdrawal or recovered top-up', async () => {
+  const { client, requests } = fixture();
+  await client.withdrawal('withdrawal/one');
+  await client.getTopUp('topup/one');
+  assert.deepEqual(requests, [
+    { path: '/wallet/withdrawals/withdrawal%2Fone', options: undefined },
+    { path: '/wallet/top-ups/topup%2Fone', options: undefined },
+  ]);
+});
