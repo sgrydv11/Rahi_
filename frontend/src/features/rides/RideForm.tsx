@@ -1,9 +1,19 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { listVehicles, type Vehicle } from '../vehicles/VehiclesPage';
 import { localDateTime, validateRide, type Ride, type RideInput } from './api';
 import { errorMessage } from '../auth/auth';
 export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) => Promise<void> }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  useEffect(() => {
+    if (ride) return;
+    const controller = new AbortController();
+    listVehicles(controller.signal)
+      .then(items => { if (!controller.signal.aborted) setVehicles(items.filter(item => item.active)); })
+      .catch(failure => { if (!controller.signal.aborted) setError(errorMessage(failure)); });
+    return () => controller.abort();
+  }, [ride]);
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError('');
@@ -16,6 +26,7 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       dropoffDescription: text('dropoffDescription'), departureAt: date.toISOString(), timeZone,
       totalSeats: Number(text('totalSeats')), pricePerSeat: text('pricePerSeat'), currency: text('currency').toUpperCase(),
       vehicleDetails: text('vehicleDetails'), notes: text('notes'),
+      vehicleId: text('vehicleId') || undefined,
     };
     const invalid = validateRide(body); if (invalid) { setError(invalid); return; }
     setBusy(true);
@@ -32,6 +43,12 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       <label>Currency<input name="currency" required pattern="[A-Za-z]{3}" maxLength={3} defaultValue={ride?.currency ?? 'INR'} /></label>
       <label>Pickup description (optional)<input name="pickupDescription" maxLength={500} defaultValue={ride?.pickupDescription ?? ''} /></label>
       <label>Drop-off description (optional)<input name="dropoffDescription" maxLength={500} defaultValue={ride?.dropoffDescription ?? ''} /></label>
+      {!ride && vehicles.length > 0 && <label>Saved vehicle<select name="vehicleId" defaultValue="">
+        <option value="">Enter vehicle details manually</option>
+        {vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>
+          {vehicle.make} {vehicle.model} ({vehicle.passengerCapacity} seats)
+        </option>)}
+      </select></label>}
       <label className="form-wide">Vehicle details (optional)<input name="vehicleDetails" maxLength={300} placeholder="For example, blue Suzuki Swift" defaultValue={ride?.vehicleDetails ?? ''} /></label>
       <label className="form-wide">Notes (optional)<textarea name="notes" maxLength={2000} rows={4} defaultValue={ride?.notes ?? ''} /></label>
       <p className="notice form-wide">Departure is entered in {timeZone}. Ride descriptions and notes are public. Leave out private contact details.</p>

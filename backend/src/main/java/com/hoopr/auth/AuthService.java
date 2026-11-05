@@ -108,6 +108,21 @@ public class AuthService {
         return new Profile(user.id, user.email, profile == null ? "" : profile.fullName, user.role,
                 profile == null ? TravelPreference.BOTH : profile.travelPreference);
     }
+    @Transactional
+    public Profile updateProfile(UUID id, String fullName, TravelPreference preference) {
+        Profile current = profile(id);
+        UserProfile profile = profiles.findById(id).orElseGet(() -> {
+            UserProfile created = new UserProfile();
+            created.userId = id;
+            created.createdAt = clock.instant();
+            return created;
+        });
+        profile.fullName = fullName.strip();
+        profile.travelPreference = preference;
+        profile.updatedAt = clock.instant();
+        profiles.save(profile);
+        return new Profile(id, current.email(), profile.fullName, current.role(), preference);
+    }
     private Issued issue(UserAccount user, RefreshSession session) {
         byte[] bytes = new byte[32]; random.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);

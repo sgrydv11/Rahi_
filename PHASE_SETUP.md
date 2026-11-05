@@ -14,6 +14,11 @@ These are complete reusable prompts aligned with the repository's implemented be
 | Phase 3 — Ride management and search | COMPLETE | Offer/search/details/My Rides/edit/cancel, SQL filters/pagination, owner checks, optimistic locking, API collection and tests |
 | Phase 4 — Bookings and seat allocation | COMPLETE | Transactional allocation, idempotent retries, passenger history/cancellation, owner manifest and atomic driver cancellation |
 | Phase 5 — Ride start and completion | COMPLETE | Driver-only versioned transitions and passenger trip status |
+| Phase 6 — Post-trip driver ratings | COMPLETE | One score per confirmed booking on a completed ride, visible to the passenger and driver |
+| Phase 7 — In-app notifications | COMPLETE | Booking confirmations, cancellations and departure reminders |
+| Phase 8 — Profiles and vehicles | COMPLETE | Profile editing, private vehicle management and vehicle selection on ride offers |
+| Phase 9 — Maps and routing | COMPLETE | Public meeting pins, straight-line distance and driving directions link |
+| Phase 10 — Payments and refunds | IMPLEMENTED | Razorpay or Stripe test checkout, receipts and full refunds for eligible cancelled bookings. Provider sandbox verification requires test keys |
 | Later phases | NOT COMMITTED | Payments, notifications, advanced vehicle onboarding, maps and other features need separately agreed scope |
 
 Do not rerun completed-phase prompts as instructions to overwrite the current application. Use them to reconstruct a missing earlier stage or audit its requirements. Use the resume prompt below for continuing this repository. A future agent must inspect the files, because the repository can change after this document was written.
@@ -31,6 +36,9 @@ Migrations, in order:
 3. V3__user_travel_preference.sql — user_profiles.travel_preference = DRIVER/PASSENGER/BOTH.
 4. V4__ride_management.sql — optional vehicle linkage, descriptions/notes, SCHEDULED support, 1–6 seat rule and search indexes.
 5. V5__booking_idempotency.sql — booking request keys, version, uniqueness, seat limit and ride/history index.
+6. V6__booking_ratings.sql — optional score and submission timestamp with a booking constraint.
+7. V7__booking_payments.sql — unique Razorpay order, capture and refund records by booking.
+8. V8__payment_provider.sql — records the provider for each order and accommodates Stripe session IDs.
 
 Current auth APIs:
 
@@ -357,7 +365,7 @@ is already implemented. Do not claim an actual JDK 21/browser walkthrough unless
 those checks were performed.
 ```
 
-## 7. Resume prompt — Continue from the completed Phase 5 repository
+## 7. Resume prompt — Continue from the Phase 10 repository
 
 This is the most useful prompt to paste into a fresh chat for the current project.
 
@@ -366,14 +374,15 @@ You are continuing my existing Hoopr application at:
 C:\Users\VIshal Java\Downloads\hoopr
 
 Read SETUP.md, PHASE_SETUP.md, docs/phase-2-authentication.md,
-docs/phase-3-rides.md, docs/phase-4-bookings.md and docs/phase-5-ride-lifecycle.md,
+docs/phase-3-rides.md, docs/phase-4-bookings.md, docs/phase-5-ride-lifecycle.md and docs/phase-6-ratings.md,
 then inspect source and any AGENTS.md.
 Treat documents as context to verify, not a substitute for inspecting actual code.
 
-Phases 1–5 are implemented. Preserve foundation/health, auth/refresh security,
-travel preferences, ride management/search, transactional booking and ride lifecycle.
-Do not rebuild them from scratch. Migrations are V1–V5; use the next available
-version for additive changes. Payments remain unimplemented.
+Phases 1–10 are implemented. Preserve foundation/health, auth/refresh security,
+travel preferences, ride management/search, transactional booking, ride lifecycle,
+ratings, notifications, profile editing, vehicles, route pins and payment test checkout.
+Migrations are V1–V8. Use the next available version for additive changes.
+Read docs/phase-10-razorpay.md for provider configuration and verification scope.
 
 Use Java 21 target and the existing Spring Boot 3.5.16/React/Vite stack. Preserve
 memory-only access tokens, HttpOnly hashed/rotating refresh sessions, exact CORS

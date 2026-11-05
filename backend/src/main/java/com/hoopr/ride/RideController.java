@@ -36,6 +36,10 @@ public class RideController {
     @PatchMapping("/{id}") public View update(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Update body) {
         return rides.update(id, user(jwt), body);
     }
+    @PatchMapping("/{id}/route")
+    public View route(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RouteChange body) {
+        return rides.updateRoute(id, user(jwt), body);
+    }
     @PostMapping("/{id}/cancel") public View cancel(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Cancel body) {
         return rides.cancel(id, user(jwt), body);
     }

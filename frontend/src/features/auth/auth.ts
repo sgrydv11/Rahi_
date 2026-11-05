@@ -21,6 +21,11 @@ const publish = (next: Session | null) => {
 export const authStore = {
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   snapshot: () => session?.user ?? null,
+  updateProfile(user: User) {
+    if (session?.user.id !== user.id) return;
+    session = { ...session, user };
+    listeners.forEach(listener => listener());
+  },
 };
 async function mutate<T>(path: string, body?: unknown): Promise<T> {
   csrfPending ??= request<{ token: string; headerName: string }>('/auth/csrf', { credentials: 'include' })

@@ -3,6 +3,9 @@ package com.hoopr.booking;
 import com.hoopr.auth.AuthService;
 import com.hoopr.database.TestDatabase;
 import com.hoopr.ride.*;
+import com.hoopr.payment.RazorpayGateway;
+import com.hoopr.payment.StripeGateway;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
@@ -13,13 +16,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.*;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.http.MediaType;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest(properties = {
+    "PAYMENT_PROVIDER=razorpay",
     "hoopr.auth.jwt-secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "hoopr.auth.issuer=hoopr-test",
     "hoopr.auth.origins=http://localhost:5173", "hoopr.auth.cookie-secure=true",
     "hoopr.auth.cookie-same-site=Lax", "hoopr.auth.refresh-lifetime=30d"
@@ -36,6 +42,9 @@ class BookingIT {
     @Autowired RideService rides;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+    @Autowired ObjectMapper json;
+    @MockitoBean RazorpayGateway gateway;
+    @MockitoBean StripeGateway stripe;
     UUID owner, passenger, stranger;
     String ownerToken, passengerToken, strangerToken;
     Instant departure;
@@ -52,6 +61,10 @@ class BookingIT {
         strangerToken = "Bearer " + auth.login(c, "booking-test-password").access.accessToken();
     }
     @AfterEach void cleanup() {
+        if (owner != null) jdbc.update("""
+                DELETE FROM booking_payments WHERE booking_id IN
+                    (SELECT b.id FROM bookings b JOIN rides r ON r.id = b.ride_id WHERE r.driver_id = ?)
+                """, owner);
         if (owner != null) jdbc.update("DELETE FROM bookings WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
         for (UUID user : Arrays.asList(owner, passenger, stranger)) {
             if (user == null) continue;
@@ -64,6 +77,206 @@ class BookingIT {
         }
     }
     RideDtos.View offer(int seats) { return rides.create(owner, new RideDtos.Create("Mumbai", "Pune", null, null, departure, "Asia/Kolkata", seats, new BigDecimal("125.50"), "INR", null, null)); }
+    @Test void razorpayCaptureAndRefundAreVerifiedAndRetrySafe() throws Exception {
+        var ride = offer(3);
+        UUID booking = bookings.create(ride.id(), passenger, UUID.randomUUID(), 2).booking().id();
+        String path = "/api/v1/bookings/" + booking + "/payment";
+        mvc.perform(get(path).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(false));
+        mvc.perform(post(path + "/order").header("Authorization", passengerToken))
+                .andExpect(status().isServiceUnavailable());
+        mvc.perform(post(path + "/order").header("Authorization", strangerToken)).andExpect(status().isNotFound());
+        when(gateway.enabled()).thenReturn(true);
+        when(gateway.keyId()).thenReturn("rzp_test_fixture");
+        when(gateway.order(booking, 25100)).thenReturn(json.readTree("""
+                {"id":"order_fixture","amount":25100,"currency":"INR"}
+                """));
+        for (int attempt = 0; attempt < 2; attempt++)
+            mvc.perform(post(path + "/order").header("Authorization", passengerToken))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.orderId").value("order_fixture"))
+                    .andExpect(jsonPath("$.amount").value(25100));
+        verify(gateway, times(1)).order(booking, 25100);
+
+        String signature = "a".repeat(64);
+        String body = "{\"paymentId\":\"pay_fixture\",\"signature\":\"" + signature + "\"}";
+        mvc.perform(post(path + "/verify").header("Authorization", passengerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+        when(gateway.validSignature("order_fixture", "pay_fixture", signature)).thenReturn(true);
+        when(gateway.payment("pay_fixture")).thenReturn(json.readTree("""
+                {"id":"pay_fixture","order_id":"order_fixture","amount":100,"currency":"INR","status":"captured"}
+                """));
+        mvc.perform(post(path + "/verify").header("Authorization", passengerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isConflict());
+        when(gateway.payment("pay_fixture")).thenReturn(json.readTree("""
+                {"id":"pay_fixture","order_id":"order_fixture","amount":25100,"currency":"INR","status":"captured"}
+                """));
+        mvc.perform(post(path + "/verify").header("Authorization", passengerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").value("pay_fixture")).andExpect(jsonPath("$.paidAt").isNotEmpty());
+        mvc.perform(post(path + "/refund").header("Authorization", passengerToken)).andExpect(status().isConflict());
+        bookings.cancel(booking, passenger, "Payment test");
+        when(gateway.refund(booking, "pay_fixture", 25100)).thenReturn(json.readTree("""
+                {"id":"rfnd_fixture","payment_id":"pay_fixture","amount":25100,"status":"pending"}
+                """));
+        for (int attempt = 0; attempt < 2; attempt++)
+            mvc.perform(post(path + "/refund").header("Authorization", passengerToken))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.refundStatus").value("pending"));
+        verify(gateway, times(1)).refund(booking, "pay_fixture", 25100);
+        when(gateway.refundStatus("pay_fixture", "rfnd_fixture")).thenReturn(json.readTree("""
+                {"id":"rfnd_fixture","payment_id":"pay_fixture","amount":25100,"status":"processed"}
+                """));
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.refundStatus").value("processed"));
+        invariant(ride.id());
+    }
+
+    @Test void syncRecoversOnlyAnExactCapturedPaymentFromTheStoredOrder() throws Exception {
+        var ride = offer(2);
+        UUID booking = bookings.create(ride.id(), passenger, UUID.randomUUID(), 1).booking().id();
+        String path = "/api/v1/bookings/" + booking + "/payment";
+        when(gateway.enabled()).thenReturn(true);
+        when(gateway.order(booking, 12550)).thenReturn(json.readTree("""
+                {"id":"order_sync","amount":12550,"currency":"INR"}
+                """));
+        mvc.perform(post(path + "/order").header("Authorization", passengerToken)).andExpect(status().isOk());
+        when(gateway.orderPayments("order_sync")).thenReturn(json.readTree("""
+                [{"id":"pay_wrong","order_id":"order_other","amount":12550,"currency":"INR","status":"captured"},
+                 {"id":"pay_pending","order_id":"order_sync","amount":12550,"currency":"INR","status":"authorized"}]
+                """));
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.paymentId").doesNotExist());
+        when(gateway.orderPayments("order_sync")).thenReturn(json.readTree("""
+                [{"id":"pay_sync","order_id":"order_sync","amount":12550,"currency":"INR","status":"captured"}]
+                """));
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.paymentId").value("pay_sync"));
+    }
+
+    @Test void storedStripeProviderControlsCheckoutCaptureAndRefund() throws Exception {
+        var ride = offer(2);
+        UUID booking = bookings.create(ride.id(), passenger, UUID.randomUUID(), 1).booking().id();
+        jdbc.update("""
+                INSERT INTO booking_payments (booking_id, provider, order_id, amount, currency)
+                VALUES (?, 'stripe', 'cs_test_fixture', 12550, 'INR')
+                """, booking);
+        String path = "/api/v1/bookings/" + booking + "/payment";
+        when(stripe.enabled()).thenReturn(true);
+        String session = """
+                {"id":"cs_test_fixture","client_reference_id":"%s","livemode":false,"mode":"payment",
+                 "currency":"inr","amount_total":12550,"status":"open","payment_status":"unpaid",
+                 "url":"https://checkout.stripe.com/c/pay/fixture"}
+                """.formatted(booking);
+        when(stripe.session("cs_test_fixture")).thenReturn(json.readTree(session));
+        mvc.perform(post(path + "/order").header("Authorization", passengerToken)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.provider").value("stripe"))
+                .andExpect(jsonPath("$.checkoutUrl").value("https://checkout.stripe.com/c/pay/fixture"));
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").doesNotExist());
+        String paid = session.replace("\"open\"", "\"complete\"").replace("\"unpaid\"", "\"paid\"")
+                .replace("\"url\"", "\"payment_intent\":\"pi_fixture\",\"url\"");
+        when(stripe.session("cs_test_fixture")).thenReturn(json.readTree(paid.replace("12550", "100")));
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken)).andExpect(status().isBadGateway());
+        when(stripe.session("cs_test_fixture")).thenReturn(json.readTree(paid));
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").value("pi_fixture"));
+        bookings.cancel(booking, passenger, "Stripe test");
+        when(stripe.refund(booking, "pi_fixture", 12550)).thenReturn(json.readTree("""
+                {"id":"re_fixture","payment_intent":"pi_fixture","amount":12550,"currency":"inr","status":"succeeded"}
+                """));
+        mvc.perform(post(path + "/refund").header("Authorization", passengerToken)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.refundStatus").value("processed"));
+        verifyNoInteractions(gateway);
+    }
+    @Test void inboxIsPrivateAndRemindersFollowCurrentBookingState() throws Exception {
+        departure = Instant.now().plusSeconds(3600);
+        var ride = offer(2);
+        var booking = bookings.create(ride.id(), passenger, UUID.randomUUID(), 1).booking();
+        String inbox = "/api/v1/notifications";
+        mvc.perform(get(inbox)).andExpect(status().isUnauthorized());
+        mvc.perform(get(inbox).header("Authorization", strangerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get(inbox).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].kind").value("DEPARTURE_REMINDER"))
+                .andExpect(jsonPath("$[1].kind").value("BOOKING_CONFIRMED"))
+                .andExpect(jsonPath("$[1].link").value("/bookings/" + booking.id()));
+        mvc.perform(get(inbox).header("Authorization", ownerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].link").value("/rides/" + ride.id()));
+        bookings.cancel(booking.id(), passenger, "Plans changed");
+        mvc.perform(get(inbox).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].kind").value("CANCELLED_BY_PASSENGER"));
+        mvc.perform(get(inbox).header("Authorization", ownerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[1].kind").value("CANCELLED_BY_PASSENGER"));
+    }
+    void finishRide(UUID id) {
+        jdbc.update("UPDATE rides SET departure_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = ?", id);
+        var started = rides.start(id, owner, rides.details(id, owner).version());
+        rides.complete(id, owner, started.version());
+    }
+
+    @Test void ratingRequiresConfirmedCompletedBookingAndPassengerIdentity() throws Exception {
+        var ride = offer(3);
+        var booking = bookings.create(ride.id(), passenger, UUID.randomUUID(), 1).booking();
+        var cancelled = bookings.create(ride.id(), stranger, UUID.randomUUID(), 1).booking();
+        bookings.cancel(cancelled.id(), stranger, "Plans changed");
+        String path = "/api/v1/bookings/" + booking.id() + "/rating";
+        mvc.perform(post(path).header("Authorization", passengerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"score\":5}"))
+                .andExpect(status().isConflict());
+        finishRide(ride.id());
+        for (String token : List.of(ownerToken, strangerToken)) {
+            mvc.perform(post(path).header("Authorization", token)
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"score\":5}"))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(post(path).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"score\":5}"))
+                .andExpect(status().isUnauthorized());
+        for (String invalid : List.of("{}", "{\"score\":0}", "{\"score\":6}", "{\"score\":4.5}",
+                "{\"score\":5,\"driverId\":\"other\"}")) {
+            mvc.perform(post(path).header("Authorization", passengerToken)
+                            .contentType(MediaType.APPLICATION_JSON).content(invalid))
+                    .andExpect(status().isBadRequest());
+        }
+        assertEquals(409, assertThrows(BookingFailure.class, () -> bookings.rate(cancelled.id(), stranger, 5)).status);
+        assertNull(bookings.details(booking.id(), passenger).rating());
+        mvc.perform(post(path).header("Authorization", passengerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"score\":5}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rating.score").value(5))
+                .andExpect(jsonPath("$.rating.ratedAt").isNotEmpty());
+        var persisted = bookings.details(booking.id(), owner);
+        var replay = bookings.rate(booking.id(), passenger, 5);
+        assertEquals(persisted.rating(), replay.rating());
+        assertEquals(persisted.version(), replay.version());
+        assertEquals(409, assertThrows(BookingFailure.class, () -> bookings.rate(booking.id(), passenger, 4)).status);
+        mvc.perform(get("/api/v1/bookings/" + booking.id()).header("Authorization", strangerToken))
+                .andExpect(status().isForbidden());
+        assertEquals(5, bookings.details(booking.id(), passenger).rating().score());
+        invariant(ride.id());
+    }
+
+    @Test void concurrentDifferentRatingsCannotOverwriteTheWinner() throws Exception {
+        var ride = offer(2);
+        UUID id = bookings.create(ride.id(), passenger, UUID.randomUUID(), 1).booking().id();
+        finishRide(ride.id());
+        var ready = new CyclicBarrier(2);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> tryRate(id, 3, ready));
+            var second = executor.submit(() -> tryRate(id, 5, ready));
+            int a = first.get(10, TimeUnit.SECONDS), b = second.get(10, TimeUnit.SECONDS);
+            assertEquals(1, java.util.stream.IntStream.of(a, b).filter(value -> value == 409).count());
+            assertEquals(a == 409 ? b : a, bookings.details(id, owner).rating().score());
+        }
+    }
+
+    private int tryRate(UUID id, int score, CyclicBarrier ready) throws Exception {
+        ready.await(5, TimeUnit.SECONDS);
+        try {
+            return bookings.rate(id, passenger, score).rating().score();
+        } catch (BookingFailure conflict) {
+            return conflict.status;
+        }
+    }
     void invariant(UUID ride) {
         assertEquals(rides.details(ride, owner).totalSeats(), jdbc.queryForObject("SELECT r.available_seats + coalesce(sum(b.seats_booked) FILTER (WHERE b.status = 'CONFIRMED'),0) FROM rides r LEFT JOIN bookings b ON b.ride_id=r.id WHERE r.id=? GROUP BY r.id", Integer.class, ride));
     }

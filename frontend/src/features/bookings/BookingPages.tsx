@@ -4,6 +4,9 @@ import { useAuth } from '../auth/AuthContext';
 import { errorMessage } from '../auth/auth';
 import { Pagination } from '../rides/RideComponents';
 import { bookingsApi, bookingStatus, type Booking, type BookingPage } from './api';
+import { BookingRating } from './BookingRating';
+import { RoutePreview } from '../rides/RoutePanel';
+import { BookingPayment } from './BookingPayment';
 
 function BookingCard({ booking }: { booking: Booking }) {
   return <article className="panel ride-card"><div><p className="eyebrow">{bookingStatus(booking.status)}</p>
@@ -54,15 +57,30 @@ export function BookingDetailsPage() {
     try { setBooking(await bookingsApi.cancel(id, reason)); setConfirm(false); setMessage('Cancellation recorded. Your seats have been released.'); }
     catch (failure) { setError(errorMessage(failure)); } finally { setBusy(false); }
   }
+  async function rate(score: number) {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      setBooking(await bookingsApi.rate(id, score));
+      setMessage('Rating saved.');
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
   return <section className="page"><Link to="/bookings/mine">← My bookings</Link><h1>Booking details.</h1>
     {loading ? <p role="status">Loading booking…</p> : booking ? <>
       {message && <p role="status">{message}</p>}<BookingCard booking={booking} />
       <div className="panel"><p>Booking reference: {booking.id}</p><p>Price agreed: {booking.currency} {Number(booking.pricePerSeat).toFixed(2)} per seat.</p>
-        <p>No payment is collected by Hoopr in this phase.</p>
         {booking.cancelledAt && <p>Cancelled: {new Date(booking.cancelledAt).toLocaleString()}</p>}
         {booking.cancellationReason && <p>Reason: {booking.cancellationReason}</p>}
         {booking.ride.status !== 'IN_PROGRESS' && <Link to={`/rides/${booking.ride.id}`}>View ride</Link>}
       </div>
+      <BookingRating booking={booking} viewerId={user?.id} busy={busy} onRate={rate} />
+      {booking.ride.route && <RoutePreview pins={booking.ride.route} />}
+      {user?.id === booking.passenger.id && <BookingPayment key={booking.id} booking={booking} />}
       {booking.canCancel && user?.id === booking.passenger.id && (!confirm ? <button className="button button-danger" onClick={() => setConfirm(true)}>Cancel booking</button> :
         <form className="panel auth-form" onSubmit={cancel} aria-busy={busy}><h2>Cancel this booking?</h2><p>All {booking.seats} seats in this booking will be released.</p>
           <label>Reason (optional)<textarea name="reason" maxLength={500} disabled={busy} /></label>

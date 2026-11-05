@@ -38,6 +38,19 @@ public class RideService {
         ride.originKey = locationKey(ride.origin); ride.destinationKey = locationKey(ride.destination);
         ride.pickupDescription = optional(body.pickupDescription()); ride.dropoffDescription = optional(body.dropoffDescription());
         ride.vehicleDetails = optional(body.vehicleDetails()); ride.notes = optional(body.notes());
+        if (body.vehicleId() != null) {
+            var vehicle = jdbc.query("""
+                    SELECT make, model, color, passenger_capacity FROM vehicles
+                    WHERE id = ? AND driver_id = ? AND active FOR UPDATE
+                    """, (row, index) -> new VehicleSnapshot(
+                    String.join(" ", Objects.toString(row.getString("color"), ""),
+                            row.getString("make"), row.getString("model")).strip(),
+                    row.getInt("passenger_capacity")), body.vehicleId(), driver)
+                    .stream().findFirst().orElseThrow(() -> new RideFailure(404, "Active vehicle not found."));
+            if (body.totalSeats() > vehicle.capacity()) throw new RideFailure(400, "Seats exceed the linked vehicle capacity.");
+            ride.vehicleId = body.vehicleId();
+            ride.vehicleDetails = vehicle.description();
+        }
         ride.departureAt = body.departureAt(); ride.timeZone = zone(body.timeZone()).getId();
         ride.totalSeats = body.totalSeats().shortValue(); ride.availableSeats = ride.totalSeats;
         ride.pricePerSeat = body.pricePerSeat(); ride.currency = body.currency(); ride.status = "SCHEDULED";
@@ -67,9 +80,11 @@ public class RideService {
     public View update(UUID id, UUID owner, Update body) {
         active(owner);
         Ride ride = editable(id, owner, body.version());
-        Long reserved = jdbc.queryForObject("SELECT count(*) FROM bookings WHERE ride_id = ? AND status = 'CONFIRMED'", Long.class, id);
-        if (ride.availableSeats != ride.totalSeats || (reserved != null && reserved > 0))
-            throw new RideFailure(409, "Cancel active bookings before editing this ride.");
+        requireUnreserved(ride);
+        if ((body.origin() != null && !ride.origin.equals(body.origin().strip())) ||
+                (body.destination() != null && !ride.destination.equals(body.destination().strip()))) {
+            ride.pickupLatitude = ride.pickupLongitude = ride.dropoffLatitude = ride.dropoffLongitude = null;
+        }
         if (body.origin() != null) { ride.origin = body.origin().strip(); ride.originKey = locationKey(ride.origin); }
         if (body.destination() != null) { ride.destination = body.destination().strip(); ride.destinationKey = locationKey(ride.destination); }
         validateLocations(ride.origin, ride.destination);
@@ -78,7 +93,7 @@ public class RideService {
         validateDeparture(ride.departureAt, ride.timeZone);
         if (body.totalSeats() != null) {
             if (ride.vehicleId != null) {
-                Integer capacity = jdbc.queryForObject("SELECT passenger_capacity FROM vehicles WHERE id = ? AND driver_id = ?", Integer.class, ride.vehicleId, owner);
+                Integer capacity = jdbc.queryForObject("SELECT passenger_capacity FROM vehicles WHERE id = ? AND driver_id = ? FOR UPDATE", Integer.class, ride.vehicleId, owner);
                 if (capacity == null || body.totalSeats() > capacity) throw new RideFailure(400, "Seats exceed the linked vehicle capacity.");
             }
             ride.totalSeats = body.totalSeats().shortValue(); ride.availableSeats = ride.totalSeats;
@@ -91,6 +106,32 @@ public class RideService {
         if (body.notes() != null) ride.notes = optional(body.notes());
         ride.updatedAt = clock.instant(); rides.flush();
         return view(ride);
+    }
+    @Transactional
+    public View updateRoute(UUID id, UUID owner, RouteChange change) {
+        active(owner);
+        Ride ride = editable(id, owner, change.version());
+        requireUnreserved(ride);
+        Point pickup = change.pickup();
+        Point dropoff = change.dropoff();
+        if ((pickup == null) != (dropoff == null))
+            throw new RideFailure(400, "Provide both pickup and drop-off pins.");
+        if (pickup != null && pickup.latitude().compareTo(dropoff.latitude()) == 0 &&
+                pickup.longitude().compareTo(dropoff.longitude()) == 0)
+            throw new RideFailure(400, "Pickup and drop-off pins must be different.");
+        ride.pickupLatitude = pickup == null ? null : pickup.latitude();
+        ride.pickupLongitude = pickup == null ? null : pickup.longitude();
+        ride.dropoffLatitude = dropoff == null ? null : dropoff.latitude();
+        ride.dropoffLongitude = dropoff == null ? null : dropoff.longitude();
+        ride.updatedAt = clock.instant();
+        rides.flush();
+        return view(ride);
+    }
+
+    private void requireUnreserved(Ride ride) {
+        Long reserved = jdbc.queryForObject("SELECT count(*) FROM bookings WHERE ride_id = ? AND status = 'CONFIRMED'", Long.class, ride.id);
+        if (ride.availableSeats != ride.totalSeats || (reserved != null && reserved > 0))
+            throw new RideFailure(409, "Cancel active bookings before editing this ride.");
     }
     @Transactional
     public View cancel(UUID id, UUID owner, Cancel body) {
@@ -145,6 +186,7 @@ public class RideService {
             throw new RideFailure(409, "Only future scheduled rides can be changed.");
         return ride;
     }
+    private record VehicleSnapshot(String description, int capacity) { }
     private void active(UUID user) {
         if (users.findById(user).filter(u -> "ACTIVE".equals(u.status)).isEmpty())
             throw new RideFailure(401, "Account is unavailable. Please log in.");
@@ -184,6 +226,6 @@ public class RideService {
                 ride.totalSeats, ride.availableSeats, ride.pricePerSeat, ride.currency, ride.vehicleDetails,
                 ride.notes, "PUBLISHED".equals(ride.status) ? "SCHEDULED" : ride.status, ride.version,
                 ride.createdAt, ride.updatedAt, ride.cancelledAt, ride.cancellationReason,
-                ride.startedAt, ride.completedAt, canStart(ride, clock.instant()));
+                ride.startedAt, ride.completedAt, canStart(ride, clock.instant()), routePins(ride));
     }
 }

@@ -5,6 +5,7 @@ import { errorMessage } from '../auth/auth';
 import { canManage, departureLabel, money, ridesApi, type Ride } from './api';
 import { CancelRideDialog } from './CancelRideDialog';
 import { BookSeats } from '../bookings/BookSeats';
+import { RouteEditor, RoutePreview } from './RoutePanel';
 export function RideDetailsPage() {
   const { id = '' } = useParams();
   const { user } = useAuth();
@@ -55,6 +56,9 @@ export function RideDetailsPage() {
         {ride.cancelledAt && <><dt>Cancelled</dt><dd>{new Date(ride.cancelledAt).toLocaleString()}</dd></>}
         {ride.cancellationReason && <><dt>Cancellation reason</dt><dd>{ride.cancellationReason}</dd></>}
       </dl></div>
+      {ride.route && <RoutePreview pins={ride.route} />}
+      {user?.id === ride.driver.id && canManage(ride) && ride.availableSeats === ride.totalSeats &&
+        <RouteEditor key={ride.id} ride={ride} onSaved={updated => { setRide(updated); setMessage('Route updated.'); }} />}
       <BookSeats key={ride.id} ride={ride} />
       {user?.id === ride.driver.id && <div className="ride-actions">
         <Link to="/rides/mine">My rides</Link>

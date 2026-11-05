@@ -2,7 +2,7 @@
 
 Start with [SETUP.md](SETUP.md) for prerequisites, versions, permissions, database setup and run/test commands. See [PHASE_SETUP.md](PHASE_SETUP.md) for completed phases, complete reusable prompts and the proposed next-phase prompt.
 
-Hoopr carpooling application with authentication, ride management/search and transactional seat bookings: React + Vite + TypeScript, a Java 21 Spring Boot modular monolith, and PostgreSQL. Payments remain deferred. See [Phase 2 setup, API examples, tests and file inventory](docs/phase-2-authentication.md).
+Hoopr is a carpooling application with authentication, ride search, transactional seat bookings and Stripe or Razorpay test checkout. It uses React, Vite, TypeScript, Java 21, Spring Boot and PostgreSQL. See [Phase 2 setup and API examples](docs/phase-2-authentication.md).
 
 To test the APIs, import the [Postman collection](docs/api/Hoopr-Phase-2.postman_collection.json) and follow the [API testing guide](docs/api/README.md), including manual Thunder Client instructions.
 
@@ -11,6 +11,12 @@ Phase 3 adds ride offers, public search/details and owner management. See the [P
 Phase 4 adds seat confirmation, My Bookings, passenger cancellation, owner manifests and atomic driver cancellation. See the [Phase 4 guide and file inventory](docs/phase-4-bookings.md) and [booking API collection](docs/api/Hoopr-Phase-4.postman_collection.json).
 
 Phase 5 adds driver start and completion controls and passenger trip status. See the [ride lifecycle guide](docs/phase-5-ride-lifecycle.md) and [lifecycle API collection](docs/api/Hoopr-Phase-5.postman_collection.json).
+
+Phase 6 adds post-trip driver ratings from confirmed passengers. See the [rating guide](docs/phase-6-ratings.md) and [regression test cases](docs/test-cases.md).
+
+Phase 7 adds an in-app Notifications inbox. Phase 8 adds profile editing and private saved vehicles, with an optional vehicle selector on new ride offers. See the [regression test cases](docs/test-cases.md).
+
+Phase 9 adds optional public pickup and drop-off pins, straight-line distance and a driving directions link. Phase 10 adds Stripe or Razorpay test checkout, receipts and refunds. See the [payment setup guide](docs/phase-10-razorpay.md).
 
 ## Prerequisites
 
@@ -124,7 +130,7 @@ This explicit integration test is excluded from the default unit-test naming pat
 
 ## Scope
 
-Phases 1–4: foundation, authentication, profile reading, ride offers/search/details, owner management/history and transactional bookings/seat allocation. Payments, account/profile editing, notifications and ride start/completion remain deferred.
+Phases 1–10 cover the application foundation through test checkout. Sandbox checkout requires test credentials for the selected provider. The ADMIN role exists, and an admin dashboard is outside these phases.
 
 ## Phase 1 verification in this workspace
 

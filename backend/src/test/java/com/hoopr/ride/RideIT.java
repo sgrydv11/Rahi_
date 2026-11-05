@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static com.hoopr.ride.RideDtos.*;
 
 @SpringBootTest(properties = {
@@ -70,6 +71,74 @@ class RideIT {
         return new Create(origin, destination, "Station entrance", null, departure, "Asia/Kolkata", seats, new BigDecimal(price), "INR", null, "Test journey");
     }
     View offer() { return service.create(owner, body("Mumbai", "Pune", tomorrow, 3, "250.00")); }
+    @Test void routePinsValidateOwnershipAndFreezeAfterBooking() throws Exception {
+        View ride = offer();
+        String path = "/api/v1/rides/" + ride.id();
+        String pins = """
+                {"version":%d,"pickup":{"latitude":19.076,"longitude":72.8777},
+                 "dropoff":{"latitude":18.5204,"longitude":73.8567}}
+                """.formatted(ride.version());
+        mvc.perform(patch(path + "/route").header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
+                        .content(pins.replace("19.076", "91")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch(path + "/route").with(jwt().jwt(j -> j.subject(other.toString())).authorities(() -> "ROLE_USER"))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(pins))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch(path + "/route").header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content(pins))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.route.pickup.latitude").value(19.076));
+        mvc.perform(get(path)).andExpect(status().isOk()).andExpect(jsonPath("$.route.dropoff.longitude").value(73.8567));
+        mvc.perform(patch(path + "/route").header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content(pins))
+                .andExpect(status().isConflict());
+        var booking = bookings.create(ride.id(), other, UUID.randomUUID(), 1).booking();
+        assertNotNull(bookings.details(booking.id(), other).ride().route());
+        long currentVersion = service.details(ride.id(), owner).version();
+        mvc.perform(patch(path + "/route").header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"version\":" + currentVersion + ",\"pickup\":null,\"dropoff\":null}"))
+                .andExpect(status().isConflict());
+    }
+    @Test void profileChangesPersistWithoutAllowingRoleChanges() throws Exception {
+        String path = "/api/v1/users/me";
+        mvc.perform(patch(path).header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Updated Driver\",\"travelPreference\":\"DRIVER\",\"role\":\"ADMIN\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch(path).header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\" Updated Driver \",\"travelPreference\":\"DRIVER\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("USER"));
+        mvc.perform(get(path).header("Authorization", bearer)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Updated Driver"))
+                .andExpect(jsonPath("$.travelPreference").value("DRIVER"));
+    }
+
+    @Test void vehicleOwnershipCapacityAndPrivacyApplyToRideOffers() throws Exception {
+        String path = "/api/v1/vehicles";
+        String input = """
+                {"make":"Suzuki","model":"Swift","color":"Blue","registrationNumber":"PRIVATE123",
+                 "passengerCapacity":2,"active":true}
+                """;
+        mvc.perform(post(path).header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content(input))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.registrationNumber").value("PRIVATE123"));
+        UUID vehicle = jdbc.queryForObject("SELECT id FROM vehicles WHERE driver_id = ?", UUID.class, owner);
+        mvc.perform(get(path).with(jwt().jwt(j -> j.subject(other.toString())).authorities(() -> "ROLE_USER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(patch(path + "/" + vehicle).with(jwt().jwt(j -> j.subject(other.toString())).authorities(() -> "ROLE_USER"))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(input))
+                .andExpect(status().isNotFound());
+        Create offer = new Create("Mumbai", "Pune", null, null, tomorrow, "Asia/Kolkata", 2,
+                new BigDecimal("125.00"), "INR", null, null, vehicle);
+        assertEquals(404, assertThrows(RideFailure.class, () -> service.create(other, offer)).status);
+        View ride = service.create(owner, offer);
+        mvc.perform(get("/api/v1/rides/" + ride.id())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.vehicleDetails").value("Blue Suzuki Swift"))
+                .andExpect(jsonPath("$.registrationNumber").doesNotExist());
+        mvc.perform(patch(path + "/" + vehicle).header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
+                        .content(input.replace("Capacity\":2", "Capacity\":1")))
+                .andExpect(status().isConflict());
+        mvc.perform(patch(path + "/" + vehicle).header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
+                        .content(input.replace("true", "false")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+        assertEquals(404, assertThrows(RideFailure.class, () -> service.create(owner, offer)).status);
+        assertEquals("Blue Suzuki Swift", service.details(ride.id(), owner).vehicleDetails());
+    }
     @Test void lifecycleRequiresOwnerDepartureAndCurrentVersion() throws Exception {
         View ride = offer();
         String path = "/api/v1/rides/" + ride.id();

@@ -25,6 +25,10 @@ public class BookingController {
             @RequestParam(defaultValue = "0") @Min(0) @Max(100000) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) { return bookings.mine(user(jwt), page, size); }
     @GetMapping("/bookings/{id}") public View details(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) { return bookings.details(id, user(jwt)); }
+    @PostMapping("/bookings/{id}/rating")
+    public View rate(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Rate body) {
+        return bookings.rate(id, user(jwt), body.score());
+    }
     @PostMapping("/bookings/{id}/cancel")
     public View cancel(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Cancel body) {
         return bookings.cancel(id, user(jwt), body.reason());

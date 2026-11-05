@@ -1,6 +1,6 @@
 # Hoopr setup guide
 
-Updated: 4 November 2026. These instructions describe the current repository after Phases 1–3. They are a manual setup/run guide; they do not install software or change permissions automatically.
+Updated 5 November 2026. This guide covers local setup and verification through Phase 10.
 
 ## 1. Required applications and versions
 
@@ -124,6 +124,9 @@ Do not run separate CREATE TABLE scripts. Flyway creates and upgrades tables usi
 | V3__user_travel_preference.sql | DRIVER / PASSENGER / BOTH profile preference; existing profiles default to BOTH |
 | V4__ride_management.sql | Optional saved vehicle, ride descriptions/notes, SCHEDULED status, seat limit and search indexes |
 | V5__booking_idempotency.sql | Booking keys, unique passenger/request index, version, seat limit and ride/history index |
+| V6__booking_ratings.sql | Optional driver score and rating timestamp with a booking constraint |
+| V7__booking_payments.sql | Razorpay test orders, verified captures and refunds tied to bookings |
+| V8__payment_provider.sql | Stripe session IDs and the provider associated with each order |
 
 Applied migration files must stay unchanged. Add the next version for future schema changes. Hibernate remains in validate mode. V4 intentionally fails if existing rides exceed six seats; investigate those records instead of deleting history or changing applied migrations.
 
@@ -327,7 +330,7 @@ psql -h localhost -p 5432 -U hoopr -d hoopr_test -W -c '\dt'
 psql -h localhost -p 5432 -U hoopr -d hoopr_test -W -c 'SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;'
 ```
 
-After current code has started/migrated each database, versions 1–5 should be successful. Application tables are users, user_profiles, driver_profiles, vehicles, rides, bookings, refresh_sessions and refresh_tokens, plus flyway_schema_history. Booking APIs/UI now use the existing bookings table with additive V5 metadata.
+After startup, Flyway versions 1–8 should be successful. Application tables are users, user_profiles, driver_profiles, vehicles, rides, bookings, booking_payments, refresh_sessions and refresh_tokens, plus flyway_schema_history. See the [payment setup guide](docs/phase-10-razorpay.md) to select Stripe or Razorpay test checkout.
 
 ## 12. Running packaged output
 

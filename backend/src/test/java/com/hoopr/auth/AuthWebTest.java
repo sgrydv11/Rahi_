@@ -35,6 +35,7 @@ class AuthWebTest {
     @MockitoBean AuthService auth;
     @MockitoBean com.hoopr.ride.RideService rides;
     @MockitoBean com.hoopr.booking.BookingService bookings;
+    @MockitoBean org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate notificationJdbc;
     private final UUID id = UUID.randomUUID();
     private AuthService.Profile profile() { return new AuthService.Profile(id, "alice@example.test", "Alice", "USER", com.hoopr.user.TravelPreference.BOTH); }
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder write(String path) throws Exception {

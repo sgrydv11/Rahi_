@@ -71,6 +71,27 @@ public class BookingService {
         return results(bookings.findByRideId(rideId, paging(page, size)));
     }
     @Transactional
+    public View rate(UUID id, UUID passenger, int score) {
+        active(passenger);
+        UUID rideId = bookings.rideIdFor(id).orElseThrow(() -> new BookingFailure(404, "Booking not found."));
+        Ride ride = lockRide(rideId);
+        Booking booking = find(id);
+        if (!booking.passengerId.equals(passenger) || ride.driverId.equals(passenger))
+            throw new BookingFailure(403, "Only the booked passenger can rate this ride.");
+        if (!"CONFIRMED".equals(booking.status) || !"COMPLETED".equals(ride.status))
+            throw new BookingFailure(409, "Only confirmed bookings on completed rides can be rated.");
+        if (score < 1 || score > 5)
+            throw new BookingFailure(400, "Choose a score from 1 to 5.");
+        if (booking.driverRating != null) {
+            if (booking.driverRating == score) return view(booking);
+            throw new BookingFailure(409, "A rating has already been submitted for this booking.");
+        }
+        booking.driverRating = score;
+        booking.ratedAt = booking.updatedAt = clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        bookings.flush();
+        return view(booking);
+    }
+    @Transactional
     public View cancel(UUID id, UUID passenger, String reason) {
         active(passenger);
         // Scalar lookup does not cache a Booking before its ride lock is acquired.
@@ -116,13 +137,14 @@ public class BookingService {
         String name = booking.passengerProfile == null ? "Hoopr passenger" : booking.passengerProfile.getFullName();
         if (name == null || name.isBlank()) name = "Hoopr passenger"; else name = name.strip().split("\\s+", 2)[0];
         var journey = new Journey(ride.getId(), ride.getDriverId(), ride.getOrigin(), ride.getDestination(), ride.getDepartureAt(),
-                ride.getTimeZone(), "PUBLISHED".equals(ride.getStatus()) ? "SCHEDULED" : ride.getStatus());
+                ride.getTimeZone(), "PUBLISHED".equals(ride.getStatus()) ? "SCHEDULED" : ride.getStatus(), RideDtos.routePins(ride));
         boolean canCancel = "CONFIRMED".equals(booking.status) && List.of("SCHEDULED", "PUBLISHED").contains(ride.getStatus())
                 && ride.getDepartureAt().isAfter(clock.instant());
+        Rating rating = booking.driverRating == null ? null : new Rating(booking.driverRating, booking.ratedAt);
         return new View(booking.id, journey, new Person(booking.passengerId, name), booking.seatsBooked,
                 booking.pricePerSeatSnapshot, booking.pricePerSeatSnapshot.multiply(java.math.BigDecimal.valueOf(booking.seatsBooked)),
                 booking.currency, booking.status, booking.version, canCancel, booking.createdAt, booking.updatedAt,
-                booking.cancelledAt, booking.cancellationReason);
+                booking.cancelledAt, booking.cancellationReason, rating);
     }
     private Results results(Page<Booking> page) {
         return new Results(page.getContent().stream().map(this::view).toList(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());

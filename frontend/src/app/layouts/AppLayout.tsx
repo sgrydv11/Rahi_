@@ -22,6 +22,7 @@ export function AppLayout() {
           <NavLink to="/rides/new">Offer a ride</NavLink>
           <NavLink to="/rides/mine">My rides</NavLink>
           <NavLink to="/bookings/mine">My bookings</NavLink>
+          <NavLink to="/notifications">Notifications</NavLink>
           <NavLink to="/profile">My profile</NavLink>
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
         </> : <><NavLink to="/login">Log in</NavLink>

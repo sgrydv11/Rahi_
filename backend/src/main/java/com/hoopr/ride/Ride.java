@@ -15,6 +15,14 @@ public class Ride {
     public Instant getDepartureAt() { return departureAt; }
     public String getTimeZone() { return timeZone; }
     public String getStatus() { return status; }
+    public BigDecimal getPickupLatitude() { return pickupLatitude; }
+    public BigDecimal getPickupLongitude() { return pickupLongitude; }
+    public BigDecimal getDropoffLatitude() { return dropoffLatitude; }
+    public BigDecimal getDropoffLongitude() { return dropoffLongitude; }
+    @Column(name = "source_latitude", precision = 9, scale = 6) public BigDecimal pickupLatitude;
+    @Column(name = "source_longitude", precision = 9, scale = 6) public BigDecimal pickupLongitude;
+    @Column(name = "destination_latitude", precision = 9, scale = 6) public BigDecimal dropoffLatitude;
+    @Column(name = "destination_longitude", precision = 9, scale = 6) public BigDecimal dropoffLongitude;
     @Id public UUID id;
     @Column(name = "driver_id", nullable = false) public UUID driverId;
     @ManyToOne(fetch = FetchType.LAZY)

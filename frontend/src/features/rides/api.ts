@@ -1,6 +1,9 @@
 import { api } from '../../lib/api/client';
 import { authenticatedRequest } from '../auth/auth';
 
+export interface Point { latitude: number; longitude: number }
+export interface RoutePins { pickup: Point; dropoff: Point }
+
 export interface Ride {
   id: string; driver: { id: string; displayName: string }; origin: string; destination: string;
   pickupDescription: string | null; dropoffDescription: string | null; departureAt: string; timeZone: string;
@@ -8,12 +11,14 @@ export interface Ride {
   vehicleDetails: string | null; notes: string | null; status: string; version: number;
   createdAt: string; updatedAt: string; cancelledAt: string | null; cancellationReason: string | null;
   startedAt?: string | null; completedAt?: string | null; canStart?: boolean;
+  route?: RoutePins | null;
 }
 export interface RidePage { content: Ride[]; page: number; size: number; totalElements: number; totalPages: number }
 export interface RideInput {
   origin: string; destination: string; pickupDescription: string; dropoffDescription: string;
   departureAt: string; timeZone: string; totalSeats: number; pricePerSeat: string; currency: string;
   vehicleDetails: string; notes: string;
+  vehicleId?: string;
 }
 export const ridesApi = {
   search: (query: URLSearchParams, signal?: AbortSignal) => api<RidePage>(`/rides?${query}`, { signal }),
@@ -21,6 +26,10 @@ export const ridesApi = {
   mine: (page = 0, signal?: AbortSignal) => authenticatedRequest<RidePage>(`/rides/me?page=${page}&size=10`, { signal }),
   create: (body: RideInput) => authenticatedRequest<Ride>('/rides', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: RideInput, version: number) => authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ ...body, version }) }),
+  updateRoute: (id: string, version: number, pins: RoutePins | null) =>
+    authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}/route`, {
+      method: 'PATCH', body: JSON.stringify({ version, pickup: pins?.pickup ?? null, dropoff: pins?.dropoff ?? null }),
+    }),
   cancel: (id: string, version: number, reason: string) => authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: JSON.stringify({ version, reason }) }),
   transition: (id: string, version: number, action: 'start' | 'complete') =>
     authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}/${action}`, {
