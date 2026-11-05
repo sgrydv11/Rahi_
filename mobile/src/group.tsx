@@ -3,7 +3,7 @@ import RazorpayCheckout from 'react-native-razorpay';
 import { useEffect, useRef, useState } from 'react';
 import { randomUUID } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
-import type { GroupOffer, SeatHold } from './groupWallet';
+import { formatQuote, type GroupOffer, type SeatHold } from './groupWallet';
 import { groupWalletApi } from './api';
 import { Button, Card, Copy, ErrorText, Field, QueryState, date, useAction, useQuery } from './ui';
 
@@ -18,6 +18,7 @@ export function GroupOffers({ userId, openBooking }: { userId: string; openBooki
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [search, setSearch] = useState({ origin: '', destination: '', page: 0 });
+  const discount = useQuery('next-ride-discount', groupWalletApi.nextDiscount);
   const query = useQuery(JSON.stringify(search),
     () => groupWalletApi.offers(search.page, search.origin, search.destination));
 
@@ -33,12 +34,14 @@ export function GroupOffers({ userId, openBooking }: { userId: string; openBooki
       setDismissed(true);
       setHold(undefined);
       query.reload();
+      discount.reload();
     }} />;
   if (!dismissed && !recovery.data) return <QueryState error={recovery.error} reload={recovery.reload} />;
 
   return <>
     <Card>
       <Copy>Open Ride Group</Copy>
+      {discount.data && <Copy>Next eligible ride discount {discount.data.discountPercent}%</Copy>}
       <Field label="Leaving from" value={origin} change={setOrigin} />
       <Field label="Going to" value={destination} change={setDestination} />
       <Button label="Find seats" onPress={() => {
@@ -92,10 +95,13 @@ function HoldCard({ hold, update, back, openBooking, restored }: {
   const remaining = Math.max(0, Math.ceil((Date.parse(hold.expiresAt) - now) / 1000));
   const payable = hold.status === 'HELD' || hold.status === 'PAYMENT_PENDING';
   const active = payable && remaining > 0;
+  const quote = formatQuote(hold.quote);
   const message = active ? 'Seats held temporarily' : payable ? 'Hold expired' : hold.status.replace(/_/g, ' ').toLowerCase();
   return <Card>
     <Copy>{message}</Copy>
-    <Copy>{hold.seats} seat(s). INR {(hold.quote.totalPaise / 100).toFixed(2)} total.</Copy>
+    <Copy>{hold.seats} seat(s) · {quote.fare} original fare</Copy>
+    {quote.discount && <Copy>{quote.discount}</Copy>}
+    <Copy>{quote.total} total</Copy>
     {active && <Copy>{remaining} seconds left.</Copy>}
     {active && !started && <Button label="Pay from wallet" disabled={action.busy} onPress={() => action.run(async () => {
       walletKey.current ??= randomUUID();

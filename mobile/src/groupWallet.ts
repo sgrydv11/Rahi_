@@ -63,3 +63,12 @@ export function parseTopUpPaise(input: string): number | null {
   const paise = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
   return paise >= 100 && paise <= 1_000_000 ? paise : null;
 }
+
+export function formatQuote(quote: Quote) {
+  const money = (paise: number) => quote.currency + ' ' + (paise / 100).toFixed(2);
+  return {
+    fare: money(quote.farePaise),
+    discount: quote.discountPercent ? quote.discountPercent + '% off (' + money(quote.discountPaise) + ')' : null,
+    total: money(quote.totalPaise),
+  };
+}

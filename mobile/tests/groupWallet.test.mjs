@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createGroupWalletClient, parseTopUpPaise } from '../src/groupWallet.ts';
+import { createGroupWalletClient, formatQuote, parseTopUpPaise } from '../src/groupWallet.ts';
 
 function fixture() {
   const requests = [];
@@ -92,4 +92,10 @@ test('checks the status of the exact withdrawal or recovered top-up', async () =
     { path: '/wallet/withdrawals/withdrawal%2Fone', options: undefined },
     { path: '/wallet/top-ups/topup%2Fone', options: undefined },
   ]);
+});
+
+test('displays the server-quoted fare, discount and exact payable amount', () => {
+  const quote = { currency: 'INR', farePaise: 12550, discountPercent: 5, discountPaise: 628, totalPaise: 11922 };
+  assert.deepEqual(formatQuote(quote), { fare: 'INR 125.50', discount: '5% off (INR 6.28)', total: 'INR 119.22' });
+  assert.equal(formatQuote({ ...quote, discountPercent: 0, discountPaise: 0, totalPaise: 12550 }).discount, null);
 });
