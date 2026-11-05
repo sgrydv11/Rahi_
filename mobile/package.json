@@ -9,6 +9,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "bundle:check": "expo export --platform android --platform ios --output-dir dist"
   },
   "dependencies": {

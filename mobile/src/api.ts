@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { createGroupWalletClient } from './groupWallet';
 
 export type Preference = 'DRIVER' | 'PASSENGER' | 'BOTH';
 export interface User { id: string; fullName: string; email: string; role: string; travelPreference: Preference }
@@ -107,3 +108,5 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
     return request<T>(path, options, next.accessToken);
   }
 }
+
+export const groupWalletApi = createGroupWalletClient(api);

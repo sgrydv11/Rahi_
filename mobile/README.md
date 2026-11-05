@@ -9,7 +9,7 @@ This Expo app renders Hoopr screens with React Native components. The app talks 
 
 Ride search, offers, bookings and cancellations, trip start and completion, passenger manifests, ratings, notifications, profile, vehicles and route pins are available from the native screens. Driving directions open the maps provider. Razorpay uses its native checkout module. Stripe opens hosted Checkout in the system browser. Return to Hoopr afterward and tap **Check payment status** on the booking. Provider checkout requires the backend test keys described in the payment setup guide.
 
-Run `npm run typecheck` and `npm run bundle:check` to check both target bundles. For device acceptance, exercise sign-in and restart, ride offer and booking with two accounts, trip completion and rating, notifications, profile and vehicles, directions, checkout and cancellation refunds. Check both platforms with their native builds.
+Run `npm test` with Node 24 for the API contract cases, then `npm run typecheck` and `npm run bundle:check` to check both target bundles. For device acceptance, exercise sign-in and restart, ride offer and booking with two accounts, trip completion and rating, notifications, profile and vehicles, directions, checkout and cancellation refunds. Check both platforms with their native builds.
 
 Dependency installation applies a namespace compatibility fix to the pinned Razorpay Android library before Gradle runs.
 
