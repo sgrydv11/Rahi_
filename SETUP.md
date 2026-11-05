@@ -266,6 +266,15 @@ npm.cmd run mobile:build
 
 Replace the example URL with the real public HTTPS API address. `mobile:build` rejects missing or non-HTTPS API URLs, builds the frontend, syncs Capacitor, and adds the iOS app's API domain to `WKAppBoundDomains` for refresh-cookie support. Capacitor uses `https://localhost` as the native app origin on both platforms.
 
+To build a browse-only sample APK before the backend is deployed, explicitly enable the bundled demo rides instead:
+
+```powershell
+$env:VITE_DEMO_MODE = 'true'
+npm.cmd run mobile:build
+```
+
+The sample app includes four illustrative rides with future dates. Authentication, booking, and payments are disabled; the demo build does not send API requests. Unset `VITE_DEMO_MODE` and configure the deployed HTTPS API URL before building a live app.
+
 Configure the backend to allow the native origin and accept secure cross-site refresh cookies. Keep any existing web frontend origin in the list:
 
 ```powershell

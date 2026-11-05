@@ -5,6 +5,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../../features/auth/AuthContext';
 import { logout, errorMessage } from '../../features/auth/auth';
+import { demoMode } from '../../features/rides/api';
 
 export function AppLayout() {
   const { user, loading } = useAuth();
@@ -56,11 +57,12 @@ export function AppLayout() {
           <NavLink to="/notifications">Notifications</NavLink>
           <NavLink to="/profile">My profile</NavLink>
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
-        </> : <><NavLink to="/login">Log in</NavLink>
+        </> : demoMode ? <span className="demo-nav-note">Sample app</span> : <><NavLink to="/login">Log in</NavLink>
           <NavLink className="button button-small" to="/register">Join Hoopr</NavLink></>}
       </nav>
     </header>
     {error && <p role="alert">{error}</p>}
+    {demoMode && <p className="demo-banner" role="status">Sample app · Browse demo rides. Accounts and bookings are disabled.</p>}
     <main id="main" tabIndex={-1}><Outlet /></main>
     <footer><span className="footer-brand">hoopr</span><span>Good company. Shared journeys.</span><span>Shared journeys</span></footer>
     <nav className="mobile-nav" aria-label="App navigation">
@@ -81,7 +83,7 @@ export function AppLayout() {
             {busy ? 'Logging out…' : 'Log out'}
           </button>
         </div>}
-      </> : <>
+      </> : demoMode ? <span className="mobile-nav-loading">Sample mode</span> : <>
         <MobileNavLink to="/login" label="Log in" icon="rides" end />
         <MobileNavLink to="/register" label="Join" icon="offer" end />
       </>}

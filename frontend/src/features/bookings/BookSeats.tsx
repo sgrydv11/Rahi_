@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { errorMessage } from '../auth/auth';
 import { ApiError } from '../../lib/api/client';
-import { canManage, type Ride } from '../rides/api';
+import { canManage, demoMode, type Ride } from '../rides/api';
 import { bookingsApi } from './api';
 
 export function BookSeats({ ride }: { ride: Ride }) {
@@ -14,6 +14,7 @@ export function BookSeats({ ride }: { ride: Ride }) {
   const request = useRef<{ key: string; seats: number; version: number } | null>(null);
   if (user?.id === ride.driver.id || !canManage(ride)) return null;
   if (!ride.availableSeats) return <p className="notice">This ride is fully booked.</p>;
+  if (demoMode) return <p className="notice">Seat booking is not available in this sample app.</p>;
   if (!user) return <p><Link className="button" to="/login" state={{ from: `/rides/${ride.id}` }}>Log in to book seats</Link></p>;
   async function submit(event: FormEvent) {
     event.preventDefault();

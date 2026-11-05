@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { errorMessage, login, register, validateCredentials, travelPreferenceLabels, type TravelPreference } from './auth';
+import { demoMode } from '../rides/api';
 
 function AuthForm({ registering = false }: { registering?: boolean }) {
   const [email, setEmail] = useState('');
@@ -12,6 +13,16 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  if (demoMode) {
+    return <section className="page narrow">
+      <p className="eyebrow">Sample app</p>
+      <h1>Preview Hoopr.</h1>
+      <div className="panel">
+        <p>Sign-in and account creation need the live backend and are disabled in this demo.</p>
+        <Link className="button" to="/rides">Browse sample rides</Link>
+      </div>
+    </section>;
+  }
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
     const invalid = validateCredentials(email, password, registering);

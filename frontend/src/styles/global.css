@@ -85,6 +85,8 @@ select { font: inherit; width: 100%; min-width: 0; min-height: 44px; padding: 10
 .mobile-more-menu { display: grid; gap: 4px; padding: 10px; border: 1px solid #d9dfd3; border-radius: 14px; background: #fffef9; box-shadow: 0 8px 30px #163e3226; }
 .mobile-more-menu a, .mobile-more-menu button { min-height: 44px; padding: 10px 14px; display: flex; align-items: center; border: 0; border-radius: 8px; background: transparent; color: #163e32; font: inherit; font-weight: 600; text-align: left; text-decoration: none; cursor: pointer; }
 .mobile-more-menu a.active, .mobile-more-menu a:hover, .mobile-more-menu button:hover { background: #e4ebd9; }
+.demo-banner { width: min(1200px, 90%); margin: 12px auto 0; padding: 10px 14px; border: 1px solid #d5dfc4; border-radius: 9px; background: #edf2e4; color: #35523b; font-size: 13px; font-weight: 600; }
+.demo-nav-note { color: #53645b; font-size: 13px; font-weight: 600; }
 @media (max-width: 700px) {
   .app-shell { min-height: 100dvh; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
   .site-header { width: 100%; padding: max(12px, env(safe-area-inset-top, 0px)) 5% 12px; border-bottom-color: #e5e9e1; }

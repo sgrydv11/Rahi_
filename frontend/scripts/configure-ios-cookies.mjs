@@ -10,7 +10,9 @@ try {
   throw error;
 }
 
-const apiUrl = new URL(process.env.VITE_API_BASE_URL);
+const apiUrl = new URL(process.env.VITE_DEMO_MODE === 'true'
+  ? 'https://localhost'
+  : process.env.VITE_API_BASE_URL);
 const domains = new Set(['localhost', apiUrl.hostname]);
 const existingDomains = plist.match(/<key>WKAppBoundDomains<\/key>\s*<array>([\s\S]*?)<\/array>/);
 const domainList = [...domains].map(domain => `\t\t<string>${domain}</string>`).join('\n');

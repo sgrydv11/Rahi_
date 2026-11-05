@@ -1,5 +1,8 @@
 import { api } from '../../lib/api/client';
 import { authenticatedRequest } from '../auth/auth';
+import { findDemoRide, searchDemoRides } from './demoData';
+
+export const demoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export interface Point { latitude: number; longitude: number }
 export interface RoutePins { pickup: Point; dropoff: Point }
@@ -21,8 +24,15 @@ export interface RideInput {
   vehicleId?: string;
 }
 export const ridesApi = {
-  search: (query: URLSearchParams, signal?: AbortSignal) => api<RidePage>(`/rides?${query}`, { signal }),
-  details: (id: string, authenticated = false, signal?: AbortSignal) => (authenticated ? authenticatedRequest : api)<Ride>(`/rides/${encodeURIComponent(id)}`, { signal }),
+  search: (query: URLSearchParams, signal?: AbortSignal) => demoMode
+    ? Promise.resolve().then(() => searchDemoRides(query, signal))
+    : api<RidePage>(`/rides?${query}`, { signal }),
+  details: (id: string, authenticated = false, signal?: AbortSignal) => demoMode
+    ? Promise.resolve().then(() => findDemoRide(id, signal)).then(ride => {
+      if (!ride) throw new Error('This sample ride is not available.');
+      return ride;
+    })
+    : (authenticated ? authenticatedRequest : api)<Ride>(`/rides/${encodeURIComponent(id)}`, { signal }),
   mine: (page = 0, signal?: AbortSignal) => authenticatedRequest<RidePage>(`/rides/me?page=${page}&size=10`, { signal }),
   create: (body: RideInput) => authenticatedRequest<Ride>('/rides', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: RideInput, version: number) => authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ ...body, version }) }),

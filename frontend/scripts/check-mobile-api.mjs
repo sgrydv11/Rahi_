@@ -1,5 +1,9 @@
 const value = process.env.VITE_API_BASE_URL?.trim();
 
+if (process.env.VITE_DEMO_MODE === 'true') {
+  process.exit(0);
+}
+
 if (!value || !URL.canParse(value)) {
   console.error('Set VITE_API_BASE_URL to the HTTPS API base URL before building the mobile app.');
   process.exit(1);

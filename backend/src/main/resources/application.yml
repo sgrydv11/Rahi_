@@ -22,7 +22,7 @@ spring:
     problemdetails:
       enabled: true
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
   error:
     include-message: never
     include-stacktrace: never
