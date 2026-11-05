@@ -64,7 +64,7 @@ function NativeApp() {
       case 'bookings': return <Bookings go={go} />;
       case 'manifest': return <Bookings ride={screen.id} go={go} />;
       case 'booking': return user && <BookingDetails id={screen.id} user={user} go={go} />;
-      case 'group': return user && <GroupOffers />;
+      case 'group': return user && <GroupOffers userId={user.id} openBooking={id => go({ kind: 'booking', id })} />;
       case 'notifications': return <Notifications go={go} />;
       case 'profile': return user && <Profile user={user} onUser={setUser} go={go} />;
       case 'vehicles': return <Vehicles go={go} />;

@@ -64,3 +64,13 @@ test('loads and releases only the selected hold with the expected HTTP methods',
     { path: '/group/holds/hold%2Fone/cancel', options: { method: 'POST' } },
   ]);
 });
+
+test('provider checkout reuses its key and sync uses the server-side order', async () => {
+  const { client, requests } = fixture();
+  await client.checkout('hold', 'PROVIDER', 'checkout-key');
+  await client.checkout('hold', 'PROVIDER', 'checkout-key');
+  await client.sync('hold');
+  assert.deepEqual(requests[0], requests[1]);
+  assert.deepEqual(requests[0].options, { method: 'POST', body: { method: 'PROVIDER' }, key: 'checkout-key' });
+  assert.deepEqual(requests[2], { path: '/group/holds/hold/sync', options: { method: 'POST', body: undefined } });
+});

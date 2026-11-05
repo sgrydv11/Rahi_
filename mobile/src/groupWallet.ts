@@ -7,8 +7,8 @@ export interface Quote {
   discountPaise: number; totalPaise: number; currency: 'INR';
 }
 export interface SeatHold {
-  id: string; rideId: string; seats: number; expiresAt: string; quote: Quote; bookingId?: string;
-  status: 'HELD' | 'PAYMENT_PENDING' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED' | 'REFUND_PENDING';
+  id: string; rideId: string; seats: number; expiresAt: string; quote: Quote; bookingId?: string | null;
+  status: 'HELD' | 'PAYMENT_PENDING' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED' | 'REFUND_PENDING' | 'REFUNDED';
 }
 export type Checkout = { provider: 'stripe'; checkoutUrl: string } |
   { provider: 'razorpay'; keyId: string; orderId: string };
