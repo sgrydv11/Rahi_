@@ -48,3 +48,9 @@ test('wallet writes send integer paise and preserve the operation key', async ()
   await client.nextDiscount();
   assert.equal(requests[3].path, '/ride-discounts/next');
 });
+
+test('the initial feed omits blank filters and requests the first page', async () => {
+  const { client, requests } = fixture();
+  await client.offers(0, '  ', '');
+  assert.deepEqual(requests, [{ path: '/group/offers?page=0&size=20', options: undefined }]);
+});
