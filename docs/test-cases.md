@@ -34,13 +34,32 @@ Use the local frontend at http://localhost:5173 and the backend at http://localh
 | PAY-02 | Refund a cancelled booking | Attempt refund before cancellation and expect a conflict. Cancel, request a full refund twice, and check that the same refund is returned. Refresh pending status and verify it becomes processed after provider confirmation. | PostgreSQL integration with simulated Razorpay |
 | PAY-03 | Provider configuration and privacy | With test keys absent or a live key supplied, checkout is disabled. An unrelated user cannot read or create payment state. | Backend tests |
 | PAY-04 | Stripe checkout and provider continuity | Select Stripe and verify hosted Checkout uses HTTPS on the Stripe host. Switch the default to Razorpay and check an existing Stripe order. An unpaid or wrong-amount session must not generate a receipt. Verify an exact capture and a cancelled booking refund still use Stripe. | Backend integration with simulated Stripe and redirect validation tests |
+| PAY-05 | Expired Stripe Checkout session | Start checkout for a booking whose stored Stripe session has expired. Verify a new session replaces it. Retry checkout and confirm the new session is reused, with no payment recorded before capture. | PostgreSQL integration with simulated Stripe |
 | WEB-01 | Mobile browser layout | Open the home, search, and sign-in pages at phone width. Verify navigation wraps, form controls remain visible, and the page has no horizontal overflow. | Browser smoke |
+| WEB-02 | Browse-only demo | Build with `VITE_DEMO_MODE=true`. Verify four future sample rides appear, then filter by route, paginate, and open a sample ride. Verify sign-in and booking are disabled in this mode. | Frontend demo data tests and manual browser checks for disabled actions |
 
 The [API collections](api/README.md) cover authentication, rides and bookings. Run the [Phase 5 collection](api/Hoopr-Phase-5.postman_collection.json) in two folders as described in the [lifecycle guide](phase-5-ride-lifecycle.md).
 
 For rating requests and expected responses, see the [Phase 6 guide](phase-6-ratings.md).
 
 To exercise checkout and refunds with Razorpay or Stripe test credentials, follow the [sandbox walkthrough](phase-10-razorpay.md).
+
+## Automated coverage by phase
+
+| Phase | Cases | Main backend suite |
+| --- | --- | --- |
+| 1 | FND | `HealthControllerTest`, `DatabaseMigrationIT` |
+| 2 | AUTH | `AuthWebTest`, `AuthServiceTest`, `AuthenticationIT` |
+| 3 | RIDE | `RideWebTest`, `RideServiceTest`, `RideIT` |
+| 4 | BOOK | `BookingIT` |
+| 5 | LIFE | `RideIT` |
+| 6 | RATE | `BookingIT` |
+| 7 | NOTIFY | `BookingIT` |
+| 8 | PROFILE, VEHICLE | `RideIT` |
+| 9 | MAP | `RideIT` |
+| 10 | PAY | `BookingIT`, `RazorpayGatewayTest`, `StripeGatewayTest` |
+
+The frontend suite adds checks for auth, booking and rating controls, route previews, ride pages and demo data. Provider tests simulate payment API responses. The mobile layout case is a browser check.
 
 ## Phase gates on 5 November 2026
 
@@ -52,6 +71,8 @@ To exercise checkout and refunds with Razorpay or Stripe test credentials, follo
 | 10 | 86 | 44 | Checkout was disabled without keys. Capture, receipts and refunds passed with simulated provider responses |
 
 Both builds passed at each gate. After V7 migrated the running database, the Phase 2–4 collections passed 67 requests and 122 assertions. The frontend, frontend API proxy and backend health endpoint returned HTTP 200. End-to-end Razorpay sandbox verification requires local test credentials.
+
+On 5 November 2026, the `shareable-web-build` branch passed all 89 existing backend tests against PostgreSQL, the new Stripe expiry integration case, all 47 frontend tests, and the frontend production build. The frontend, API proxy and backend health checks returned HTTP 200. A registration timeout cleared after restarting the local backend, and the Phase 2–4 collections then passed all 67 requests and 122 assertions. Payment coverage used simulated provider responses. The frontend checks covered the web build.
 
 Run the backend suite from the backend directory after setting the test database environment variables:
 

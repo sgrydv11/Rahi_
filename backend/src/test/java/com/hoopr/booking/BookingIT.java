@@ -187,6 +187,37 @@ class BookingIT {
                 .andExpect(jsonPath("$.refundStatus").value("processed"));
         verifyNoInteractions(gateway);
     }
+
+    @Test void expiredStripeSessionIsReplacedAndTheReplacementIsReused() throws Exception {
+        var ride = offer(2);
+        UUID booking = bookings.create(ride.id(), passenger, UUID.randomUUID(), 1).booking().id();
+        jdbc.update("""
+                INSERT INTO booking_payments (booking_id, provider, order_id, amount, currency)
+                VALUES (?, 'stripe', 'cs_test_expired', 12550, 'INR')
+                """, booking);
+        when(stripe.enabled()).thenReturn(true);
+        String session = """
+                {"id":"cs_test_expired","client_reference_id":"%s","livemode":false,"mode":"payment",
+                 "currency":"inr","amount_total":12550,"status":"expired","payment_status":"unpaid"}
+                """.formatted(booking);
+        var replacement = json.readTree("""
+                {"id":"cs_test_replacement","client_reference_id":"%s","livemode":false,"mode":"payment",
+                 "currency":"inr","amount_total":12550,"status":"open","payment_status":"unpaid",
+                 "url":"https://checkout.stripe.com/c/pay/replacement"}
+                """.formatted(booking));
+        when(stripe.session("cs_test_expired")).thenReturn(json.readTree(session));
+        when(stripe.checkout(booking, 12550, "cs_test_expired")).thenReturn(replacement);
+        when(stripe.session("cs_test_replacement")).thenReturn(replacement);
+        String path = "/api/v1/bookings/" + booking + "/payment/order";
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(post(path).header("Authorization", passengerToken)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.orderId").value("cs_test_replacement"))
+                    .andExpect(jsonPath("$.paymentId").doesNotExist());
+        }
+        verify(stripe, times(1)).checkout(booking, 12550, "cs_test_expired");
+        verifyNoInteractions(gateway);
+    }
+
     @Test void inboxIsPrivateAndRemindersFollowCurrentBookingState() throws Exception {
         departure = Instant.now().plusSeconds(3600);
         var ride = offer(2);
