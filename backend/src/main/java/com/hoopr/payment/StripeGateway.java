@@ -47,7 +47,15 @@ public class StripeGateway {
         return checkout(hold, amount, null, "/");
     }
 
+    public JsonNode walletCheckout(UUID operation, long amount) {
+        return checkout(operation, amount, null, "/", "Hoopr test wallet top-up");
+    }
+
     private JsonNode checkout(UUID booking, long amount, String previous, String returnPath) {
+        return checkout(booking, amount, previous, returnPath, "Hoopr test ride fare");
+    }
+
+    private JsonNode checkout(UUID booking, long amount, String previous, String returnPath, String description) {
         String returnUrl = frontendOrigin.replaceFirst("/+$", "") + returnPath;
         var form = new LinkedMultiValueMap<String, String>();
         form.add("mode", "payment");
@@ -55,7 +63,7 @@ public class StripeGateway {
         form.add("line_items[0][quantity]", "1");
         form.add("line_items[0][price_data][currency]", "inr");
         form.add("line_items[0][price_data][unit_amount]", Long.toString(amount));
-        form.add("line_items[0][price_data][product_data][name]", "Hoopr test ride fare");
+        form.add("line_items[0][price_data][product_data][name]", description);
         form.add("client_reference_id", booking.toString());
         form.add("success_url", returnUrl);
         form.add("cancel_url", returnUrl);

@@ -75,10 +75,56 @@ class BookingIT {
             jdbc.update("DELETE FROM refresh_tokens WHERE session_id IN (SELECT id FROM refresh_sessions WHERE user_id = ?)", user);
             jdbc.update("DELETE FROM refresh_sessions WHERE user_id = ?", user);
             jdbc.update("DELETE FROM user_profiles WHERE user_id = ?", user);
+            jdbc.update("DELETE FROM wallet_entries WHERE user_id = ?", user);
+            jdbc.update("DELETE FROM wallet_top_ups WHERE user_id = ?", user);
+            jdbc.update("DELETE FROM wallets WHERE user_id = ?", user);
             jdbc.update("DELETE FROM users WHERE id = ?", user);
         }
     }
     RideDtos.View offer(int seats) { return rides.create(owner, new RideDtos.Create("Mumbai", "Pune", null, null, departure, "Asia/Kolkata", seats, new BigDecimal("125.50"), "INR", null, null)); }
+    @Test void walletCreditsOnlyVerifiedCaptureAndRecordsExactlyOneEntry() throws Exception {
+        String root = "/api/v1/wallet";
+        mvc.perform(get(root)).andExpect(status().isUnauthorized());
+        mvc.perform(get(root).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.availablePaise").value(0));
+        when(gateway.enabled()).thenReturn(true);
+        when(gateway.keyId()).thenReturn("rzp_test_fixture");
+        when(gateway.order(any(UUID.class), eq(12550L))).thenReturn(json.readTree("""
+                {"id":"order_wallet","amount":12550,"currency":"INR"}
+                """));
+        UUID key = UUID.randomUUID();
+        var request = post(root + "/top-ups").header("Authorization", passengerToken)
+                .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON);
+        String body = mvc.perform(request.content("{\"amountPaise\":12550}")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.operation.status").value("PENDING")).andReturn().getResponse().getContentAsString();
+        String id = json.readTree(body).path("operation").path("id").asText();
+        mvc.perform(request.content("{\"amountPaise\":12550}")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.operation.id").value(id));
+        mvc.perform(request.content("{\"amountPaise\":12551}")).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
+        String sync = root + "/top-ups/" + id + "/sync";
+        mvc.perform(post(sync).header("Authorization", strangerToken)).andExpect(status().isNotFound());
+        when(gateway.orderPayments("order_wallet")).thenReturn(json.readTree("""
+                [{"id":"pay_wallet","order_id":"order_wallet","amount":100,"currency":"INR","status":"captured"}]
+                """));
+        mvc.perform(post(sync).header("Authorization", passengerToken)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        when(gateway.orderPayments("order_wallet")).thenReturn(json.readTree("""
+                [{"id":"pay_wallet","order_id":"order_wallet","amount":12550,"currency":"INR","status":"captured"}]
+                """));
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(post(sync).header("Authorization", passengerToken)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+        }
+        mvc.perform(get(root).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.availablePaise").value(12550));
+        mvc.perform(get(root + "/transactions").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].kind").value("TOP_UP"))
+                .andExpect(jsonPath("$.content[0].amountPaise").value(12550));
+        verify(gateway, times(1)).order(any(UUID.class), eq(12550L));
+    }
+
     @Test void onlyOneConcurrentGroupHoldWinsTheLastSeat() throws Exception {
         UUID ride = offer(1).id();
         var start = new CountDownLatch(1);
