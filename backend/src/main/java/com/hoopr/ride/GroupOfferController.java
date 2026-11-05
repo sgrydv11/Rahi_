@@ -21,9 +21,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/group/offers")
 public class GroupOfferController {
     private static final String ELIGIBLE = """
-            FROM rides
+            FROM rides CROSS JOIN LATERAL (
+                SELECT rides.available_seats - coalesce(sum(seats), 0) AS open_seats
+                FROM group_seat_holds WHERE ride_id = rides.id AND status = 'HELD' AND expires_at > :now
+            ) inventory
             WHERE status IN ('SCHEDULED', 'PUBLISHED')
-              AND departure_at > :now AND available_seats > 0
+              AND departure_at > :now AND open_seats > 0
               AND currency = 'INR' AND price_per_seat >= 1
               AND driver_id <> :viewer
               AND strpos(lower(source_name), lower(:origin)) > 0
@@ -50,7 +53,7 @@ public class GroupOfferController {
         long count = eligible("SELECT count(*) ", "", now, viewer, origin, destination)
                 .query(Long.class).single();
         List<Offer> content = eligible("""
-                SELECT id, source_name, destination_name, departure_at, available_seats,
+                SELECT id, source_name, destination_name, departure_at, open_seats AS available_seats,
                        price_per_seat * 100 AS fare_paise
                 """, "ORDER BY departure_at, id LIMIT :size OFFSET :offset", now, viewer, origin, destination)
                 .param("size", size).param("offset", (long) page * size)

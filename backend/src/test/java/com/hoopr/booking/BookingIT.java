@@ -65,6 +65,7 @@ class BookingIT {
                 DELETE FROM booking_payments WHERE booking_id IN
                     (SELECT b.id FROM bookings b JOIN rides r ON r.id = b.ride_id WHERE r.driver_id = ?)
                 """, owner);
+        if (owner != null) jdbc.update("DELETE FROM group_seat_holds WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
         if (owner != null) jdbc.update("DELETE FROM bookings WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
         for (UUID user : Arrays.asList(owner, passenger, stranger)) {
             if (user == null) continue;
@@ -77,6 +78,30 @@ class BookingIT {
         }
     }
     RideDtos.View offer(int seats) { return rides.create(owner, new RideDtos.Create("Mumbai", "Pune", null, null, departure, "Asia/Kolkata", seats, new BigDecimal("125.50"), "INR", null, null)); }
+    @Test void groupHoldReplaysAndReleasesInventoryForOtherRiders() throws Exception {
+        var ride = offer(1);
+        String key = UUID.randomUUID().toString();
+        String path = "/api/v1/group/holds";
+        String body = "{\"rideId\":\"" + ride.id() + "\",\"seats\":1}";
+        var create = post(path).header("Authorization", passengerToken)
+                .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON).content(body);
+        String result = mvc.perform(create).andExpect(status().isOk())
+                .andExpect(jsonPath("$.quote.totalPaise").value(12550))
+                .andExpect(jsonPath("$.status").value("HELD")).andReturn().getResponse().getContentAsString();
+        String id = json.readTree(result).path("id").asText();
+        mvc.perform(create).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id));
+        mvc.perform(get(path + "/" + id).header("Authorization", strangerToken)).andExpect(status().isNotFound());
+        assertThrows(BookingFailure.class, () -> bookings.create(ride.id(), stranger, UUID.randomUUID(), 1));
+        mvc.perform(post(path).header("Authorization", strangerToken).header("Idempotency-Key", UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SOLD_OUT"));
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(post(path + "/" + id + "/cancel").header("Authorization", passengerToken))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        }
+        assertNotNull(bookings.create(ride.id(), stranger, UUID.randomUUID(), 1));
+    }
+
     @Test void groupFeedRequiresLoginAndShowsOnlyMatchingBookableSeats() throws Exception {
         var ride = offer(1);
         String path = "/api/v1/group/offers?origin=mUmBaI&destination=PUNE&size=1";

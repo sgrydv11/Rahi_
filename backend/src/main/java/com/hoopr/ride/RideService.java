@@ -130,8 +130,11 @@ public class RideService {
 
     private void requireUnreserved(Ride ride) {
         Long reserved = jdbc.queryForObject("SELECT count(*) FROM bookings WHERE ride_id = ? AND status = 'CONFIRMED'", Long.class, ride.id);
-        if (ride.availableSeats != ride.totalSeats || (reserved != null && reserved > 0))
-            throw new RideFailure(409, "Cancel active bookings before editing this ride.");
+        Long holds = jdbc.queryForObject("""
+                SELECT count(*) FROM group_seat_holds WHERE ride_id = ? AND status = 'HELD' AND expires_at > ?
+                """, Long.class, ride.id, clock.instant().atOffset(ZoneOffset.UTC));
+        if (ride.availableSeats != ride.totalSeats || (reserved != null && reserved > 0) || (holds != null && holds > 0))
+            throw new RideFailure(409, "Cancel active bookings or wait for seat holds to end before editing this ride.");
     }
     @Transactional
     public View cancel(UUID id, UUID owner, Cancel body) {

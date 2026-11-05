@@ -16,8 +16,9 @@ public class BookingService {
     private final UserRepository users;
     private final ProfileRepository profiles;
     private final Clock clock;
-    public BookingService(BookingRepository bookings, RideRepository rides, UserRepository users, ProfileRepository profiles, Clock clock) {
-        this.bookings = bookings; this.rides = rides; this.users = users; this.profiles = profiles; this.clock = clock;
+    private final GroupSeatInventory groupSeats;
+    public BookingService(BookingRepository bookings, RideRepository rides, UserRepository users, ProfileRepository profiles, Clock clock, GroupSeatInventory groupSeats) {
+        this.bookings = bookings; this.rides = rides; this.users = users; this.profiles = profiles; this.clock = clock; this.groupSeats = groupSeats;
     }
     @Transactional
     public Created create(UUID rideId, UUID passenger, UUID requestKey, int seats) {
@@ -42,7 +43,9 @@ public class BookingService {
         if (seats < 1 || seats > 6 || seats > ride.totalSeats) throw new BookingFailure(400, "Choose a valid number of seats for this ride.");
         if (bookings.existsByRideIdAndPassengerIdAndStatus(rideId, passenger, "CONFIRMED"))
             throw new BookingFailure(409, "You already have an active booking on this ride. View My Bookings.");
-        if (ride.availableSeats < seats) throw new BookingFailure(409, "Not enough seats remain. Reload the ride and try again.");
+        if (groupSeats.hasHold(rideId, passenger, clock.instant().atOffset(ZoneOffset.UTC)))
+            throw new BookingFailure(409, "Cancel your active seat hold before booking this ride.");
+        if (ride.availableSeats - groupSeats.heldSeats(rideId, clock.instant()) < seats) throw new BookingFailure(409, "Not enough seats remain. Reload the ride and try again.");
         Booking booking = new Booking(); booking.id = UUID.randomUUID(); booking.rideId = rideId;
         booking.ride = ride; booking.passengerId = passenger; booking.passengerProfile = profiles.findById(passenger).orElse(null);
         booking.seatsBooked = (short) seats; booking.pricePerSeatSnapshot = ride.pricePerSeat;
@@ -111,6 +114,7 @@ public class BookingService {
         requireConsistentSeats(ride);
         for (Booking booking : bookings.findByRideIdAndStatusOrderById(ride.id, "CONFIRMED"))
             cancelRecord(booking, "CANCELLED_BY_DRIVER", owner, reason);
+        groupSeats.cancelForRide(ride.id);
         ride.availableSeats = ride.totalSeats;
     }
     public void requireConsistentSeats(Ride ride) {

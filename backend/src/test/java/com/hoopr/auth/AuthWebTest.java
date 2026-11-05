@@ -34,6 +34,7 @@ class AuthWebTest {
     @Autowired JwtDecoder decoder;
     @MockitoBean AuthService auth;
     @MockitoBean com.hoopr.ride.RideService rides;
+    @MockitoBean com.hoopr.ride.RideRepository rideRepository;
     @MockitoBean com.hoopr.booking.BookingService bookings;
     @MockitoBean org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate notificationJdbc;
     private final UUID id = UUID.randomUUID();
