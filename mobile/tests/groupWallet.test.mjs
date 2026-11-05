@@ -54,3 +54,13 @@ test('the initial feed omits blank filters and requests the first page', async (
   await client.offers(0, '  ', '');
   assert.deepEqual(requests, [{ path: '/group/offers?page=0&size=20', options: undefined }]);
 });
+
+test('loads and releases only the selected hold with the expected HTTP methods', async () => {
+  const { client, requests } = fixture();
+  await client.getHold('hold/one');
+  await client.cancel('hold/one');
+  assert.deepEqual(requests, [
+    { path: '/group/holds/hold%2Fone', options: undefined },
+    { path: '/group/holds/hold%2Fone/cancel', options: { method: 'POST' } },
+  ]);
+});
