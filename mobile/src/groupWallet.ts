@@ -47,6 +47,7 @@ export function createGroupWalletClient(send: Send) {
     transactions: (page = 0) => send<Page<WalletEntry>>(`/wallet/transactions?page=${page}&size=20`),
     topUp: (amountPaise: number, key: string) =>
       send<{ operation: WalletOperation; checkout: Checkout }>('/wallet/top-ups', { method: 'POST', body: { amountPaise }, key }),
+    getTopUp: (id: string) => send<{ operation: WalletOperation; checkout: Checkout }>(topUpPath(id)),
     syncTopUp: (id: string, body?: Verification) =>
       send<WalletOperation>(`${topUpPath(id)}/sync`, { method: 'POST', body }),
     withdraw: (amountPaise: number, key: string) =>
@@ -54,4 +55,11 @@ export function createGroupWalletClient(send: Send) {
     withdrawal: (id: string) => send<WalletOperation>(`/wallet/withdrawals/${encodeURIComponent(id)}`),
     nextDiscount: () => send<{ discountPercent: 5 | 10 | 15 }>('/ride-discounts/next'),
   };
+}
+
+export function parseTopUpPaise(input: string): number | null {
+  const match = /^(\d{1,5})(?:\.(\d{1,2}))?$/.exec(input.trim());
+  if (!match) return null;
+  const paise = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
+  return paise >= 100 && paise <= 1_000_000 ? paise : null;
 }

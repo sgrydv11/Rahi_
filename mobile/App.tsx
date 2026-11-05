@@ -1,3 +1,4 @@
+import { Wallet } from './src/wallet';
 import { GroupOffers } from './src/group';
 import { useEffect, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
@@ -11,7 +12,7 @@ import { PinsForm, RideDetails, RideForm, Rides } from './src/rides';
 import { Button, Card, colors, Copy, ErrorText, styles, useAction } from './src/ui';
 
 const titles: Record<Screen['kind'], string> = {
-  group: 'Open Ride Group', home: 'Share the journey.', search: 'Find a ride', rides: 'My rides', bookings: 'My bookings',
+  group: 'Open Ride Group', wallet: 'Wallet', home: 'Share the journey.', search: 'Find a ride', rides: 'My rides', bookings: 'My bookings',
   notifications: 'Notifications', profile: 'Your profile', vehicles: 'My vehicles',
   login: 'Welcome back', register: 'Join Hoopr', ride: 'Ride details', booking: 'Booking details',
   manifest: 'Passenger bookings', pins: 'Route pins', rideForm: 'Ride offer', vehicleForm: 'Vehicle details',
@@ -64,6 +65,7 @@ function NativeApp() {
       case 'bookings': return <Bookings go={go} />;
       case 'manifest': return <Bookings ride={screen.id} go={go} />;
       case 'booking': return user && <BookingDetails id={screen.id} user={user} go={go} />;
+      case 'wallet': return user && <Wallet userId={user.id} />;
       case 'group': return user && <GroupOffers userId={user.id} openBooking={id => go({ kind: 'booking', id })} />;
       case 'notifications': return <Notifications go={go} />;
       case 'profile': return user && <Profile user={user} onUser={setUser} go={go} />;
@@ -78,6 +80,7 @@ function NativeApp() {
           <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
           <Button label="My rides" onPress={() => go({ kind: 'rides' })} />
           <Button label="Open Ride Group" onPress={() => go({ kind: 'group' })} />
+          <Button label="Wallet" onPress={() => go({ kind: 'wallet' })} />
           <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
           <Button label="Notifications" onPress={() => go({ kind: 'notifications' })} />
           <Button label="Profile" onPress={() => go({ kind: 'profile' })} />

@@ -1,6 +1,6 @@
 # Open Ride Group and wallet API contract
 
-Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. Authenticated group offers, holds, provider checkout and reconciliation are available. Wallet and discount endpoints below are reserved.
+Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. Authenticated group offers, holds, provider checkout and reconciliation are available. Wallet balance, transaction history and sandbox top-ups are available. Wallet spending, withdrawals and discount endpoints are reserved.
 
 Mobile authentication uses JSON requests to `POST /api/v1/mobile/auth/register` with `email`, `password`, `fullName` and optional `travelPreference`, and to `POST /api/v1/mobile/auth/login` with `email` and `password`. Login returns `accessToken`, `expiresIn`, `refreshToken` and `user`. The `refresh` and `logout` endpoints under the same prefix accept the current `refreshToken` in the body. Refresh rotates the token and returns a new session. Logout revokes it and returns 204. The native app stores the refresh token in device secure storage. These endpoints do not set session cookies and reject browser-origin requests.
 
@@ -17,6 +17,7 @@ Use the existing `/api/v1` prefix and a mobile access token in the bearer header
 | GET `/wallet` | — | Currency, available and reserved balances |
 | GET `/wallet/transactions?page=0&size=20` | — | Paged ledger entries |
 | POST `/wallet/top-ups` | `amountPaise` | Pending operation and provider checkout details |
+| GET `/wallet/top-ups/{id}` | — | Owned top-up and checkout details for resuming payment |
 | POST `/wallet/top-ups/{id}/sync` | — | Updated top-up status |
 | POST `/wallet/withdrawals` | `amountPaise` | Sandbox withdrawal operation and status |
 | GET `/wallet/withdrawals/{id}` | — | Updated withdrawal status |

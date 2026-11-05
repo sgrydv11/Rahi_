@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createGroupWalletClient } from '../src/groupWallet.ts';
+import { createGroupWalletClient, parseTopUpPaise } from '../src/groupWallet.ts';
 
 function fixture() {
   const requests = [];
@@ -73,4 +73,13 @@ test('provider checkout reuses its key and sync uses the server-side order', asy
   assert.deepEqual(requests[0], requests[1]);
   assert.deepEqual(requests[0].options, { method: 'POST', body: { method: 'PROVIDER' }, key: 'checkout-key' });
   assert.deepEqual(requests[2], { path: '/group/holds/hold/sync', options: { method: 'POST', body: undefined } });
+});
+
+test('converts wallet input to exact paise and rejects unsupported amounts', () => {
+  assert.equal(parseTopUpPaise(' 10.01 '), 1001);
+  assert.equal(parseTopUpPaise('1.1'), 110);
+  assert.equal(parseTopUpPaise('10000'), 1000000);
+  for (const invalid of ['', '0.99', '10000.01', '-2', '1e2', '1.001']) {
+    assert.equal(parseTopUpPaise(invalid), null);
+  }
 });
