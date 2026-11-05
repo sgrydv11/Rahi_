@@ -218,7 +218,7 @@ class BookingIT {
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM wallet_entries WHERE user_id = ?", Integer.class, passenger));
     }
 
-    @Test void walletCreditsOnlyVerifiedCaptureAndRecordsExactlyOneEntry() throws Exception {
+    @Test void verifiedTopUpFundsDiscountedBookingAndCancellationRefund() throws Exception {
         String root = "/api/v1/wallet";
         mvc.perform(get(root)).andExpect(status().isUnauthorized());
         mvc.perform(get(root).header("Authorization", passengerToken))
@@ -258,6 +258,25 @@ class BookingIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].kind").value("TOP_UP"))
                 .andExpect(jsonPath("$.content[0].amountPaise").value(12550));
+        UUID ride = offer(1).id();
+        String hold = newWalletHold(ride);
+        String paid = mvc.perform(post(hold + "/checkout").header("Authorization", passengerToken)
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"WALLET\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.hold.quote.totalPaise").value(11922))
+                .andExpect(jsonPath("$.hold.status").value("CONFIRMED")).andReturn().getResponse().getContentAsString();
+        UUID booking = UUID.fromString(json.readTree(paid).path("hold").path("bookingId").asText());
+        mvc.perform(get(root).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.availablePaise").value(628));
+        var currentRide = rides.details(ride, owner);
+        rides.cancel(ride, owner, new RideDtos.Cancel(currentRide.version(), "Release test"));
+        mvc.perform(get(root).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.availablePaise").value(12550));
+        mvc.perform(get("/api/v1/bookings/" + booking).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED_BY_DRIVER"));
+        mvc.perform(get("/api/v1/ride-discounts/next").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.discountPercent").value(10));
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM wallet_entries WHERE user_id = ?", Integer.class, passenger));
         verify(gateway, times(1)).order(any(UUID.class), eq(12550L));
     }
 
