@@ -99,3 +99,20 @@ test('displays the server-quoted fare, discount and exact payable amount', () =>
   assert.deepEqual(formatQuote(quote), { fare: 'INR 125.50', discount: '5% off (INR 6.28)', total: 'INR 119.22' });
   assert.equal(formatQuote({ ...quote, discountPercent: 0, discountPaise: 0, totalPaise: 12550 }).discount, null);
 });
+
+test('a discounted wallet booking uses the hold quote and sends no client-calculated fare', async () => {
+  const calls = [];
+  const quote = { farePaise: 12550, discountPercent: 5, discountPaise: 628, totalPaise: 11922, currency: 'INR' };
+  const client = createGroupWalletClient(async (path, options) => {
+    calls.push({ path, options });
+    if (path === '/group/holds') return { id: 'hold', status: 'HELD', quote };
+    return { hold: { id: 'hold', status: 'CONFIRMED', bookingId: 'booking', quote }, checkout: null };
+  });
+  const hold = await client.hold('ride', 1, 'hold-key');
+  const result = await client.checkout(hold.id, 'WALLET', 'checkout-key');
+  assert.equal(formatQuote(result.hold.quote).total, 'INR 119.22');
+  assert.equal(result.hold.bookingId, 'booking');
+  assert.equal(result.checkout, null);
+  assert.deepEqual(calls[1], { path: '/group/holds/hold/checkout',
+    options: { method: 'POST', body: { method: 'WALLET' }, key: 'checkout-key' } });
+});

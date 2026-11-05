@@ -26,3 +26,14 @@ After each phase, run the phase-specific tests and the applicable regression che
 - Backend commit `4df25f0` ports native registration, login, refresh and logout. Maven `-Dtest=*Test,*IT verify` passed all 91 tests against `hoopr_test`, including cookie-free mobile login, token rotation and revocation, and existing web auth. Flyway validated V1–V8. Phase 1 adds no migration.
 - On `app-fe`, `npm test` passed all three native contract cases. `npm run typecheck` and `npm run bundle:check` passed for Android and iOS. No device run was performed.
 - The API contract is recorded on both branches. Phase 2 starts with the group feed and transactional seat hold endpoints, then connects the native screens.
+
+### Phase 5 release verification
+
+The Phase 4 starting points were `150cfc2` on `app-fe` and `86bd68f` on `codex/backend`. This phase adds a cross-feature regression and a mobile API contract test. It adds no migration. The test database must be migrated through V14.
+
+- Backend, from the backend checkout with the existing `TEST_DB_*` settings for the dedicated `hoopr_test` database, run `mvn '-Dtest=*Test,*IT' verify`.
+- Mobile, from the mobile directory, run `npm test`, `npm run typecheck`, and `npm run bundle:check`.
+- To reproduce on a device, publish a future INR ride as a driver, then sign in as a separate passenger. Open **Wallet** and complete a provider test top-up. Open **Open Ride Group**, hold a seat, compare the original and discounted amounts, and pay from the wallet. Cancel the ride as the driver. Check that the passenger gets back the amount charged and that the next discount step still advances.
+- Provider sandbox credentials and device tooling were unavailable for this release check. The automated backend test uses a mocked provider with real PostgreSQL transactions. Withdrawals remain simulated.
+
+Release results. PostgreSQL backend verification passed all 101 tests. Mobile verification passed all 10 tests and TypeScript, and exported both Android and iOS production bundles.
