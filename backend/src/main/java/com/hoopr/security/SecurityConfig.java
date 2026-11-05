@@ -92,6 +92,10 @@ public class SecurityConfig {
                 .requestCache(c -> c.disable())
                 .cors(c -> { })
                 .csrf(c -> c.csrfTokenRepository(csrfRepo).csrfTokenRequestHandler(csrfHandler)
+                        .ignoringRequestMatchers(r -> "POST".equals(r.getMethod()) &&
+                                Set.of("/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
+                                        "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout")
+                                        .contains(r.getRequestURI().substring(r.getContextPath().length())))
                         // Only bearer-authenticated business requests bypass CSRF, never cookie auth routes.
                         .ignoringRequestMatchers(r -> !r.getRequestURI().startsWith(r.getContextPath() + "/api/v1/auth/")
                                 && r.getHeader("Authorization") != null && r.getHeader("Authorization").startsWith("Bearer ")))
@@ -106,6 +110,8 @@ public class SecurityConfig {
                     }
                 }, CsrfFilter.class)
                 .authorizeHttpRequests(a -> a
+                        .requestMatchers(HttpMethod.POST, "/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
+                                "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health", "/actuator/health", "/api/v1/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
                                 "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
