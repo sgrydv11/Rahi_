@@ -40,7 +40,15 @@ public class StripeGateway {
     public boolean enabled() { return key.matches("(sk|rk)_test_[A-Za-z0-9]+"); }
 
     public JsonNode checkout(UUID booking, long amount, String previous) {
-        String returnUrl = frontendOrigin.replaceFirst("/+$", "") + "/bookings/" + booking;
+        return checkout(booking, amount, previous, "/bookings/" + booking);
+    }
+
+    public JsonNode groupCheckout(UUID hold, long amount) {
+        return checkout(hold, amount, null, "/");
+    }
+
+    private JsonNode checkout(UUID booking, long amount, String previous, String returnPath) {
+        String returnUrl = frontendOrigin.replaceFirst("/+$", "") + returnPath;
         var form = new LinkedMultiValueMap<String, String>();
         form.add("mode", "payment");
         form.add("payment_method_types[0]", "card");

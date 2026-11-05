@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.*;
 
 @SpringBootTest(properties = {
+    "hoopr.group.reconcile-enabled=false",
     "PAYMENT_PROVIDER=razorpay",
     "hoopr.auth.jwt-secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "hoopr.auth.issuer=hoopr-test",
     "hoopr.auth.origins=http://localhost:5173", "hoopr.auth.cookie-secure=true",
@@ -78,6 +79,99 @@ class BookingIT {
         }
     }
     RideDtos.View offer(int seats) { return rides.create(owner, new RideDtos.Create("Mumbai", "Pune", null, null, departure, "Asia/Kolkata", seats, new BigDecimal("125.50"), "INR", null, null)); }
+    @Test void onlyOneConcurrentGroupHoldWinsTheLastSeat() throws Exception {
+        UUID ride = offer(1).id();
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Future<Integer> first = pool.submit(() -> placeGroupHold(ride, passengerToken, start));
+            Future<Integer> second = pool.submit(() -> placeGroupHold(ride, strangerToken, start));
+            start.countDown();
+            assertEquals(Set.of(200, 409), Set.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)));
+        }
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM group_seat_holds WHERE ride_id = ?", Integer.class, ride));
+    }
+
+    private int placeGroupHold(UUID ride, String token, CountDownLatch start) throws Exception {
+        start.await();
+        return mvc.perform(post("/api/v1/group/holds").header("Authorization", token)
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rideId\":\"" + ride + "\",\"seats\":1}"))
+                .andReturn().getResponse().getStatus();
+    }
+
+    @Test void groupCheckoutConfirmsOnlyTheVerifiedFareAndReplaysWithoutAnotherOrder() throws Exception {
+        UUID ride = offer(1).id();
+        String path = startGroupCheckout(ride);
+        when(gateway.orderPayments("order_group")).thenReturn(json.readTree("""
+                [{"id":"pay_group","order_id":"order_group","amount":100,"currency":"INR","status":"captured"}]
+                """));
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PAYMENT_PENDING"))
+                .andExpect(jsonPath("$.bookingId").doesNotExist());
+        groupCapture();
+        String result = mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andReturn().getResponse().getContentAsString();
+        UUID booking = UUID.fromString(json.readTree(result).path("bookingId").asText());
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.bookingId").value(booking.toString()));
+        assertEquals("pay_group", jdbc.queryForObject("SELECT payment_id FROM booking_payments WHERE booking_id = ?", String.class, booking));
+        verify(gateway, times(1)).order(any(UUID.class), eq(12550L));
+    }
+
+    @Test void lateGroupPaymentIsRefundedWithoutReclaimingTheSeat() throws Exception {
+        UUID ride = offer(1).id();
+        String path = startGroupCheckout(ride);
+        UUID hold = UUID.fromString(path.substring(path.lastIndexOf('/') + 1));
+        jdbc.update("UPDATE group_seat_holds SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute' WHERE id = ?", hold);
+        bookings.create(ride, stranger, UUID.randomUUID(), 1);
+        groupCapture();
+        mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUND_PENDING"));
+        when(gateway.refund(hold, "pay_group", 12550)).thenReturn(json.readTree("""
+                {"id":"rfnd_group","payment_id":"pay_group","amount":12550,"status":"processed"}
+                """));
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                    .andExpect(jsonPath("$.bookingId").doesNotExist());
+        }
+        verify(gateway, times(1)).refund(hold, "pay_group", 12550);
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM bookings WHERE ride_id = ?", Integer.class, ride));
+    }
+
+    private String startGroupCheckout(UUID ride) throws Exception {
+        String root = "/api/v1/group/holds";
+        String created = mvc.perform(post(root).header("Authorization", passengerToken)
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rideId\":\"" + ride + "\",\"seats\":1}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String path = root + "/" + json.readTree(created).path("id").asText();
+        mvc.perform(post(path + "/checkout").header("Authorization", passengerToken)
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"PROVIDER\"}"))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("PROVIDER_UNAVAILABLE"));
+        when(gateway.enabled()).thenReturn(true);
+        when(gateway.keyId()).thenReturn("rzp_test_fixture");
+        when(gateway.order(any(UUID.class), eq(12550L))).thenReturn(json.readTree("""
+                {"id":"order_group","amount":12550,"currency":"INR"}
+                """));
+        UUID key = UUID.randomUUID();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(post(path + "/checkout").header("Authorization", passengerToken)
+                            .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"method\":\"PROVIDER\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.checkout.orderId").value("order_group"));
+        }
+        return path;
+    }
+
+    private void groupCapture() throws Exception {
+        when(gateway.orderPayments("order_group")).thenReturn(json.readTree("""
+                [{"id":"pay_group","order_id":"order_group","amount":12550,"currency":"INR","status":"captured"}]
+                """));
+    }
+
     @Test void groupHoldReplaysAndReleasesInventoryForOtherRiders() throws Exception {
         var ride = offer(1);
         String key = UUID.randomUUID().toString();
