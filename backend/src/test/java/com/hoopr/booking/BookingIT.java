@@ -77,6 +77,25 @@ class BookingIT {
         }
     }
     RideDtos.View offer(int seats) { return rides.create(owner, new RideDtos.Create("Mumbai", "Pune", null, null, departure, "Asia/Kolkata", seats, new BigDecimal("125.50"), "INR", null, null)); }
+    @Test void groupFeedRequiresLoginAndShowsOnlyMatchingBookableSeats() throws Exception {
+        var ride = offer(1);
+        String path = "/api/v1/group/offers?origin=mUmBaI&destination=PUNE&size=1";
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(get(path).header("Authorization", passengerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].rideId").value(ride.id().toString()))
+                .andExpect(jsonPath("$.content[0].availableSeats").value(1))
+                .andExpect(jsonPath("$.content[0].farePerSeatPaise").value(12550))
+                .andExpect(jsonPath("$.totalPages").value(1));
+        mvc.perform(get(path).header("Authorization", ownerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
+        mvc.perform(get(path + "&page=1").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
+        bookings.create(ride.id(), passenger, UUID.randomUUID(), 1);
+        mvc.perform(get(path).header("Authorization", strangerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
+    }
+
     @Test void razorpayCaptureAndRefundAreVerifiedAndRetrySafe() throws Exception {
         var ride = offer(3);
         UUID booking = bookings.create(ride.id(), passenger, UUID.randomUUID(), 2).booking().id();

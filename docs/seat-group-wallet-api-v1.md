@@ -1,6 +1,6 @@
 # Open Ride Group and wallet API contract
 
-Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. The endpoints below are reserved for those later phases.
+Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. The authenticated group offers endpoint is available. The hold, wallet, and discount endpoints below are reserved for subsequent implementation.
 
 Mobile authentication uses JSON requests to `POST /api/v1/mobile/auth/register` with `email`, `password`, `fullName` and optional `travelPreference`, and to `POST /api/v1/mobile/auth/login` with `email` and `password`. Login returns `accessToken`, `expiresIn`, `refreshToken` and `user`. The `refresh` and `logout` endpoints under the same prefix accept the current `refreshToken` in the body. Refresh rotates the token and returns a new session. Logout revokes it and returns 204. The native app stores the refresh token in device secure storage. These endpoints do not set session cookies and reject browser-origin requests.
 
