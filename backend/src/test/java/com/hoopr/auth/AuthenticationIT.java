@@ -53,6 +53,32 @@ class AuthenticationIT {
         jdbc.update("DELETE FROM user_profiles WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM users WHERE id = ?", userId);
     }
+    @Test void mobileLoginRefreshAndLogoutUseExplicitTokensWithoutCookies() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        String path = "/api/v1/mobile/auth";
+        String credentials = json.writeValueAsString(Map.of("email", email, "password", "test-password-long"));
+        mvc.perform(post(path + "/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("email", email, "password", "short", "fullName", "Test User"))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post(path + "/login").header("Origin", "http://localhost:5173")
+                .contentType(MediaType.APPLICATION_JSON).content(credentials)).andExpect(status().isForbidden());
+        var response = mvc.perform(post(path + "/login").contentType(MediaType.APPLICATION_JSON).content(credentials))
+                .andExpect(status().isOk()).andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(header().string("Cache-Control", "no-store")).andReturn().getResponse();
+        var session = json.readTree(response.getContentAsString());
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + session.path("accessToken").asText()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.email").value(email));
+        var refreshed = mvc.perform(post(path + "/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("refreshToken", session.path("refreshToken").asText()))))
+                .andExpect(status().isOk()).andExpect(header().doesNotExist("Set-Cookie")).andReturn().getResponse();
+        String rotated = json.readTree(refreshed.getContentAsString()).path("refreshToken").asText();
+        assertNotEquals(session.path("refreshToken").asText(), rotated);
+        String token = json.writeValueAsString(Map.of("refreshToken", rotated));
+        mvc.perform(post(path + "/logout").contentType(MediaType.APPLICATION_JSON).content(token))
+                .andExpect(status().isNoContent());
+        mvc.perform(post(path + "/refresh").contentType(MediaType.APPLICATION_JSON).content(token))
+                .andExpect(status().isUnauthorized());
+    }
     @Test void travelPreferencesPersistAcrossLoginRefreshAndProfile() {
         for (var preference : com.hoopr.user.TravelPreference.values()) {
             var account = auth.register("preference-" + UUID.randomUUID() + "@example.test", "test-password-long", "Preference User", preference);

@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Hoopr",
+    "slug": "hoopr-native",
+    "scheme": "hoopr",
+    "version": "0.1.0",
+    "platforms": ["android", "ios"],
+    "newArchEnabled": false,
+    "android": { "package": "com.hoopr.app" },
+    "ios": { "bundleIdentifier": "com.hoopr.app" },
+    "plugins": ["expo-secure-store"]
+  }
+}

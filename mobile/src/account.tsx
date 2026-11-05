@@ -1,0 +1,104 @@
+import { useState } from 'react';
+import { View } from 'react-native';
+import { api, login, register, type Preference, type User, type Vehicle } from './api';
+import type { Navigate } from './navigation';
+import { Button, Card, Copy, ErrorText, Field, QueryState, styles, useAction, useQuery } from './ui';
+
+const preferences: Record<Preference, string> = { BOTH: 'Drive and ride', DRIVER: 'Drive', PASSENGER: 'Ride' };
+function Preferences({ value, change }: { value: Preference; change: (value: Preference) => void }) {
+  return <><Copy>Travel preference</Copy><View style={styles.row}>
+    {(Object.keys(preferences) as Preference[]).map(option => <Button key={option}
+      label={preferences[option] + (value === option ? ' ✓' : '')} onPress={() => change(option)} />)}
+  </View></>;
+}
+export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user: User) => void; go: Navigate }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [preference, setPreference] = useState<Preference>('BOTH');
+  const action = useAction();
+  function submit() {
+    void action.run(async () => {
+      if (!email.trim() || !password || (create && (!name.trim() || password.length < 12)))
+        throw new Error(create ? 'Enter a name, email and password of at least 12 characters.' : 'Enter your email and password.');
+      onUser(await (create ? register(email.trim(), password, name.trim(), preference) : login(email.trim(), password)));
+    });
+  }
+  return <Card>
+    {create && <><Field label="Full name" value={name} change={setName} /><Preferences value={preference} change={setPreference} /></>}
+    <Field label="Email" value={email} change={setEmail} />
+    <Field label="Password" value={password} change={setPassword} secret />
+    <ErrorText message={action.error} />
+    <Button label={create ? 'Register' : 'Sign in'} disabled={action.busy} onPress={submit} />
+    <Button label={create ? 'Already have an account?' : 'Create an account'} disabled={action.busy}
+      onPress={() => go({ kind: create ? 'login' : 'register' })} />
+  </Card>;
+}
+
+export function Profile({ user, onUser, go }: { user: User; onUser: (user: User) => void; go: Navigate }) {
+  const [name, setName] = useState(user.fullName);
+  const [preference, setPreference] = useState(user.travelPreference);
+  const [saved, setSaved] = useState(false);
+  const action = useAction();
+  return <Card>
+    <Copy>{user.email}</Copy>
+    <Field label="Full name" value={name} change={value => { setName(value); setSaved(false); }} />
+    <Preferences value={preference} change={value => { setPreference(value); setSaved(false); }} />
+    <ErrorText message={action.error} />
+    {saved && <Copy>Profile saved.</Copy>}
+    <Button label="Save profile" disabled={action.busy} onPress={() => void action.run(async () => {
+      onUser(await api<User>('/users/me', { method: 'PATCH', body: { fullName: name.trim(), travelPreference: preference } }));
+      setSaved(true);
+    })} />
+    <Button label="Manage vehicles" onPress={() => go({ kind: 'vehicles' })} />
+  </Card>;
+}
+
+export function Vehicles({ go }: { go: Navigate }) {
+  const result = useQuery('vehicles', () => api<Vehicle[]>('/vehicles'));
+  return <>
+    <Button label="Add vehicle" onPress={() => go({ kind: 'vehicleForm' })} />
+    {!result.data ? <QueryState {...result} /> : <>
+      {!result.data.length && <Copy>No saved vehicles.</Copy>}
+      {result.data.map(vehicle => <Card key={vehicle.id}>
+        <Copy>{vehicle.make} {vehicle.model} · {vehicle.passengerCapacity} seats</Copy>
+        <Copy>{vehicle.registrationNumber} · {vehicle.active ? 'Active' : 'Archived'}</Copy>
+        <Button label="Edit vehicle" onPress={() => go({ kind: 'vehicleForm', id: vehicle.id })} />
+      </Card>)}
+    </>}
+  </>;
+}
+
+function VehicleFields({ vehicle, back }: { vehicle?: Vehicle; back: () => void }) {
+  const [draft, setDraft] = useState({
+    make: vehicle?.make ?? '', model: vehicle?.model ?? '', color: vehicle?.color ?? '',
+    registrationNumber: vehicle?.registrationNumber ?? '', passengerCapacity: String(vehicle?.passengerCapacity ?? 1),
+  });
+  const [active, setActive] = useState(vehicle?.active ?? true);
+  const action = useAction();
+  const labels = { make: 'Make', model: 'Model', color: 'Colour', registrationNumber: 'Registration number', passengerCapacity: 'Passenger seats' };
+  return <Card>
+    {Object.entries(labels).map(([name, label]) => {
+      const key = name as keyof typeof labels;
+      return <Field key={key} label={label} numeric={key === 'passengerCapacity'} value={draft[key]}
+        change={value => setDraft(previous => ({ ...previous, [key]: value }))} />;
+    })}
+    <Button label={active ? 'Available for new rides ✓' : 'Archived'} onPress={() => setActive(!active)} />
+    <ErrorText message={action.error} />
+    <Button label="Save vehicle" disabled={action.busy} onPress={() => void action.run(async () => {
+      await api(vehicle ? `/vehicles/${encodeURIComponent(vehicle.id)}` : '/vehicles', {
+        method: vehicle ? 'PATCH' : 'POST',
+        body: { ...draft, passengerCapacity: Number(draft.passengerCapacity), active },
+      });
+      back();
+    })} />
+  </Card>;
+}
+export function VehicleForm({ id, back }: { id?: string; back: () => void }) {
+  const result = useQuery(id ?? 'new', async () => ({
+    vehicle: id ? (await api<Vehicle[]>('/vehicles')).find(vehicle => vehicle.id === id) : undefined,
+  }));
+  if (!result.data) return <QueryState {...result} />;
+  if (id && !result.data.vehicle) return <Copy>Vehicle not found.</Copy>;
+  return <VehicleFields vehicle={result.data.vehicle} back={back} />;
+}
