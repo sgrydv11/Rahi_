@@ -40,4 +40,12 @@ public class RideController {
         return rides.cancel(id, user(jwt), body);
     }
     private static UUID user(Jwt jwt) { return jwt == null ? null : UUID.fromString(jwt.getSubject()); }
+    @PostMapping("/{id}/start")
+    public View start(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Transition body) {
+        return rides.start(id, user(jwt), body.version());
+    }
+    @PostMapping("/{id}/complete")
+    public View complete(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Transition body) {
+        return rides.complete(id, user(jwt), body.version());
+    }
 }

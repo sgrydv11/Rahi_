@@ -40,11 +40,13 @@ public final class RideDtos {
         public void unknown(String name, Object value) { throw new IllegalArgumentException("Unknown ride field"); }
     }
     public record Cancel(@NotNull @PositiveOrZero Long version, @Size(max = 500) String reason) { }
+    public record Transition(@NotNull @PositiveOrZero Long version) { }
     public record Driver(UUID id, String displayName) { }
     public record View(UUID id, Driver driver, String origin, String destination,
         String pickupDescription, String dropoffDescription, Instant departureAt, String timeZone,
         int totalSeats, int availableSeats, BigDecimal pricePerSeat, String currency,
         String vehicleDetails, String notes, String status, long version,
-        Instant createdAt, Instant updatedAt, Instant cancelledAt, String cancellationReason) { }
+        Instant createdAt, Instant updatedAt, Instant cancelledAt, String cancellationReason,
+        Instant startedAt, Instant completedAt, boolean canStart) { }
     public record Results(List<View> content, int page, int size, long totalElements, int totalPages) { }
 }

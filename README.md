@@ -10,6 +10,8 @@ Phase 3 adds ride offers, public search/details and owner management. See the [P
 
 Phase 4 adds seat confirmation, My Bookings, passenger cancellation, owner manifests and atomic driver cancellation. See the [Phase 4 guide and file inventory](docs/phase-4-bookings.md) and [booking API collection](docs/api/Hoopr-Phase-4.postman_collection.json).
 
+Phase 5 adds driver start and completion controls and passenger trip status. See the [ride lifecycle guide](docs/phase-5-ride-lifecycle.md) and [lifecycle API collection](docs/api/Hoopr-Phase-5.postman_collection.json).
+
 ## Prerequisites
 
 - JDK 21 and Maven 3.6.3+; check `java -version` and `mvn -version`.

@@ -7,6 +7,7 @@ export interface Ride {
   totalSeats: number; availableSeats: number; pricePerSeat: number; currency: string;
   vehicleDetails: string | null; notes: string | null; status: string; version: number;
   createdAt: string; updatedAt: string; cancelledAt: string | null; cancellationReason: string | null;
+  startedAt?: string | null; completedAt?: string | null; canStart?: boolean;
 }
 export interface RidePage { content: Ride[]; page: number; size: number; totalElements: number; totalPages: number }
 export interface RideInput {
@@ -21,6 +22,10 @@ export const ridesApi = {
   create: (body: RideInput) => authenticatedRequest<Ride>('/rides', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: RideInput, version: number) => authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ ...body, version }) }),
   cancel: (id: string, version: number, reason: string) => authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: JSON.stringify({ version, reason }) }),
+  transition: (id: string, version: number, action: 'start' | 'complete') =>
+    authenticatedRequest<Ride>(`/rides/${encodeURIComponent(id)}/${action}`, {
+      method: 'POST', body: JSON.stringify({ version }),
+    }),
 };
 export function localDateTime(instant: string) {
   const date = new Date(instant);

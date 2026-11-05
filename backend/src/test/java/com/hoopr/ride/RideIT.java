@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static com.hoopr.ride.RideDtos.*;
 
 @SpringBootTest(properties = {
@@ -36,6 +37,7 @@ class RideIT {
     }
     @Autowired AuthService auth;
     @Autowired RideService service;
+    @Autowired com.hoopr.booking.BookingService bookings;
     @Autowired RideRepository rides;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
@@ -68,6 +70,78 @@ class RideIT {
         return new Create(origin, destination, "Station entrance", null, departure, "Asia/Kolkata", seats, new BigDecimal(price), "INR", null, "Test journey");
     }
     View offer() { return service.create(owner, body("Mumbai", "Pune", tomorrow, 3, "250.00")); }
+    @Test void lifecycleRequiresOwnerDepartureAndCurrentVersion() throws Exception {
+        View ride = offer();
+        String path = "/api/v1/rides/" + ride.id();
+        String initial = "{\"version\":" + ride.version() + "}";
+        mvc.perform(post(path + "/start").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(initial))
+                .andExpect(status().isUnauthorized());
+        assertEquals(403, assertThrows(RideFailure.class, () -> service.start(ride.id(), other, ride.version())).status);
+        assertEquals(409, assertThrows(RideFailure.class, () -> service.start(ride.id(), owner, ride.version())).status);
+        assertEquals(409, assertThrows(RideFailure.class, () -> service.complete(ride.id(), owner, ride.version())).status);
+        var booking = bookings.create(ride.id(), other, UUID.randomUUID(), 1).booking();
+        jdbc.update("UPDATE rides SET departure_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = ?", ride.id());
+        long version = service.details(ride.id(), owner).version();
+        mvc.perform(post(path + "/start").header("Authorization", bearer)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"version\":" + version + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.startedAt").isNotEmpty());
+        assertEquals("IN_PROGRESS", bookings.details(booking.id(), other).ride().status());
+        assertEquals(409, assertThrows(RideFailure.class, () -> service.complete(ride.id(), owner, version)).status);
+        mvc.perform(post(path + "/complete").header("Authorization", bearer)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"version\":" + (version + 1) + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.completedAt").isNotEmpty());
+        assertEquals("COMPLETED", bookings.details(booking.id(), other).ride().status());
+        assertEquals(409, assertThrows(RideFailure.class, () -> service.complete(ride.id(), owner, version + 2)).status);
+    }
+
+    @Test void concurrentStartAndLastSeatBookingAtDepartureCannotAllocate() throws Exception {
+        View ride = service.create(owner, body("Mumbai", "Pune", tomorrow, 1, "250.00"));
+        jdbc.update("UPDATE rides SET departure_at = CURRENT_TIMESTAMP - interval '1 second' WHERE id = ?", ride.id());
+        var ready = new CyclicBarrier(2);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var start = executor.submit(() -> {
+                ready.await(5, TimeUnit.SECONDS);
+                return service.start(ride.id(), owner, ride.version());
+            });
+            var booking = executor.submit(() -> {
+                ready.await(5, TimeUnit.SECONDS);
+                return assertThrows(com.hoopr.booking.BookingFailure.class,
+                        () -> bookings.create(ride.id(), other, UUID.randomUUID(), 1));
+            });
+            assertEquals("IN_PROGRESS", start.get(10, TimeUnit.SECONDS).status());
+            assertEquals(409, booking.get(10, TimeUnit.SECONDS).status);
+        }
+        assertEquals(1, service.details(ride.id(), owner).availableSeats());
+    }
+
+    @Test void lifecycleRejectsMalformedVersionsAndKeepsCompletedRideOutOfSearch() throws Exception {
+        View ride = offer();
+        String path = "/api/v1/rides/" + ride.id();
+        for (String action : List.of("/start", "/complete")) {
+            for (String invalid : List.of("{}", "{\"version\":-1}", "{\"version\":0.5}")) {
+                mvc.perform(post(path + action).header("Authorization", bearer)
+                                .contentType(MediaType.APPLICATION_JSON).content(invalid))
+                        .andExpect(status().isBadRequest());
+            }
+        }
+        assertEquals(ride.version(), service.details(ride.id(), owner).version());
+        jdbc.update("UPDATE rides SET departure_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = ?", ride.id());
+        View started = service.start(ride.id(), owner, ride.version());
+        assertEquals(403, assertThrows(RideFailure.class,
+                () -> service.complete(ride.id(), other, started.version())).status);
+        assertEquals(409, assertThrows(RideFailure.class,
+                () -> service.start(ride.id(), owner, started.version())).status);
+        Instant persistedStart = service.details(ride.id(), owner).startedAt();
+        View completed = service.complete(ride.id(), owner, started.version());
+        assertEquals(persistedStart, completed.startedAt());
+        assertFalse(completed.completedAt().isBefore(completed.startedAt()));
+        assertTrue(service.mine(owner, 0, 20).content().stream()
+                .anyMatch(entry -> entry.id().equals(ride.id()) && entry.status().equals("COMPLETED")));
+        assertFalse(service.search("Mumbai", "Pune", null, "UTC", 1, null, 0, 20).content().stream()
+                .anyMatch(entry -> entry.id().equals(ride.id())));
+    }
     Update update(long version, int seats) { return new Update(version, null, null, null, null, null, null, seats, null, null, null, null); }
     @Test void httpCreateUsesJwtAndPublicDetailsAreSafe() throws Exception {
         String json = "{\"origin\":\"Mumbai\",\"destination\":\"Pune\",\"departureAt\":\"" + tomorrow + "\",\"timeZone\":\"Asia/Kolkata\",\"totalSeats\":3,\"pricePerSeat\":250,\"currency\":\"INR\"}";

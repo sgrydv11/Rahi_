@@ -115,6 +115,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/rides/{id}/bookings", "/api/v1/bookings/{id}/cancel").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/rides", "/api/v1/rides/{id}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/rides", "/api/v1/rides/{id}/cancel").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/rides/{id}/start", "/api/v1/rides/{id}/complete").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/rides/{id}").hasAnyRole("USER", "ADMIN")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.bearerTokenResolver(request -> {

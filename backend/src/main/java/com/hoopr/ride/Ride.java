@@ -39,6 +39,8 @@ public class Ride {
     @Version @Column(nullable = false) public long version;
     @Column(name = "cancellation_reason", length = 500) public String cancellationReason;
     @Column(name = "cancelled_at") public Instant cancelledAt;
+    @Column(name = "started_at") public Instant startedAt;
+    @Column(name = "completed_at") public Instant completedAt;
     @Column(name = "created_at", nullable = false) public Instant createdAt;
     @Column(name = "updated_at", nullable = false) public Instant updatedAt;
 }

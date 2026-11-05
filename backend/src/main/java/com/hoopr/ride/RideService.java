@@ -101,10 +101,46 @@ public class RideService {
         ride.cancelledAt = ride.updatedAt = clock.instant(); rides.flush();
         return view(ride);
     }
-    private Ride editable(UUID id, UUID owner, long version) {
+    @Transactional
+    public View start(UUID id, UUID owner, long version) {
+        active(owner);
+        Ride ride = lockOwned(id, owner, version);
+        Instant now = clock.instant();
+        if (!canStart(ride, now))
+            throw new RideFailure(409, "A scheduled ride can start at or after departure.");
+        ride.status = "IN_PROGRESS";
+        ride.startedAt = ride.updatedAt = now;
+        rides.flush();
+        return view(ride);
+    }
+
+    @Transactional
+    public View complete(UUID id, UUID owner, long version) {
+        active(owner);
+        Ride ride = lockOwned(id, owner, version);
+        if (!"IN_PROGRESS".equals(ride.status))
+            throw new RideFailure(409, "Only a ride in progress can be completed.");
+        Instant now = clock.instant();
+        if (ride.startedAt != null && now.isBefore(ride.startedAt))
+            throw new RideFailure(409, "Completion cannot precede the ride start.");
+        ride.status = "COMPLETED";
+        ride.completedAt = ride.updatedAt = now;
+        rides.flush();
+        return view(ride);
+    }
+
+    private static boolean canStart(Ride ride, Instant now) {
+        return List.of("SCHEDULED", "PUBLISHED").contains(ride.status) && !ride.departureAt.isAfter(now);
+    }
+
+    private Ride lockOwned(UUID id, UUID owner, long version) {
         Ride ride = rides.lockById(id).orElseThrow(() -> new RideFailure(404, "Ride not found."));
         if (!ride.driverId.equals(owner)) throw new RideFailure(403, "Only the ride owner can manage this ride.");
         if (ride.version != version) throw new RideFailure(409, "Ride changed. Reload before trying again.");
+        return ride;
+    }
+    private Ride editable(UUID id, UUID owner, long version) {
+        Ride ride = lockOwned(id, owner, version);
         if (!List.of("SCHEDULED", "PUBLISHED").contains(ride.status) || !ride.departureAt.isAfter(clock.instant()))
             throw new RideFailure(409, "Only future scheduled rides can be changed.");
         return ride;
@@ -147,6 +183,7 @@ public class RideService {
                 ride.pickupDescription, ride.dropoffDescription, ride.departureAt, ride.timeZone,
                 ride.totalSeats, ride.availableSeats, ride.pricePerSeat, ride.currency, ride.vehicleDetails,
                 ride.notes, "PUBLISHED".equals(ride.status) ? "SCHEDULED" : ride.status, ride.version,
-                ride.createdAt, ride.updatedAt, ride.cancelledAt, ride.cancellationReason);
+                ride.createdAt, ride.updatedAt, ride.cancelledAt, ride.cancellationReason,
+                ride.startedAt, ride.completedAt, canStart(ride, clock.instant()));
     }
 }

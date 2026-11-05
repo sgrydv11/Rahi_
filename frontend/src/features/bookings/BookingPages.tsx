@@ -8,6 +8,7 @@ import { bookingsApi, bookingStatus, type Booking, type BookingPage } from './ap
 function BookingCard({ booking }: { booking: Booking }) {
   return <article className="panel ride-card"><div><p className="eyebrow">{bookingStatus(booking.status)}</p>
     <h2><Link to={`/bookings/${booking.id}`}>{booking.ride.origin} → {booking.ride.destination}</Link></h2>
+    <p>Trip status: {bookingStatus(booking.ride.status)}</p>
     <p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: booking.ride.timeZone }).format(new Date(booking.ride.departureAt))} ({booking.ride.timeZone})</p>
     <p>Passenger: {booking.passenger.displayName} · {booking.seats} seat{booking.seats > 1 ? 's' : ''}</p></div>
     <div><p>{booking.currency} {Number(booking.totalPrice).toFixed(2)} total</p><Link className="button button-small" to={`/bookings/${booking.id}`}>View booking</Link></div>
@@ -60,7 +61,7 @@ export function BookingDetailsPage() {
         <p>No payment is collected by Hoopr in this phase.</p>
         {booking.cancelledAt && <p>Cancelled: {new Date(booking.cancelledAt).toLocaleString()}</p>}
         {booking.cancellationReason && <p>Reason: {booking.cancellationReason}</p>}
-        <Link to={`/rides/${booking.ride.id}`}>View ride</Link>
+        {booking.ride.status !== 'IN_PROGRESS' && <Link to={`/rides/${booking.ride.id}`}>View ride</Link>}
       </div>
       {booking.canCancel && user?.id === booking.passenger.id && (!confirm ? <button className="button button-danger" onClick={() => setConfirm(true)}>Cancel booking</button> :
         <form className="panel auth-form" onSubmit={cancel} aria-busy={busy}><h2>Cancel this booking?</h2><p>All {booking.seats} seats in this booking will be released.</p>

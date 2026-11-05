@@ -17,6 +17,14 @@ describe('booking controls', () => {
     state.user = { id: 'driver' }; expect(render()).toBe('');
     state.user = { id: 'passenger' }; expect(render({ ...ride, availableSeats: 0 })).toContain('fully booked');
   });
+  it.each(['IN_PROGRESS', 'COMPLETED'])('hides booking controls for a trip in state %s', status => {
+    state.user = { id: 'passenger' };
+    expect(render({ ...ride, status })).toBe('');
+  });
+  it('hides booking controls after the scheduled departure', () => {
+    state.user = { id: 'passenger' };
+    expect(render({ ...ride, departureAt: '2000-01-01T10:00:00Z' })).toBe('');
+  });
   it('shows available seat choices, the total, and review before confirmation', () => {
     state.user = { id: 'passenger' }; const html = render();
     expect(html).toContain('Review booking'); expect(html).toContain('INR'); expect(html).toContain('125.50');

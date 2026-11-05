@@ -13,7 +13,8 @@ These are complete reusable prompts aligned with the repository's implemented be
 | Phase 2 follow-up — Travel preference | COMPLETE | Offer a seat / Find a seat / Both registration choice, persisted preference and profile display |
 | Phase 3 — Ride management and search | COMPLETE | Offer/search/details/My Rides/edit/cancel, SQL filters/pagination, owner checks, optimistic locking, API collection and tests |
 | Phase 4 — Bookings and seat allocation | COMPLETE | Transactional allocation, idempotent retries, passenger history/cancellation, owner manifest and atomic driver cancellation |
-| Later phases | NOT COMMITTED | Payments, notifications, advanced vehicle onboarding, maps, lifecycle completion and other features need separately agreed scope |
+| Phase 5 — Ride start and completion | COMPLETE | Driver-only versioned transitions and passenger trip status |
+| Later phases | NOT COMMITTED | Payments, notifications, advanced vehicle onboarding, maps and other features need separately agreed scope |
 
 Do not rerun completed-phase prompts as instructions to overwrite the current application. Use them to reconstruct a missing earlier stage or audit its requirements. Use the resume prompt below for continuing this repository. A future agent must inspect the files, because the repository can change after this document was written.
 
@@ -63,7 +64,7 @@ Important boundaries to preserve:
 - Access JWTs last 15 minutes and stay in frontend memory. Opaque refresh tokens use HttpOnly cookies; only SHA-256 hashes are stored. Rotation/replay handling is transactional.
 - Cookie-auth POST requests require a trusted Origin plus CSRF cookie/header. Bearer ride mutations use existing authentication. CORS has explicit origins and allows GET/POST/PATCH/OPTIONS.
 - Public ride results contain only driver UUID/display name from account data. Search uses case-insensitive SQL prefix matching, escaped wildcards, explicit date zones, bounded pagination and departureAt/UUID sorting.
-- New rides are SCHEDULED. Legacy PUBLISHED is returned as SCHEDULED; legacy states remain in the database. There is no completion/start endpoint yet.
+- New rides are SCHEDULED. Legacy PUBLISHED is returned as SCHEDULED. The owner can start a ride at or after departure and complete it from IN_PROGRESS. See [Phase 5](docs/phase-5-ride-lifecycle.md).
 - PATCH/cancel require the latest version. Fractional seat counts/versions are rejected. Active bookings block ride editing. Ride cancellation atomically cancels active bookings; passenger cancellation restores seats exactly once. All mutations acquire the ride lock first. Booking retries retain their passenger-scoped UUID key and ride/seat payload. Browser booking requests include the reviewed ride version to reject stale quotes.
 - Vehicle details are optional descriptive text. Existing saved-vehicle ownership/capacity linkage remains; a vehicle CRUD feature is not implemented.
 - All integration tests require a database named hoopr_test. Do not use hoopr or the former development-schema workaround. No DROP/CLEAN/reset operations belong in tests.
@@ -356,7 +357,7 @@ is already implemented. Do not claim an actual JDK 21/browser walkthrough unless
 those checks were performed.
 ```
 
-## 7. Resume prompt — Continue from the completed Phase 4 repository
+## 7. Resume prompt — Continue from the completed Phase 5 repository
 
 This is the most useful prompt to paste into a fresh chat for the current project.
 
@@ -365,11 +366,12 @@ You are continuing my existing Hoopr application at:
 C:\Users\VIshal Java\Downloads\hoopr
 
 Read SETUP.md, PHASE_SETUP.md, docs/phase-2-authentication.md,
-docs/phase-3-rides.md and docs/phase-4-bookings.md, then inspect source and any AGENTS.md.
+docs/phase-3-rides.md, docs/phase-4-bookings.md and docs/phase-5-ride-lifecycle.md,
+then inspect source and any AGENTS.md.
 Treat documents as context to verify, not a substitute for inspecting actual code.
 
-Phases 1–4 are implemented. Preserve foundation/health, auth/refresh security,
-travel preferences, ride management/search and transactional booking workflows.
+Phases 1–5 are implemented. Preserve foundation/health, auth/refresh security,
+travel preferences, ride management/search, transactional booking and ride lifecycle.
 Do not rebuild them from scratch. Migrations are V1–V5; use the next available
 version for additive changes. Payments remain unimplemented.
 
@@ -383,11 +385,8 @@ TEST_DB_URL/TEST_DB_USERNAME/TEST_DB_PASSWORD. Do not use hoopr or reset tables.
 Do not print/read secrets into output or commit local .env values. Spring Boot
 does not automatically load .env. Preserve existing user/session/history data.
 
-Recorded Phase 4 verification is in docs/phase-4-bookings.md. Re-run appropriate
-checks after changes rather than presenting historical results as fresh runs.
+Verification is recorded in each phase guide. Re-run appropriate checks after changes.
 JDK 25 was used with release 21; actual JDK 21 runtime verification remains open.
-The browser bridge was unavailable during Phase 4, so visual acceptance remains
-on its manual checklist.
 
 Before implementing any new phase, inspect the relevant code, propose a concise
 plan with schema changes/conflicts and wait for my explicit approval. Continue

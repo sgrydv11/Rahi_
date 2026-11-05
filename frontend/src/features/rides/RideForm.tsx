@@ -34,7 +34,7 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       <label>Drop-off description (optional)<input name="dropoffDescription" maxLength={500} defaultValue={ride?.dropoffDescription ?? ''} /></label>
       <label className="form-wide">Vehicle details (optional)<input name="vehicleDetails" maxLength={300} placeholder="For example, blue Suzuki Swift" defaultValue={ride?.vehicleDetails ?? ''} /></label>
       <label className="form-wide">Notes (optional)<textarea name="notes" maxLength={2000} rows={4} defaultValue={ride?.notes ?? ''} /></label>
-      <p className="notice form-wide">Departure is entered in {timeZone}. Ride descriptions and notes are public; leave out private contact details. Seat booking is not available yet.</p>
+      <p className="notice form-wide">Departure is entered in {timeZone}. Ride descriptions and notes are public. Leave out private contact details.</p>
       {error && <p className="form-wide" role="alert">{error}</p>}
       <button className="button" type="submit">{busy ? 'Saving…' : ride ? 'Save changes' : 'Offer this ride'}</button>
     </fieldset>
