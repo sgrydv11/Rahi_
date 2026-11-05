@@ -17,6 +17,7 @@ public class Booking {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "passenger_id", referencedColumnName = "user_id", insertable = false, updatable = false) public UserProfile passengerProfile;
     @Column(name = "seats_booked", nullable = false) public short seatsBooked;
+    @Column(name = "paid_fare_paise") public Long paidFarePaise;
     @Column(name = "price_per_seat_snapshot", nullable = false, precision = 12, scale = 2) public BigDecimal pricePerSeatSnapshot;
     @Column(nullable = false, length = 3) public String currency;
     @Column(nullable = false, length = 30) public String status;

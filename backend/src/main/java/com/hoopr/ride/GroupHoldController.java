@@ -39,9 +39,10 @@ public class GroupHoldController {
     private final StripeGateway stripe;
     private final String provider;
     private final WalletRidePayments wallet;
+    private final RideDiscounts discounts;
 
     public GroupHoldController(RideRepository rides, GroupSeatInventory inventory, NamedParameterJdbcTemplate jdbc, Clock clock,
-                               BookingService bookings, AuthService auth, RazorpayGateway razorpay, StripeGateway stripe, WalletRidePayments wallet,
+                               BookingService bookings, AuthService auth, RazorpayGateway razorpay, StripeGateway stripe, WalletRidePayments wallet, RideDiscounts discounts,
                                @Value("${PAYMENT_PROVIDER:razorpay}") String provider) {
         this.rides = rides;
         this.inventory = inventory;
@@ -53,6 +54,7 @@ public class GroupHoldController {
         this.stripe = stripe;
         this.provider = provider;
         this.wallet = wallet;
+        this.discounts = discounts;
     }
 
     @PostMapping
@@ -63,6 +65,7 @@ public class GroupHoldController {
         var existing = replay(passenger, key);
         if (existing.isPresent()) return match(existing.get(), request);
         Ride ride = rides.lockById(request.rideId()).orElseThrow(GroupHoldController::missing);
+        discounts.lockRider(passenger);
         existing = replay(passenger, key);
         if (existing.isPresent()) return match(existing.get(), request);
         Instant now = clock.instant();
@@ -83,13 +86,21 @@ public class GroupHoldController {
         Instant deadline = now.plusSeconds(300);
         Instant expiresAt = deadline.isBefore(ride.departureAt) ? deadline : ride.departureAt;
         long fare = ride.pricePerSeat.movePointRight(2).longValueExact() * request.seats();
+        int percent = 0;
+        // Every step must leave at least the provider minimum of 100 paise payable.
+        if (fare >= 118 && !discounts.alreadyUsed(passenger, ride.id)) {
+            if (discounts.pending(passenger, utc(now)))
+                throw new Failure(409, "DISCOUNT_HELD", "Finish or release your current discounted seat hold first.");
+            percent = discounts.next(passenger);
+        }
+        long reduction = (fare * percent + 50) / 100;
         UUID id = UUID.randomUUID();
         jdbc.sql("""
-                INSERT INTO group_seat_holds (id, ride_id, passenger_id, request_key, seats, fare_paise, expires_at, status)
-                VALUES (:id, :ride, :passenger, :key, :seats, :fare, :expires, 'HELD')
+                INSERT INTO group_seat_holds (id, ride_id, passenger_id, request_key, seats, fare_paise, expires_at, status, discount_percent, discount_paise)
+                VALUES (:id, :ride, :passenger, :key, :seats, :fare, :expires, 'HELD', :percent, :reduction)
                 ON CONFLICT (passenger_id, request_key) DO NOTHING
                 """).param("id", id).param("ride", ride.id).param("passenger", passenger).param("key", key)
-                .param("seats", request.seats()).param("fare", fare).param("expires", utc(expiresAt)).update();
+                .param("seats", request.seats()).param("fare", fare).param("expires", utc(expiresAt)).param("percent", percent).param("reduction", reduction).update();
         return match(replay(passenger, key).orElseThrow(), request);
     }
 
@@ -120,6 +131,8 @@ public class GroupHoldController {
         Hold hold = owned(passenger, id);
         Payment payment = payment(id);
         if ("WALLET".equals(request.method())) {
+            discounts.lockRider(passenger);
+            hold = owned(passenger, id);
             if ("CONFIRMED".equals(hold.status()) && payment.order() == null)
                 return new Checkout(hold, null);
             if (payment.order() != null)
@@ -130,7 +143,7 @@ public class GroupHoldController {
             UUID booking = bookings.create(ride.id, passenger, id, hold.seats()).booking().id();
             if (!wallet.charge(booking, passenger, hold.quote().totalPaise()))
                 throw new Failure(409, "INSUFFICIENT_FUNDS", "Add wallet funds or use provider checkout.");
-            attachBooking(id, booking);
+            attachBooking(hold, passenger, booking);
             return new Checkout(owned(passenger, id), null);
         }
         if (!"PROVIDER".equals(request.method())) throw new Failure(400, "INVALID_REQUEST", "Choose a checkout method.");
@@ -180,6 +193,7 @@ public class GroupHoldController {
         }
         String capture = capture(id, payment, amount, useStripe);
         if (capture == null) return owned(passenger, id);
+        discounts.lockRider(passenger);
 
         hold = owned(passenger, id);
         Instant now = clock.instant();
@@ -201,11 +215,16 @@ public class GroupHoldController {
                 VALUES (:booking, :provider, :order, :amount, 'INR', :capture, :now)
                 """).param("booking", booking).param("provider", payment.provider()).param("order", payment.order())
                 .param("amount", amount).param("capture", capture).param("now", utc(now)).update();
-        attachBooking(id, booking);
+        attachBooking(hold, passenger, booking);
         return owned(passenger, id);
     }
 
-    private void attachBooking(UUID id, UUID booking) {
+    private void attachBooking(Hold hold, UUID passenger, UUID booking) {
+        UUID id = hold.id();
+        if (hold.quote().discountPercent() > 0)
+            discounts.consume(passenger, hold.rideId(), booking, hold.quote().discountPercent());
+        jdbc.sql("UPDATE bookings SET paid_fare_paise = :amount WHERE id = :booking")
+                .param("amount", hold.quote().totalPaise()).param("booking", booking).update();
         jdbc.sql("UPDATE group_seat_holds SET booking_id = :booking WHERE id = :id")
                 .param("id", id).param("booking", booking).update();
     }
@@ -302,9 +321,11 @@ public class GroupHoldController {
                     String status = row.getString("status");
                     if ("HELD".equals(status) && !expires.isAfter(now)) status = "EXPIRED";
                     long fare = row.getLong("fare_paise");
+                    int percent = row.getInt("discount_percent");
+                    long reduction = row.getLong("discount_paise");
                     return new Hold(row.getObject("id", UUID.class), row.getObject("ride_id", UUID.class),
                             row.getInt("seats"), expires, "HELD".equals(status) && row.getString("order_id") != null
-                                    ? "PAYMENT_PENDING" : status, new Quote(fare, 0, 0, fare, "INR"),
+                                    ? "PAYMENT_PENDING" : status, new Quote(fare, percent, reduction, fare - reduction, "INR"),
                             row.getObject("booking_id", UUID.class));
                 }).optional();
     }

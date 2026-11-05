@@ -150,7 +150,9 @@ public class BookingService {
                 && ride.getDepartureAt().isAfter(clock.instant());
         Rating rating = booking.driverRating == null ? null : new Rating(booking.driverRating, booking.ratedAt);
         return new View(booking.id, journey, new Person(booking.passengerId, name), booking.seatsBooked,
-                booking.pricePerSeatSnapshot, booking.pricePerSeatSnapshot.multiply(java.math.BigDecimal.valueOf(booking.seatsBooked)),
+                booking.pricePerSeatSnapshot, booking.paidFarePaise == null
+                        ? booking.pricePerSeatSnapshot.multiply(java.math.BigDecimal.valueOf(booking.seatsBooked))
+                        : java.math.BigDecimal.valueOf(booking.paidFarePaise, 2),
                 booking.currency, booking.status, booking.version, canCancel, booking.createdAt, booking.updatedAt,
                 booking.cancelledAt, booking.cancellationReason, rating);
     }

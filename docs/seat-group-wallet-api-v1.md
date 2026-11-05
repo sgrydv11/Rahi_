@@ -1,6 +1,6 @@
 # Open Ride Group and wallet API contract
 
-Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. Authenticated group offers, holds, provider checkout and reconciliation are available. Wallet balance, transaction history and sandbox top-ups are available. Group checkout accepts wallet funds and returns cancelled fares to the original wallet. Sandbox withdrawals reserve funds and settle asynchronously. Discount endpoints are reserved.
+Phase 1 defines the contract for Phases 2–4. The mobile authentication endpoints are implemented. Authenticated group offers, holds, provider checkout and reconciliation are available. Wallet balance, transaction history and sandbox top-ups are available. Group checkout accepts wallet funds and returns cancelled fares to the original wallet. Sandbox withdrawals reserve funds and settle asynchronously. The repeating ride discount is active for eligible Open Ride Group checkout.
 
 Mobile authentication uses JSON requests to `POST /api/v1/mobile/auth/register` with `email`, `password`, `fullName` and optional `travelPreference`, and to `POST /api/v1/mobile/auth/login` with `email` and `password`. Login returns `accessToken`, `expiresIn`, `refreshToken` and `user`. The `refresh` and `logout` endpoints under the same prefix accept the current `refreshToken` in the body. Refresh rotates the token and returns a new session. Logout revokes it and returns 204. The native app stores the refresh token in device secure storage. These endpoints do not set session cookies and reject browser-origin requests.
 
@@ -23,7 +23,7 @@ Use the existing `/api/v1` prefix and a mobile access token in the bearer header
 | GET `/wallet/withdrawals/{id}` | — | Updated withdrawal status |
 | GET `/ride-discounts/next` | — | Next discount percentage |
 
-Paged results use `content`, `page` and `totalPages`. Hold states are `HELD`, `PAYMENT_PENDING`, `CONFIRMED`, `EXPIRED`, `CANCELLED`, `REFUND_PENDING` and `REFUNDED`. A quote contains `farePaise`, `discountPercent`, `discountPaise`, `totalPaise` and `currency`. The quote holds the discount until that checkout completes or releases it. Phase 2 quotes use a zero discount until Phase 4 enables the cycle.
+Paged results use `content`, `page` and `totalPages`. Hold states are `HELD`, `PAYMENT_PENDING`, `CONFIRMED`, `EXPIRED`, `CANCELLED`, `REFUND_PENDING` and `REFUNDED`. A quote contains `farePaise`, `discountPercent`, `discountPaise`, `totalPaise` and `currency`. The quote holds the discount until that checkout completes or releases it. Eligible new holds reserve the next 5%, 10%, or 15% step. A paid booking consumes it once per passenger and ride, including after cancellation. Expiry or release frees the step. Existing holds retain their original quotes. Fares below 118 paise are excluded so all three steps respect the payment minimum.
 
 Checkout details use the existing provider shapes. Stripe returns `provider: "stripe"` and `checkoutUrl`. Razorpay returns `provider: "razorpay"`, `keyId` and `orderId`. Group sync uses the stored provider order or session to verify capture server-side. The background reconciliation job also checks unresolved orders. A late capture enters `REFUND_PENDING` and becomes `REFUNDED` after the provider confirms the refund. Wallet operations use `PENDING`, `SUCCEEDED` or `FAILED`.
 

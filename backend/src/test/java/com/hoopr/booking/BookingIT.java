@@ -69,6 +69,7 @@ class BookingIT {
                 """, owner);
         if (owner != null) jdbc.update("DELETE FROM group_seat_holds WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
         if (owner != null) jdbc.update("DELETE FROM wallet_ride_charges WHERE booking_id IN (SELECT b.id FROM bookings b JOIN rides r ON r.id = b.ride_id WHERE r.driver_id = ?)", owner);
+        if (owner != null) jdbc.update("DELETE FROM ride_discount_redemptions WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
         if (owner != null) jdbc.update("DELETE FROM bookings WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
         for (UUID user : Arrays.asList(owner, passenger, stranger)) {
             if (user == null) continue;
@@ -85,10 +86,57 @@ class BookingIT {
         }
     }
     RideDtos.View offer(int seats) { return rides.create(owner, new RideDtos.Create("Mumbai", "Pune", null, null, departure, "Asia/Kolkata", seats, new BigDecimal("125.50"), "INR", null, null)); }
+    @Test void discountCycleAdvancesOnlyForNewPaidRidesAndRoundsToPaise() throws Exception {
+        String next = "/api/v1/ride-discounts/next";
+        mvc.perform(get(next)).andExpect(status().isUnauthorized());
+        jdbc.update("INSERT INTO wallets(user_id, available_paise) VALUES (?, 100000)", passenger);
+        UUID expiredRide = offer(1).id();
+        String expired = newWalletHold(expiredRide);
+        UUID expiredId = UUID.fromString(expired.substring(expired.lastIndexOf('/') + 1));
+        jdbc.update("UPDATE group_seat_holds SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second' WHERE id = ?", expiredId);
+        assertEquals(409, walletCheckoutStatus(expired));
+
+        UUID firstRide = null;
+        for (int percent : List.of(5, 10, 15, 5, 10, 15)) {
+            mvc.perform(get(next).header("Authorization", passengerToken))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.discountPercent").value(percent));
+            UUID ride = offer(1).id();
+            if (firstRide == null) firstRide = ride;
+            String path = newWalletHold(ride);
+            long reduction = (12550L * percent + 50) / 100;
+            mvc.perform(get(path).header("Authorization", passengerToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.quote.discountPercent").value(percent))
+                    .andExpect(jsonPath("$.quote.discountPaise").value(reduction))
+                    .andExpect(jsonPath("$.quote.totalPaise").value(12550 - reduction));
+            if (percent == 5) {
+                UUID overlapping = offer(1).id();
+                mvc.perform(post("/api/v1/group/holds").header("Authorization", passengerToken)
+                                .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"rideId\":\"" + overlapping + "\",\"seats\":1}"))
+                        .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DISCOUNT_HELD"));
+            }
+            assertEquals(200, walletCheckoutStatus(path));
+            assertEquals(200, walletCheckoutStatus(path));
+        }
+        assertEquals(6, jdbc.queryForObject("SELECT count(*) FROM ride_discount_redemptions WHERE passenger_id = ?", Integer.class, passenger));
+        UUID original = jdbc.queryForObject("SELECT booking_id FROM ride_discount_redemptions WHERE passenger_id = ? AND ride_id = ?", UUID.class, passenger, firstRide);
+        bookings.cancel(original, passenger, null);
+        String repeat = newWalletHold(firstRide);
+        mvc.perform(get(repeat).header("Authorization", passengerToken)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.quote.discountPercent").value(0));
+        assertEquals(200, walletCheckoutStatus(repeat));
+        mvc.perform(get(next).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.discountPercent").value(5));
+    }
+
     @Test void concurrentWalletCheckoutsCannotSpendTheSameBalance() throws Exception {
         jdbc.update("INSERT INTO wallets(user_id, available_paise) VALUES (?, 12550)", passenger);
+        // Simulate pre-migration holds, which remain payable at their undiscounted quote.
         String first = newWalletHold(offer(1).id());
+        jdbc.update("UPDATE group_seat_holds SET discount_percent = 0, discount_paise = 0 WHERE passenger_id = ?", passenger);
         String second = newWalletHold(offer(1).id());
+        jdbc.update("UPDATE group_seat_holds SET discount_percent = 0, discount_paise = 0 WHERE passenger_id = ?", passenger);
         var start = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(2)) {
             Future<Integer> a = pool.submit(() -> { start.await(); return walletCheckoutStatus(first); });
@@ -155,7 +203,7 @@ class BookingIT {
                 .content("{\"method\":\"WALLET\"}");
         mvc.perform(checkout).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INSUFFICIENT_FUNDS"));
         mvc.perform(get(path).header("Authorization", passengerToken)).andExpect(jsonPath("$.status").value("HELD"));
-        jdbc.update("INSERT INTO wallets(user_id, available_paise) VALUES (?, 12550)", passenger);
+        jdbc.update("INSERT INTO wallets(user_id, available_paise) VALUES (?, 11922)", passenger);
         String paid = mvc.perform(checkout).andExpect(status().isOk()).andExpect(jsonPath("$.hold.status").value("CONFIRMED"))
                 .andReturn().getResponse().getContentAsString();
         UUID booking = UUID.fromString(json.readTree(paid).path("hold").path("bookingId").asText());
@@ -166,7 +214,7 @@ class BookingIT {
         assertEquals(0L, jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
         bookings.cancel(booking, passenger, null);
         bookings.cancel(booking, passenger, null);
-        assertEquals(12550L, jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
+        assertEquals(11922L, jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM wallet_entries WHERE user_id = ?", Integer.class, passenger));
     }
 
@@ -250,7 +298,11 @@ class BookingIT {
         mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.bookingId").value(booking.toString()));
         assertEquals("pay_group", jdbc.queryForObject("SELECT payment_id FROM booking_payments WHERE booking_id = ?", String.class, booking));
-        verify(gateway, times(1)).order(any(UUID.class), eq(12550L));
+        mvc.perform(get("/api/v1/bookings/" + booking).header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalPrice").value(119.22));
+        mvc.perform(get("/api/v1/ride-discounts/next").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.discountPercent").value(10));
+        verify(gateway, times(1)).order(any(UUID.class), eq(11922L));
     }
 
     @Test void lateGroupPaymentIsRefundedWithoutReclaimingTheSeat() throws Exception {
@@ -262,15 +314,17 @@ class BookingIT {
         groupCapture();
         mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUND_PENDING"));
-        when(gateway.refund(hold, "pay_group", 12550)).thenReturn(json.readTree("""
-                {"id":"rfnd_group","payment_id":"pay_group","amount":12550,"status":"processed"}
+        when(gateway.refund(hold, "pay_group", 11922)).thenReturn(json.readTree("""
+                {"id":"rfnd_group","payment_id":"pay_group","amount":11922,"status":"processed"}
                 """));
         for (int attempt = 0; attempt < 2; attempt++) {
             mvc.perform(post(path + "/sync").header("Authorization", passengerToken))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
                     .andExpect(jsonPath("$.bookingId").doesNotExist());
         }
-        verify(gateway, times(1)).refund(hold, "pay_group", 12550);
+        verify(gateway, times(1)).refund(hold, "pay_group", 11922);
+        mvc.perform(get("/api/v1/ride-discounts/next").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.discountPercent").value(5));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM bookings WHERE ride_id = ?", Integer.class, ride));
     }
 
@@ -287,8 +341,8 @@ class BookingIT {
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("PROVIDER_UNAVAILABLE"));
         when(gateway.enabled()).thenReturn(true);
         when(gateway.keyId()).thenReturn("rzp_test_fixture");
-        when(gateway.order(any(UUID.class), eq(12550L))).thenReturn(json.readTree("""
-                {"id":"order_group","amount":12550,"currency":"INR"}
+        when(gateway.order(any(UUID.class), eq(11922L))).thenReturn(json.readTree("""
+                {"id":"order_group","amount":11922,"currency":"INR"}
                 """));
         UUID key = UUID.randomUUID();
         for (int attempt = 0; attempt < 2; attempt++) {
@@ -302,7 +356,7 @@ class BookingIT {
 
     private void groupCapture() throws Exception {
         when(gateway.orderPayments("order_group")).thenReturn(json.readTree("""
-                [{"id":"pay_group","order_id":"order_group","amount":12550,"currency":"INR","status":"captured"}]
+                [{"id":"pay_group","order_id":"order_group","amount":11922,"currency":"INR","status":"captured"}]
                 """));
     }
 
@@ -314,7 +368,7 @@ class BookingIT {
         var create = post(path).header("Authorization", passengerToken)
                 .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON).content(body);
         String result = mvc.perform(create).andExpect(status().isOk())
-                .andExpect(jsonPath("$.quote.totalPaise").value(12550))
+                .andExpect(jsonPath("$.quote.totalPaise").value(11922))
                 .andExpect(jsonPath("$.status").value("HELD")).andReturn().getResponse().getContentAsString();
         String id = json.readTree(result).path("id").asText();
         mvc.perform(create).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id));

@@ -168,7 +168,7 @@ public class PaymentController {
     private Fare fare(UUID id, Jwt jwt, boolean lock) {
         UUID passenger = auth.profile(UUID.fromString(jwt.getSubject())).id();
         return jdbc.query("""
-                SELECT b.status, b.currency, b.price_per_seat_snapshot * b.seats_booked AS total,
+                SELECT b.status, b.currency, COALESCE(b.paid_fare_paise / 100.0, b.price_per_seat_snapshot * b.seats_booked) AS total,
                        r.status AS ride_status, r.departure_at, w.booking_id IS NOT NULL AS wallet_paid
                 FROM bookings b JOIN rides r ON r.id = b.ride_id
                 LEFT JOIN wallet_ride_charges w ON w.booking_id = b.id

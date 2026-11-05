@@ -123,7 +123,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/group/holds", "/api/v1/group/holds/{id}/cancel", "/api/v1/group/holds/{id}/checkout", "/api/v1/group/holds/{id}/sync").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/wallet", "/api/v1/wallet/transactions", "/api/v1/wallet/top-ups/{id}", "/api/v1/wallet/withdrawals/{id}").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/wallet/top-ups", "/api/v1/wallet/top-ups/{id}/sync", "/api/v1/wallet/withdrawals").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/rides/me", "/api/v1/group/offers", "/api/v1/group/holds/{id}").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rides/me", "/api/v1/group/offers", "/api/v1/group/holds/{id}", "/api/v1/ride-discounts/next").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/bookings/me", "/api/v1/bookings/{id}", "/api/v1/rides/{id}/bookings").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/rides/{id}/bookings", "/api/v1/bookings/{id}/cancel").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/rating").hasAnyRole("USER", "ADMIN")
