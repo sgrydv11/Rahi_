@@ -75,3 +75,30 @@ textarea { font: inherit; width: 100%; padding: 12px; border: 1px solid #aebcaf;
 dialog { width: min(550px, 90vw); padding: 28px; border: 1px solid #aebcaf; border-radius: 14px; color: #163e32; background: #fffef9; }
 dialog::backdrop { background: #163e3280; }
 @media (max-width: 600px) { .ride-filter, .ride-form { grid-template-columns: 1fr; }.ride-card { flex-direction: column; gap: 12px; }.ride-details dl { grid-template-columns: 1fr; gap: 6px; }.ride-details dd { margin-bottom: 12px; }.ride-actions { align-items: stretch; } }
+
+select { font: inherit; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #aebcaf; border-radius: 7px; background: #f8f9f3; color: #163e32; }
+.mobile-nav { display: none; }
+.mobile-nav-icon { width: 22px; height: 22px; flex: 0 0 auto; }
+.mobile-nav-item { min-width: 0; color: #53645b; background: transparent; border: 0; border-radius: 10px; padding: 6px 4px; display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; font-size: 11px; font-weight: 600; line-height: 1.15; cursor: pointer; }
+.mobile-nav-item.active { color: #163e32; background: #e4ebd9; }
+.mobile-nav-label { white-space: nowrap; }
+.mobile-more-menu { display: grid; gap: 4px; padding: 10px; border: 1px solid #d9dfd3; border-radius: 14px; background: #fffef9; box-shadow: 0 8px 30px #163e3226; }
+.mobile-more-menu a, .mobile-more-menu button { min-height: 44px; padding: 10px 14px; display: flex; align-items: center; border: 0; border-radius: 8px; background: transparent; color: #163e32; font: inherit; font-weight: 600; text-align: left; text-decoration: none; cursor: pointer; }
+.mobile-more-menu a.active, .mobile-more-menu a:hover, .mobile-more-menu button:hover { background: #e4ebd9; }
+@media (max-width: 700px) {
+  .app-shell { min-height: 100dvh; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
+  .site-header { width: 100%; padding: max(12px, env(safe-area-inset-top, 0px)) 5% 12px; border-bottom-color: #e5e9e1; }
+  .brand { font-size: 30px; }
+  .site-header nav { display: none; }
+  .mobile-nav { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; display: flex; align-items: stretch; gap: 2px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #d9dfd3; background: #fffef9; }
+  .mobile-nav-loading { display: flex; flex: 1; align-items: center; justify-content: center; font-size: 12px; }
+  .mobile-more-menu { position: fixed; z-index: 19; right: 10px; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); left: 10px; }
+  footer { display: none; }
+  .page { padding-top: 32px; padding-bottom: 40px; }
+  .panel { padding: 20px; }
+  input, textarea, select { font-size: 16px; }
+}
+@media (max-width: 360px) {
+  .mobile-nav { padding-inline: 4px; }
+  .mobile-nav-item { font-size: 10px; }
+}

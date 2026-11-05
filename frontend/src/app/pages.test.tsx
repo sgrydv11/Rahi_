@@ -19,6 +19,8 @@ describe('foundation pages', () => {
     </Routes></MemoryRouter></AuthProvider>);
     expect(html).toContain(title);
     expect(html).toContain('Main navigation');
+    expect(html).toContain('App navigation');
+    expect(html).toContain('>Find</span>');
     expect(html).toContain('Skip to content');
     if (path === '/register') {
       expect(html).toContain('Offer a seat (Driver)');

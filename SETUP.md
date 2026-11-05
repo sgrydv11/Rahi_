@@ -251,7 +251,44 @@ Current pages:
 | /bookings/:id | Passenger or ride owner booking details |
 | /rides/:id/bookings | Owner passenger manifest |
 
-## 8. Health and first manual check
+## 8. Build the Android and iOS apps
+
+The React frontend is packaged as a native app with Capacitor. The mobile app needs a deployed HTTPS backend: it cannot use Vite's `/api` development proxy or a relative API URL. Set the API base URL (including `/api/v1`) in the same PowerShell terminal before building:
+
+```powershell
+Set-Location 'C:\Users\VIshal Java\Downloads\hoopr\frontend'
+$env:VITE_API_BASE_URL = 'https://api.example.com/api/v1'
+npm.cmd run build
+npm.cmd run cap:add:android
+npm.cmd run cap:add:ios
+npm.cmd run mobile:build
+```
+
+Replace the example URL with the real public HTTPS API address. `mobile:build` rejects missing or non-HTTPS API URLs, builds the frontend, syncs Capacitor, and adds the iOS app's API domain to `WKAppBoundDomains` for refresh-cookie support. Capacitor uses `https://localhost` as the native app origin on both platforms.
+
+Configure the backend to allow the native origin and accept secure cross-site refresh cookies. Keep any existing web frontend origin in the list:
+
+```powershell
+$env:FRONTEND_ORIGINS = 'https://localhost,https://www.example.com'
+$env:AUTH_COOKIE_SECURE = 'true'
+$env:AUTH_COOKIE_SAME_SITE = 'None'
+```
+
+`SameSite=None` requires `Secure=true`; use HTTPS for the API. Do not put database credentials, signing secrets, or private keys in frontend variables.
+
+To produce an Android debug APK, install Android Studio and its Android SDK, then from `frontend/` run:
+
+```powershell
+npm.cmd run mobile:build
+Set-Location android
+.\gradlew.bat assembleDebug
+```
+
+The debug APK is written to `frontend/android/app/build/outputs/apk/debug/app-debug.apk`. For a shareable release APK or Play Store bundle, use Android Studio's signed build flow and your own private signing key. Keep signing keys out of Git.
+
+iOS builds require macOS with Xcode. After syncing, run `npm run cap:open:ios` on the Mac, select a signing team, and build/archive from Xcode. Windows can prepare the shared web frontend and Android project, but cannot compile or sign the iOS app.
+
+## 9. Health and first manual check
 
 In another terminal:
 
@@ -266,7 +303,7 @@ The travel preference is informational. All new accounts have USER security role
 
 For authentication POST requests in API clients, fetch /api/v1/auth/csrf first, then send its matching cookie/header plus a trusted Origin. Ride mutations use Bearer access tokens. The collections automate these details.
 
-## 9. Build and automated tests
+## 10. Build and automated tests
 
 Frontend, from frontend/:
 

@@ -1,6 +1,6 @@
 # Hoopr
 
-Start with [SETUP.md](SETUP.md) for prerequisites, versions, permissions, database setup and run/test commands. See [PHASE_SETUP.md](PHASE_SETUP.md) for completed phases, complete reusable prompts and the proposed next-phase prompt.
+Start with [SETUP.md](SETUP.md) for prerequisites, versions, permissions, database setup, run/test commands, and Capacitor Android/iOS builds. See [PHASE_SETUP.md](PHASE_SETUP.md) for completed phases, complete reusable prompts and the proposed next-phase prompt.
 
 Hoopr is a carpooling application with authentication, ride search, transactional seat bookings and Stripe or Razorpay test checkout. It uses React, Vite, TypeScript, Java 21, Spring Boot and PostgreSQL. See [Phase 2 setup and API examples](docs/phase-2-authentication.md).
 
