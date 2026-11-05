@@ -53,6 +53,7 @@ public class PaymentController {
     public View order(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         Fare fare = fare(id, jwt, true);
         Payment existing = stored(id);
+        if (fare.walletPaid()) throw new BookingFailure(409, "This booking was paid from the wallet.");
         String provider = provider(existing);
         requireEnabled(provider);
         if (!payable(fare) || (existing != null && existing.paymentId() != null))
@@ -168,13 +169,14 @@ public class PaymentController {
         UUID passenger = auth.profile(UUID.fromString(jwt.getSubject())).id();
         return jdbc.query("""
                 SELECT b.status, b.currency, b.price_per_seat_snapshot * b.seats_booked AS total,
-                       r.status AS ride_status, r.departure_at
+                       r.status AS ride_status, r.departure_at, w.booking_id IS NOT NULL AS wallet_paid
                 FROM bookings b JOIN rides r ON r.id = b.ride_id
+                LEFT JOIN wallet_ride_charges w ON w.booking_id = b.id
                 WHERE b.id = ? AND b.passenger_id = ?
                 """ + (lock ? " FOR UPDATE OF b" : ""), (row, index) -> new Fare(
                 row.getBigDecimal("total").movePointRight(2).longValueExact(),
                 row.getString("currency"), row.getString("status"), row.getString("ride_status"),
-                row.getTimestamp("departure_at").toInstant()), id, passenger).stream().findFirst()
+                row.getTimestamp("departure_at").toInstant(), row.getBoolean("wallet_paid")), id, passenger).stream().findFirst()
                 .orElseThrow(() -> new BookingFailure(404, "Passenger booking not found."));
     }
 
@@ -281,6 +283,8 @@ public class PaymentController {
     }
 
     private View view(Fare fare, Payment payment, String checkoutUrl) {
+        if (fare.walletPaid()) return new View(true, false, false, fare.amount(), fare.currency(), null,
+                null, null, null, null, null, "wallet", null);
         String provider = provider(payment);
         boolean enabled = enabled(provider);
         boolean captured = payment != null && payment.paymentId() != null;
@@ -292,7 +296,7 @@ public class PaymentController {
                 payment == null ? null : payment.refundStatus(), provider, checkoutUrl);
     }
 
-    private record Fare(long amount, String currency, String bookingStatus, String rideStatus, Instant departure) { }
+    private record Fare(long amount, String currency, String bookingStatus, String rideStatus, Instant departure, boolean walletPaid) { }
     private record Payment(String provider, String orderId, long amount, String paymentId, Instant paidAt, String refundId, String refundStatus) { }
     public record View(boolean enabled, boolean canPay, boolean canRefund, long amount, String currency, String keyId,
                        String orderId, String paymentId, Instant paidAt, String refundId, String refundStatus,

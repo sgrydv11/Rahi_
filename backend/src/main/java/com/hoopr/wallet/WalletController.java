@@ -29,14 +29,17 @@ public class WalletController {
     private final RazorpayGateway razorpay;
     private final StripeGateway stripe;
     private final String provider;
+    private final boolean withdrawalsEnabled;
 
     public WalletController(NamedParameterJdbcTemplate jdbc, AuthService auth, RazorpayGateway razorpay,
-                            StripeGateway stripe, @Value("${PAYMENT_PROVIDER:razorpay}") String provider) {
+                            StripeGateway stripe, @Value("${PAYMENT_PROVIDER:razorpay}") String provider,
+                            @Value("${hoopr.wallet.sandbox-withdrawals-enabled:true}") boolean withdrawalsEnabled) {
         this.jdbc = JdbcClient.create(jdbc);
         this.auth = auth;
         this.razorpay = razorpay;
         this.stripe = stripe;
         this.provider = provider;
+        this.withdrawalsEnabled = withdrawalsEnabled;
     }
 
     @GetMapping
@@ -126,6 +129,69 @@ public class WalletController {
                 VALUES (:id, :user, :amount, 'TOP_UP')
                 """).param("id", id).param("user", user).param("amount", topUp.amount()).update();
         return operation(find(user, "id", id));
+    }
+
+    @PostMapping("/withdrawals")
+    @Transactional
+    public Operation withdraw(@AuthenticationPrincipal Jwt jwt, @RequestHeader("Idempotency-Key") UUID key,
+                              @Valid @RequestBody Amount request) {
+        UUID user = user(jwt);
+        lockWallet(user);
+        Operation existing = withdrawal(user, "request_key", key);
+        long amount = request.amountPaise();
+        if (existing != null) {
+            if (existing.amountPaise() != amount)
+                throw new Failure(409, "IDEMPOTENCY_CONFLICT", "Use a new key for a different amount.");
+            return existing;
+        }
+        if (!withdrawalsEnabled)
+            throw new Failure(503, "PROVIDER_UNAVAILABLE", "Sandbox withdrawals are unavailable.");
+        int reserved = jdbc.sql("""
+                UPDATE wallets SET available_paise = available_paise - :amount, reserved_paise = reserved_paise + :amount
+                WHERE user_id = :user AND available_paise >= :amount
+                """).param("user", user).param("amount", amount).update();
+        if (reserved == 0) throw new Failure(409, "INSUFFICIENT_FUNDS", "Your available balance is too low.");
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO wallet_withdrawals(id, user_id, request_key, amount_paise, status)
+                VALUES (:id, :user, :key, :amount, 'PENDING')
+                """).param("id", id).param("user", user).param("key", key).param("amount", amount).update();
+        withdrawalEntry(id, user, -amount, "WITHDRAWAL");
+        return new Operation(id, amount, "PENDING");
+    }
+
+    @GetMapping("/withdrawals/{id}")
+    public Operation withdrawalStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        Operation operation = withdrawal(user(jwt), "id", id);
+        if (operation == null) throw new Failure(404, "NOT_FOUND", "Withdrawal not found.");
+        return operation;
+    }
+
+    @Transactional
+    public void settleWithdrawal(UUID user, UUID id, boolean succeeds) {
+        lockWallet(user);
+        Operation operation = withdrawal(user, "id", id);
+        if (operation == null || !"PENDING".equals(operation.status())) return;
+        long amount = operation.amountPaise();
+        jdbc.sql("""
+                UPDATE wallets SET reserved_paise = reserved_paise - :amount, available_paise = available_paise + :release
+                WHERE user_id = :user
+                """).param("user", user).param("amount", amount).param("release", succeeds ? 0 : amount).update();
+        jdbc.sql("UPDATE wallet_withdrawals SET status = :status WHERE id = :id")
+                .param("id", id).param("status", succeeds ? "SUCCEEDED" : "FAILED").update();
+        if (!succeeds) withdrawalEntry(UUID.randomUUID(), user, amount, "WITHDRAWAL_RELEASE");
+    }
+
+    private Operation withdrawal(UUID user, String column, UUID value) {
+        return jdbc.sql("SELECT id, amount_paise, status FROM wallet_withdrawals WHERE user_id = :user AND " + column + " = :value")
+                .param("user", user).param("value", value)
+                .query((row, index) -> new Operation(row.getObject("id", UUID.class), row.getLong(2), row.getString(3)))
+                .optional().orElse(null);
+    }
+
+    private void withdrawalEntry(UUID id, UUID user, long amount, String kind) {
+        jdbc.sql("INSERT INTO wallet_entries(id, user_id, amount_paise, kind) VALUES (:id, :user, :amount, :kind)")
+                .param("id", id).param("user", user).param("amount", amount).param("kind", kind).update();
     }
 
     private String capture(Stored topUp) {

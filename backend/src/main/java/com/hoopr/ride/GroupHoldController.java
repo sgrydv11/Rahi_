@@ -5,6 +5,7 @@ import com.hoopr.auth.AuthService;
 import com.hoopr.booking.BookingService;
 import com.hoopr.payment.RazorpayGateway;
 import com.hoopr.payment.StripeGateway;
+import com.hoopr.wallet.WalletRidePayments;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.constraints.Max;
@@ -37,9 +38,10 @@ public class GroupHoldController {
     private final RazorpayGateway razorpay;
     private final StripeGateway stripe;
     private final String provider;
+    private final WalletRidePayments wallet;
 
     public GroupHoldController(RideRepository rides, GroupSeatInventory inventory, NamedParameterJdbcTemplate jdbc, Clock clock,
-                               BookingService bookings, AuthService auth, RazorpayGateway razorpay, StripeGateway stripe,
+                               BookingService bookings, AuthService auth, RazorpayGateway razorpay, StripeGateway stripe, WalletRidePayments wallet,
                                @Value("${PAYMENT_PROVIDER:razorpay}") String provider) {
         this.rides = rides;
         this.inventory = inventory;
@@ -50,6 +52,7 @@ public class GroupHoldController {
         this.razorpay = razorpay;
         this.stripe = stripe;
         this.provider = provider;
+        this.wallet = wallet;
     }
 
     @PostMapping
@@ -113,13 +116,26 @@ public class GroupHoldController {
     public Checkout checkout(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                              @RequestHeader("Idempotency-Key") UUID key, @Valid @RequestBody CheckoutRequest request) {
         UUID passenger = auth.profile(user(jwt)).id();
-        lock(passenger, id);
+        Ride ride = lock(passenger, id);
         Hold hold = owned(passenger, id);
         Payment payment = payment(id);
-        if (!"PROVIDER".equals(request.method())) {
-            if (key.equals(payment.key())) throw new Failure(409, "IDEMPOTENCY_CONFLICT", "Checkout method changed.");
-            throw new Failure(409, "METHOD_UNAVAILABLE", "Wallet checkout is unavailable.");
+        if ("WALLET".equals(request.method())) {
+            if ("CONFIRMED".equals(hold.status()) && payment.order() == null)
+                return new Checkout(hold, null);
+            if (payment.order() != null)
+                throw new Failure(409, "IDEMPOTENCY_CONFLICT", "This hold already has a provider checkout.");
+            if (!active(hold)) throw new Failure(409, "HOLD_EXPIRED", "This hold is no longer payable.");
+            jdbc.sql("UPDATE group_seat_holds SET status = 'CONFIRMED', checkout_key = :key WHERE id = :id")
+                    .param("key", key).param("id", id).update();
+            UUID booking = bookings.create(ride.id, passenger, id, hold.seats()).booking().id();
+            if (!wallet.charge(booking, passenger, hold.quote().totalPaise()))
+                throw new Failure(409, "INSUFFICIENT_FUNDS", "Add wallet funds or use provider checkout.");
+            attachBooking(id, booking);
+            return new Checkout(owned(passenger, id), null);
         }
+        if (!"PROVIDER".equals(request.method())) throw new Failure(400, "INVALID_REQUEST", "Choose a checkout method.");
+        if (key.equals(payment.key()) && payment.order() == null)
+            throw new Failure(409, "IDEMPOTENCY_CONFLICT", "Checkout method changed.");
         if (!active(hold)) throw new Failure(409, "HOLD_EXPIRED", "This hold is no longer payable.");
         if (payment.order() == null) {
             boolean useStripe = "stripe".equals(provider);
@@ -185,9 +201,13 @@ public class GroupHoldController {
                 VALUES (:booking, :provider, :order, :amount, 'INR', :capture, :now)
                 """).param("booking", booking).param("provider", payment.provider()).param("order", payment.order())
                 .param("amount", amount).param("capture", capture).param("now", utc(now)).update();
+        attachBooking(id, booking);
+        return owned(passenger, id);
+    }
+
+    private void attachBooking(UUID id, UUID booking) {
         jdbc.sql("UPDATE group_seat_holds SET booking_id = :booking WHERE id = :id")
                 .param("id", id).param("booking", booking).update();
-        return owned(passenger, id);
     }
 
     private String capture(UUID id, Payment payment, long amount, boolean useStripe) {

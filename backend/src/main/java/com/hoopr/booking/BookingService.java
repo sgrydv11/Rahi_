@@ -1,6 +1,7 @@
 package com.hoopr.booking;
 
 import com.hoopr.ride.*;
+import com.hoopr.wallet.WalletRidePayments;
 import com.hoopr.user.*;
 import java.time.*;
 import java.util.*;
@@ -17,8 +18,9 @@ public class BookingService {
     private final ProfileRepository profiles;
     private final Clock clock;
     private final GroupSeatInventory groupSeats;
-    public BookingService(BookingRepository bookings, RideRepository rides, UserRepository users, ProfileRepository profiles, Clock clock, GroupSeatInventory groupSeats) {
-        this.bookings = bookings; this.rides = rides; this.users = users; this.profiles = profiles; this.clock = clock; this.groupSeats = groupSeats;
+    private final WalletRidePayments wallet;
+    public BookingService(BookingRepository bookings, RideRepository rides, UserRepository users, ProfileRepository profiles, Clock clock, GroupSeatInventory groupSeats, WalletRidePayments wallet) {
+        this.bookings = bookings; this.rides = rides; this.users = users; this.profiles = profiles; this.clock = clock; this.groupSeats = groupSeats; this.wallet = wallet;
     }
     @Transactional
     public Created create(UUID rideId, UUID passenger, UUID requestKey, int seats) {
@@ -112,7 +114,8 @@ public class BookingService {
     @Transactional
     public void cancelForDriver(Ride ride, UUID owner, String reason) {
         requireConsistentSeats(ride);
-        for (Booking booking : bookings.findByRideIdAndStatusOrderById(ride.id, "CONFIRMED"))
+        for (Booking booking : bookings.findByRideIdAndStatusOrderById(ride.id, "CONFIRMED").stream()
+                .sorted(Comparator.comparing(b -> b.passengerId)).toList())
             cancelRecord(booking, "CANCELLED_BY_DRIVER", owner, reason);
         groupSeats.cancelForRide(ride.id);
         ride.availableSeats = ride.totalSeats;
@@ -123,6 +126,7 @@ public class BookingService {
             throw new BookingFailure(409, "Ride availability needs review before it can be changed.");
     }
     private void cancelRecord(Booking booking, String status, UUID actor, String reason) {
+        wallet.refund(booking.id);
         booking.status = status; booking.cancelledBy = actor; booking.cancellationReason = optional(reason);
         booking.cancelledAt = booking.updatedAt = clock.instant();
     }

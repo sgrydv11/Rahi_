@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.*;
 
 @SpringBootTest(properties = {
-    "hoopr.group.reconcile-enabled=false",
+    "hoopr.group.reconcile-enabled=false", "hoopr.wallet.sandbox-withdrawals-delay=3600000",
     "PAYMENT_PROVIDER=razorpay",
     "hoopr.auth.jwt-secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "hoopr.auth.issuer=hoopr-test",
     "hoopr.auth.origins=http://localhost:5173", "hoopr.auth.cookie-secure=true",
@@ -43,6 +43,7 @@ class BookingIT {
     @Autowired RideService rides;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+    @Autowired com.hoopr.wallet.WalletController wallet;
     @Autowired ObjectMapper json;
     @MockitoBean RazorpayGateway gateway;
     @MockitoBean StripeGateway stripe;
@@ -67,6 +68,7 @@ class BookingIT {
                     (SELECT b.id FROM bookings b JOIN rides r ON r.id = b.ride_id WHERE r.driver_id = ?)
                 """, owner);
         if (owner != null) jdbc.update("DELETE FROM group_seat_holds WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
+        if (owner != null) jdbc.update("DELETE FROM wallet_ride_charges WHERE booking_id IN (SELECT b.id FROM bookings b JOIN rides r ON r.id = b.ride_id WHERE r.driver_id = ?)", owner);
         if (owner != null) jdbc.update("DELETE FROM bookings WHERE ride_id IN (SELECT id FROM rides WHERE driver_id = ?)", owner);
         for (UUID user : Arrays.asList(owner, passenger, stranger)) {
             if (user == null) continue;
@@ -77,11 +79,97 @@ class BookingIT {
             jdbc.update("DELETE FROM user_profiles WHERE user_id = ?", user);
             jdbc.update("DELETE FROM wallet_entries WHERE user_id = ?", user);
             jdbc.update("DELETE FROM wallet_top_ups WHERE user_id = ?", user);
+            jdbc.update("DELETE FROM wallet_withdrawals WHERE user_id = ?", user);
             jdbc.update("DELETE FROM wallets WHERE user_id = ?", user);
             jdbc.update("DELETE FROM users WHERE id = ?", user);
         }
     }
     RideDtos.View offer(int seats) { return rides.create(owner, new RideDtos.Create("Mumbai", "Pune", null, null, departure, "Asia/Kolkata", seats, new BigDecimal("125.50"), "INR", null, null)); }
+    @Test void concurrentWalletCheckoutsCannotSpendTheSameBalance() throws Exception {
+        jdbc.update("INSERT INTO wallets(user_id, available_paise) VALUES (?, 12550)", passenger);
+        String first = newWalletHold(offer(1).id());
+        String second = newWalletHold(offer(1).id());
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Future<Integer> a = pool.submit(() -> { start.await(); return walletCheckoutStatus(first); });
+            Future<Integer> b = pool.submit(() -> { start.await(); return walletCheckoutStatus(second); });
+            start.countDown();
+            assertEquals(Set.of(200, 409), Set.of(a.get(10, TimeUnit.SECONDS), b.get(10, TimeUnit.SECONDS)));
+        }
+        assertEquals(0L, jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM wallet_entries WHERE user_id = ?", Integer.class, passenger));
+    }
+
+    private String newWalletHold(UUID ride) throws Exception {
+        String root = "/api/v1/group/holds";
+        String response = mvc.perform(post(root).header("Authorization", passengerToken)
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rideId\":\"" + ride + "\",\"seats\":1}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return root + "/" + json.readTree(response).path("id").asText();
+    }
+
+    private int walletCheckoutStatus(String hold) throws Exception {
+        return mvc.perform(post(hold + "/checkout").header("Authorization", passengerToken)
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"WALLET\"}"))
+                .andReturn().getResponse().getStatus();
+    }
+
+    @Test void sandboxWithdrawalReservesFundsAndSettlesExactlyOnce() throws Exception {
+        String root = "/api/v1/wallet/withdrawals";
+        jdbc.update("INSERT INTO wallets(user_id, available_paise) VALUES (?, 1000)", passenger);
+        for (boolean succeeds : List.of(false, true)) {
+            var request = post(root).header("Authorization", passengerToken)
+                    .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"amountPaise\":700}");
+            String pending = mvc.perform(request).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"))
+                    .andReturn().getResponse().getContentAsString();
+            UUID id = UUID.fromString(json.readTree(pending).path("id").asText());
+            mvc.perform(request).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id.toString()));
+            mvc.perform(get(root + "/" + id).header("Authorization", strangerToken)).andExpect(status().isNotFound());
+            assertEquals(700L, jdbc.queryForObject("SELECT reserved_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
+            wallet.settleWithdrawal(passenger, id, succeeds);
+            wallet.settleWithdrawal(passenger, id, succeeds);
+            mvc.perform(get(root + "/" + id).header("Authorization", passengerToken))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value(succeeds ? "SUCCEEDED" : "FAILED"));
+            assertEquals(0L, jdbc.queryForObject("SELECT reserved_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
+            assertEquals(succeeds ? 300L : 1000L,
+                    jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
+        }
+        mvc.perform(post(root).header("Authorization", passengerToken).header("Idempotency-Key", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"amountPaise\":301}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INSUFFICIENT_FUNDS"));
+    }
+
+    @Test void walletBookingRollsBackOnLowBalanceAndRefundsOnlyOnce() throws Exception {
+        UUID ride = offer(1).id();
+        String root = "/api/v1/group/holds";
+        String created = mvc.perform(post(root).header("Authorization", passengerToken)
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rideId\":\"" + ride + "\",\"seats\":1}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String path = root + "/" + json.readTree(created).path("id").asText();
+        var checkout = post(path + "/checkout").header("Authorization", passengerToken)
+                .header("Idempotency-Key", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"method\":\"WALLET\"}");
+        mvc.perform(checkout).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INSUFFICIENT_FUNDS"));
+        mvc.perform(get(path).header("Authorization", passengerToken)).andExpect(jsonPath("$.status").value("HELD"));
+        jdbc.update("INSERT INTO wallets(user_id, available_paise) VALUES (?, 12550)", passenger);
+        String paid = mvc.perform(checkout).andExpect(status().isOk()).andExpect(jsonPath("$.hold.status").value("CONFIRMED"))
+                .andReturn().getResponse().getContentAsString();
+        UUID booking = UUID.fromString(json.readTree(paid).path("hold").path("bookingId").asText());
+        mvc.perform(checkout).andExpect(status().isOk()).andExpect(jsonPath("$.hold.bookingId").value(booking.toString()));
+        mvc.perform(get("/api/v1/bookings/" + booking + "/payment").header("Authorization", passengerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.provider").value("wallet"))
+                .andExpect(jsonPath("$.canPay").value(false));
+        assertEquals(0L, jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
+        bookings.cancel(booking, passenger, null);
+        bookings.cancel(booking, passenger, null);
+        assertEquals(12550L, jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id = ?", Long.class, passenger));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM wallet_entries WHERE user_id = ?", Integer.class, passenger));
+    }
+
     @Test void walletCreditsOnlyVerifiedCaptureAndRecordsExactlyOneEntry() throws Exception {
         String root = "/api/v1/wallet";
         mvc.perform(get(root)).andExpect(status().isUnauthorized());
