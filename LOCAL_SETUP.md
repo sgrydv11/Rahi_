@@ -1,6 +1,6 @@
 # Local Windows setup
 
-The current integration branch contains origin/codex/backend and origin/app-fe.
+The app_v1 branch contains the backend, web frontend, and native app from origin/codex/backend and origin/app-fe.
 
 Local tools are installed under `.tools/` (Maven 3.9.10 and PostgreSQL 15.13).
 Use the installed JDK at `C:\Program Files\Java\jdk-21`.
@@ -35,4 +35,4 @@ Get-Content .local/backend.pid,.local/frontend.pid | ForEach-Object { Stop-Proce
 ```
 
 
-Verified: 54 backend unit tests, 47 web tests, and 10 native contract tests passed. Backend and web builds passed; live database health and frontend API proxy returned UP, with 14 successful migrations. Port 8081 is used because 8080 is occupied. Native npm installation and the extra dedicated-database test were stopped due to severe system memory pressure; native typecheck and device build remain unverified. Retry npm ci in mobile/ after freeing memory.
+Backend and web builds, unit tests, PostgreSQL integration tests, and native API contract tests are recorded in docs/testing-app-v1.md. Live database health and the frontend API proxy return UP, with 14 successful migrations. Port 8081 is used because 8080 is occupied. Native dependency installation was previously interrupted by severe memory pressure; native typecheck and device builds remain unverified. Retry npm ci in mobile/ after freeing memory.
