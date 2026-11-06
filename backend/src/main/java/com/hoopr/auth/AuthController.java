@@ -40,7 +40,9 @@ public class AuthController {
     @PostMapping("/login") public AuthService.Access login(@Valid @RequestBody LoginRequest body,
             HttpServletRequest request, HttpServletResponse response) {
         limiter.check(request.getRemoteAddr());
-        return respond(auth.login(body.email, body.password), response);
+        var issued = auth.login(body.email, body.password);
+        limiter.succeeded(request.getRemoteAddr());
+        return respond(issued, response);
     }
     @PostMapping("/refresh") public AuthService.Access refresh(
             @CookieValue(name = "hoopr_refresh", required = false) String raw, HttpServletResponse response) {

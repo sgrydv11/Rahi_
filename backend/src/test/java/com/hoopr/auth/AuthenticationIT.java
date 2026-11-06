@@ -79,6 +79,19 @@ class AuthenticationIT {
         mvc.perform(post(path + "/refresh").contentType(MediaType.APPLICATION_JSON).content(token))
                 .andExpect(status().isUnauthorized());
     }
+    @Test void disabledTokensCannotReadNotificationsOrGroupOffers() throws Exception {
+        String bearer = "Bearer " + auth.login(email, "test-password-long").access.accessToken();
+        jdbc.update("UPDATE users SET status='DISABLED' WHERE id=?", userId);
+        for (String path : List.of("/api/v1/notifications", "/api/v1/group/offers"))
+            mvc.perform(get(path).header("Authorization", bearer)).andExpect(status().isUnauthorized());
+    }
+    @Test void validLoginsDoNotExhaustTheIpFailureBudget() throws Exception {
+        String credentials = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                Map.of("email", email, "password", "test-password-long"));
+        for (int i=0; i<22; i++)
+            mvc.perform(post("/api/v1/mobile/auth/login").with(r -> { r.setRemoteAddr("192.0.2.201"); return r; })
+                    .contentType(MediaType.APPLICATION_JSON).content(credentials)).andExpect(status().isOk());
+    }
     @Test void travelPreferencesPersistAcrossLoginRefreshAndProfile() {
         for (var preference : com.hoopr.user.TravelPreference.values()) {
             var account = auth.register("preference-" + UUID.randomUUID() + "@example.test", "test-password-long", "Preference User", preference);

@@ -28,16 +28,24 @@ export const authStore = {
   },
 };
 async function mutate<T>(path: string, body?: unknown): Promise<T> {
-  csrfPending ??= request<{ token: string; headerName: string }>('/auth/csrf', { credentials: 'include' })
-    .catch(error => { csrfPending = null; throw error; });
-  const csrf = await csrfPending;
-  try {
-    return await request<T>(path, { method: 'POST', credentials: 'include',
-      headers: { [csrf.headerName]: csrf.token }, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 403) csrfPending = null;
-    throw error;
-  }
+  const perform = async (freshCsrf: boolean) => {
+    if (freshCsrf) csrfPending = null;
+    csrfPending ??= request<{ token: string; headerName: string }>('/auth/csrf', { credentials: 'include', signal: AbortSignal.timeout(15000) })
+      .catch(error => { csrfPending = null; throw error; });
+    const csrf = await csrfPending;
+    try {
+      return await request<T>(path, { method: 'POST', credentials: 'include', signal: AbortSignal.timeout(15000),
+        headers: { [csrf.headerName]: csrf.token }, body: body === undefined ? undefined : JSON.stringify(body) });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) csrfPending = null;
+      throw error;
+    }
+  };
+  // Cookies are shared across tabs: lock CSRF acquisition and rotation together.
+  // Tokens stay in memory/cookies and are never broadcast or saved in localStorage.
+  if (typeof navigator !== 'undefined' && navigator.locks)
+    return navigator.locks.request('hoopr-cookie-auth', () => perform(true));
+  return perform(false);
 }
 export function refreshSession(): Promise<Session> {
   if (!refreshPending) {

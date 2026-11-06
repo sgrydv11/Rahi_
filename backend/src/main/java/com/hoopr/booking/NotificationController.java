@@ -17,15 +17,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationController {
     private final NamedParameterJdbcTemplate jdbc;
     private final Clock clock;
+    private final com.hoopr.auth.AuthService auth;
 
-    public NotificationController(NamedParameterJdbcTemplate jdbc, Clock clock) {
+    public NotificationController(NamedParameterJdbcTemplate jdbc, Clock clock, com.hoopr.auth.AuthService auth) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.auth = auth;
     }
 
     @GetMapping("/api/v1/notifications")
     public List<Notice> inbox(@AuthenticationPrincipal Jwt jwt) {
-        UUID user = UUID.fromString(jwt.getSubject());
+        UUID user = auth.profile(UUID.fromString(jwt.getSubject())).id();
         Instant now = clock.instant();
         var params = new MapSqlParameterSource("user", user)
                 .addValue("now", Timestamp.from(now))

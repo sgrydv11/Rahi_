@@ -25,6 +25,14 @@ describe('ride UI', () => {
     expect(html).toContain('Mumbai'); expect(html).toContain('Pune'); expect(html).toContain('INR 250.00');
     expect(html).toContain('Alice'); expect(html).toContain('/rides/test-ride'); expect(html).not.toContain('Book now');
   });
+  it.each(['UTC+05:30', 'GMT+05:30', 'Z'])('keeps legacy zone %s from crashing a card', timeZone => {
+    const html = renderToString(<MemoryRouter><RideCard ride={{ ...ride, timeZone }} /></MemoryRouter>);
+    expect(html).toContain('UTC'); expect(html).toContain('Mumbai');
+  });
+  it('keeps a legacy out-of-range departure from crashing a card', () => {
+    const html = renderToString(<MemoryRouter><RideCard ride={{ ...ride, departureAt: '+280000-01-01T00:00:00Z' }} /></MemoryRouter>);
+    expect(html).toContain('Departure time unavailable');
+  });
   it('renders an accessible cancellation dialog with a separate confirmation action', () => {
     const html = renderToString(<CancelRideDialog ride={ride} cancelled={() => {}} />);
     expect(html).toContain('aria-labelledby="cancel-ride-title"'); expect(html).toContain('Keep ride');

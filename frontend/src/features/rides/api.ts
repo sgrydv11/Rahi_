@@ -63,8 +63,16 @@ export function validateRide(input: RideInput): string | null {
   if (input.vehicleDetails.length > 300 || input.notes.length > 2000) return 'Vehicle details or notes are too long.';
   return null;
 }
-export function departureLabel(ride: Ride) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: ride.timeZone }).format(new Date(ride.departureAt)) + ` (${ride.timeZone})`;
+export function departureLabel(ride: Pick<Ride, 'departureAt' | 'timeZone'>) {
+  const date = new Date(ride.departureAt);
+  if (!Number.isFinite(date.getTime())) return 'Departure time unavailable';
+  try {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: ride.timeZone })
+      .format(date) + ` (${ride.timeZone})`;
+  } catch {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })
+      .format(date) + ' (UTC; original time zone unavailable)';
+  }
 }
 export function money(ride: Ride) { return `${ride.currency} ${Number(ride.pricePerSeat).toFixed(2)}`; }
 export function canManage(ride: Ride) { return ride.status === 'SCHEDULED' && Date.parse(ride.departureAt) > Date.now(); }

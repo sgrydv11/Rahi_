@@ -31,9 +31,18 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.detail").value("An unexpected error occurred."));
     }
 
+    @Test void exhaustedDatabaseConnectionsReturnRetryableServiceUnavailable() throws Exception {
+        mvc.perform(get("/probe/database")).andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("Retry-After", "1"))
+                .andExpect(jsonPath("$.detail").value("Service is temporarily busy. Please retry shortly."));
+    }
+
     @RestController
     static class ProbeController {
         @PostMapping("/probe") void validate(@Valid @RequestBody Probe body) { }
+        @GetMapping("/probe/database") void database() {
+            throw new org.springframework.transaction.CannotCreateTransactionException("internal datasource detail");
+        }
         @GetMapping("/probe") void fail() { throw new IllegalStateException("internal diagnostic"); }
     }
     record Probe(@NotBlank String name) { }

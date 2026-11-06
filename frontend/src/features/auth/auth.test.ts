@@ -47,6 +47,28 @@ describe('auth session client', () => {
     expect(fetcher).toHaveBeenCalledTimes(5);
     expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/auth/refresh'))).toHaveLength(2);
   });
+  it('serializes cookie refresh across separate tabs and fetches CSRF inside the lock', async () => {
+    let tail = Promise.resolve();
+    const locks = { request: vi.fn((_name: string, run: () => Promise<unknown>) => {
+      const next = tail.then(run); tail = next.then(() => undefined, () => undefined); return next;
+    }) };
+    vi.stubGlobal('navigator', { locks });
+    const calls: string[] = [];
+    const fetcher = vi.fn<typeof fetch>(async url => {
+      calls.push(String(url));
+      await new Promise(resolve => setTimeout(resolve, 5));
+      return String(url).endsWith('/csrf') ? csrf() : session();
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const firstTab = await import('./auth');
+    vi.resetModules();
+    const secondTab = await import('./auth');
+    await Promise.all([firstTab.refreshSession(), secondTab.refreshSession()]);
+    expect(locks.request).toHaveBeenCalledTimes(2);
+    expect(calls.map(url => url.split('/').at(-1))).toEqual(['csrf', 'refresh', 'csrf', 'refresh']);
+    expect(firstTab.authStore.snapshot()).toEqual(user);
+    expect(secondTab.authStore.snapshot()).toEqual(user);
+  });
   it('does not retry failed refresh and clears memory', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(Response.json({}, { status: 401 }));
     vi.stubGlobal('fetch', fetcher);

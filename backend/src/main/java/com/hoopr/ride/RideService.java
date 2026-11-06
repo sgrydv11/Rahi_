@@ -61,6 +61,8 @@ public class RideService {
     @Transactional(readOnly = true)
     public Results search(String origin, String destination, LocalDate date, String timeZone,
             int minimumSeats, BigDecimal maximumPrice, int page, int size) {
+        if (date != null && (date.getYear() < 1 || date.getYear() > 9999))
+            throw new RideFailure(400, "Travel date must be between years 0001 and 9999.");
         var filter = RideSpecifications.available(clock.instant(), origin, destination, date, zone(timeZone), minimumSeats, maximumPrice);
         return results(rides.findAll(filter, paging(page, size)));
     }
@@ -198,9 +200,17 @@ public class RideService {
     private void validateDeparture(Instant departure, String timeZone) {
         zone(timeZone);
         if (departure == null || !departure.isAfter(clock.instant())) throw new RideFailure(400, "Departure must be in the future.");
+        if (!departure.isBefore(Instant.parse("+10000-01-01T00:00:00Z")))
+            throw new RideFailure(400, "Departure must be before year 10000.");
     }
     public static ZoneId zone(String value) {
-        try { return ZoneId.of(value); }
+        try {
+            if (value == null || !ZoneId.getAvailableZoneIds().contains(value)
+                    || value.startsWith("SystemV/")
+                    || !(value.contains("/") || value.equals("UTC") || value.equals("GMT")))
+                throw new DateTimeException("Not an IANA region zone");
+            return ZoneId.of(value);
+        }
         catch (RuntimeException e) { throw new RideFailure(400, "Use a valid IANA time zone, for example Asia/Kolkata."); }
     }
     private static void validateLocations(String origin, String destination) {
@@ -217,16 +227,34 @@ public class RideService {
     private static String optional(String value) { return value == null || value.isBlank() ? null : value.strip(); }
     private static Pageable paging(int page, int size) { return PageRequest.of(page, size, Sort.by("departureAt").ascending().and(Sort.by("id"))); }
     private Results results(Page<Ride> page) {
-        return new Results(page.getContent().stream().map(this::view).toList(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
+        var content = page.getContent();
+        Map<UUID, Integer> held = new HashMap<>();
+        if (!content.isEmpty()) {
+            var params = new ArrayList<Object>();
+            params.add(clock.instant().atOffset(ZoneOffset.UTC));
+            content.forEach(ride -> params.add(ride.id));
+            // One inventory query per page, not one query per card.
+            jdbc.query("SELECT ride_id, sum(seats) FROM group_seat_holds WHERE status='HELD' AND expires_at > ? AND ride_id IN ("
+                    + String.join(",", Collections.nCopies(content.size(), "?")) + ") GROUP BY ride_id",
+                    (row, index) -> { held.put(row.getObject(1, UUID.class), row.getInt(2)); return row.getInt(2); },
+                    params.toArray());
+        }
+        return new Results(content.stream().map(ride -> view(ride, held.getOrDefault(ride.id, 0))).toList(),
+                page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
     private View view(Ride ride) {
+        Integer held = jdbc.queryForObject("SELECT coalesce(sum(seats),0) FROM group_seat_holds WHERE ride_id=? AND status='HELD' AND expires_at > ?",
+                Integer.class, ride.id, clock.instant().atOffset(ZoneOffset.UTC));
+        return view(ride, held == null ? 0 : held);
+    }
+    private View view(Ride ride, int held) {
         // Repository entity graphs fetch the safe driver profile in the page query.
         String name = ride.driverProfile == null ? "Hoopr driver" : ride.driverProfile.getFullName();
         if (name == null || name.isBlank()) name = "Hoopr driver";
         else name = name.strip().split("\\s+", 2)[0];
         return new View(ride.id, new Driver(ride.driverId, name), ride.origin, ride.destination,
                 ride.pickupDescription, ride.dropoffDescription, ride.departureAt, ride.timeZone,
-                ride.totalSeats, ride.availableSeats, ride.pricePerSeat, ride.currency, ride.vehicleDetails,
+                ride.totalSeats, Math.max(0, ride.availableSeats - held), ride.pricePerSeat, ride.currency, ride.vehicleDetails,
                 ride.notes, "PUBLISHED".equals(ride.status) ? "SCHEDULED" : ride.status, ride.version,
                 ride.createdAt, ride.updatedAt, ride.cancelledAt, ride.cancellationReason,
                 ride.startedAt, ride.completedAt, canStart(ride, clock.instant()), routePins(ride));

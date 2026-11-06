@@ -291,6 +291,34 @@ class RideIT {
             connection.rollback();
         }
     }
+    @Test void aBlockedRideCannotHoldEveryDatabaseConnectionIndefinitely() throws Exception {
+        var ride = offer();
+        try (var connection = datasource.getConnection(); var executor = Executors.newFixedThreadPool(13)) {
+            connection.setAutoCommit(false);
+            try {
+                try (var statement = connection.prepareStatement("SELECT id FROM rides WHERE id=? FOR UPDATE")) {
+                    statement.setObject(1, ride.id()); statement.executeQuery().close();
+                }
+                var entered = new CountDownLatch(12);
+                List<Future<RuntimeException>> attempts = new ArrayList<>();
+                for (int i=0; i<12; i++) attempts.add(executor.submit(() -> {
+                    entered.countDown();
+                    try { bookings.create(ride.id(), other, UUID.randomUUID(), 1); return null; }
+                    catch (RuntimeException failure) { return failure; }
+                }));
+                assertTrue(entered.await(10, TimeUnit.SECONDS));
+                var unrelatedRead = executor.submit(() -> jdbc.queryForObject("SELECT 1", Integer.class));
+                assertEquals(1, unrelatedRead.get(8, TimeUnit.SECONDS));
+                for (var attempt : attempts) {
+                    var failure = attempt.get(8, TimeUnit.SECONDS);
+                    assertTrue(failure instanceof org.springframework.dao.PessimisticLockingFailureException
+                            || failure instanceof org.springframework.transaction.CannotCreateTransactionException,
+                            "Expected bounded contention, got " + failure);
+                }
+            } finally { connection.rollback(); }
+        }
+        assertEquals(ride.totalSeats(), service.details(ride.id(), owner).availableSeats());
+    }
     @Test void dateFilterUsesRequestedLocalCalendarDay() {
         Instant boundary = tomorrow.atOffset(ZoneOffset.UTC).toLocalDate().atStartOfDay().toInstant(ZoneOffset.UTC).minusSeconds(3600);
         service.create(owner, body("Mumbai", "Pune", boundary, 1, "0.00"));

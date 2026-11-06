@@ -104,6 +104,14 @@ class AuthServiceTest {
     @Test void bcryptByteLimitIsEnforced() {
         assertThrows(AuthFailure.class, () -> service.register("new@example.test", "é".repeat(37), "Name"));
     }
+    @Test void successfulLoginsReleaseOnlyTheirOwnAttemptAndKeepFailureProtection() {
+        var limiter = new LoginLimiter(Clock.fixed(now, ZoneOffset.UTC));
+        for (int i=0; i<30; i++) { limiter.check("shared-ip"); limiter.succeeded("shared-ip"); }
+        for (int i=0; i<19; i++) limiter.check("shared-ip");
+        limiter.check("shared-ip"); limiter.succeeded("shared-ip");
+        limiter.check("shared-ip");
+        assertEquals(429, assertThrows(AuthFailure.class, () -> limiter.check("shared-ip")).status);
+    }
     @Test void limiterCapsAttemptsAndExpires() {
         var clock = mock(Clock.class); when(clock.instant()).thenReturn(now);
         var limiter = new LoginLimiter(clock);

@@ -403,6 +403,22 @@ class BookingIT {
         assertNotNull(bookings.create(ride.id(), stranger, UUID.randomUUID(), 1));
     }
 
+    @Test void ordinarySearchAndDetailsSubtractActiveHoldsAndRestoreCancelledHolds() throws Exception {
+        var ride = offer(1);
+        var response = mvc.perform(post("/api/v1/group/holds").header("Authorization", passengerToken)
+                .header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("rideId", ride.id(), "seats", 1))))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        String hold = json.readTree(response.getContentAsString()).path("id").asText();
+        mvc.perform(get("/api/v1/rides/" + ride.id())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.availableSeats").value(0));
+        mvc.perform(get("/api/v1/rides").param("origin", "Mumbai"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[?(@.id == '"+ride.id()+"')]").isEmpty());
+        mvc.perform(post("/api/v1/group/holds/"+hold+"/cancel").header("Authorization", passengerToken))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/rides/" + ride.id())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.availableSeats").value(1));
+    }
     @Test void groupFeedRequiresLoginAndShowsOnlyMatchingBookableSeats() throws Exception {
         var ride = offer(1);
         String path = "/api/v1/group/offers?origin=mUmBaI&destination=PUNE&size=1";

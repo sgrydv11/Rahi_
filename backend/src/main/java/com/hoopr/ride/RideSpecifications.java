@@ -14,7 +14,12 @@ public final class RideSpecifications {
             var predicates = new ArrayList<Predicate>();
             predicates.add(root.get("status").in("SCHEDULED", "PUBLISHED"));
             predicates.add(cb.greaterThan(root.get("departureAt"), now));
-            predicates.add(cb.greaterThanOrEqualTo(root.get("availableSeats"), seats));
+            var heldSeats = query.subquery(Long.class);
+            var hold = heldSeats.from(SeatHoldInventory.class);
+            heldSeats.select(cb.coalesce(cb.sum(hold.<Short>get("seats")).as(Long.class), 0L))
+                    .where(cb.equal(hold.get("rideId"), root.get("id")),
+                            cb.equal(hold.get("status"), "HELD"), cb.greaterThan(hold.get("expiresAt"), now));
+            predicates.add(cb.ge(cb.diff(root.get("availableSeats").as(Long.class), heldSeats), (long) seats));
             if (origin != null && !origin.isBlank()) predicates.add(cb.like(cb.lower(root.get("origin")), prefix(origin), '\\'));
             if (destination != null && !destination.isBlank()) predicates.add(cb.like(cb.lower(root.get("destination")), prefix(destination), '\\'));
             if (date != null) {

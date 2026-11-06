@@ -88,6 +88,20 @@ class RideServiceTest {
         assertEquals("CANCELLED", result.status()); assertEquals(now, result.cancelledAt());
         assertEquals("Plan changed", result.cancellationReason()); verify(rides, never()).delete(any(Ride.class));
     }
+    @Test void browserIncompatibleZonesAndDepartureYearsAreRejected() {
+        for (String zone : List.of("UTC+05:30", "GMT+05:30", "Z", "SystemV/EST5"))
+            assertEquals(400, assertThrows(RideFailure.class, () -> RideService.zone(zone)).status);
+        Create b = body();
+        assertEquals(400, assertThrows(RideFailure.class, () -> service.create(owner,
+                new Create(b.origin(), b.destination(), null, null, Instant.parse("+280000-01-01T00:00:00Z"),
+                        b.timeZone(), 3, b.pricePerSeat(), "INR", null, null))).status);
+    }
+    @Test void unsupportedSearchDatesFailValidationBeforeQuerying() {
+        for (LocalDate date : List.of(LocalDate.MAX, LocalDate.of(300000, 1, 1)))
+            assertEquals(400, assertThrows(RideFailure.class,
+                    () -> service.search(null, null, date, "UTC", 1, null, 0, 20)).status);
+        verifyNoInteractions(rides);
+    }
     @Test void disabledAccountCannotOffer() {
         when(users.findById(owner)).thenReturn(Optional.empty());
         assertEquals(401, assertThrows(RideFailure.class, () -> service.create(owner, body())).status);

@@ -35,10 +35,12 @@ public class GroupOfferController {
 
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final com.hoopr.auth.AuthService auth;
 
-    public GroupOfferController(NamedParameterJdbcTemplate jdbc, Clock clock) {
+    public GroupOfferController(NamedParameterJdbcTemplate jdbc, Clock clock, com.hoopr.auth.AuthService auth) {
         this.jdbc = JdbcClient.create(jdbc);
         this.clock = clock;
+        this.auth = auth;
     }
 
     @GetMapping
@@ -49,7 +51,7 @@ public class GroupOfferController {
                        @RequestParam(defaultValue = "") @Size(max = 200) String origin,
                        @RequestParam(defaultValue = "") @Size(max = 200) String destination) {
         var now = clock.instant().atOffset(ZoneOffset.UTC);
-        var viewer = UUID.fromString(jwt.getSubject());
+        var viewer = auth.profile(UUID.fromString(jwt.getSubject())).id();
         long count = eligible("SELECT count(*) ", "", now, viewer, origin, destination)
                 .query(Long.class).single();
         List<Offer> content = eligible("""

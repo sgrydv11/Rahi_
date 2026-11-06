@@ -3,6 +3,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { errorMessage } from '../auth/auth';
 import { Pagination } from '../rides/RideComponents';
+import { departureLabel } from '../rides/api';
 import { bookingsApi, bookingStatus, type Booking, type BookingPage } from './api';
 import { BookingRating } from './BookingRating';
 import { RoutePreview } from '../rides/RoutePanel';
@@ -12,7 +13,7 @@ function BookingCard({ booking }: { booking: Booking }) {
   return <article className="panel ride-card"><div><p className="eyebrow">{bookingStatus(booking.status)}</p>
     <h2><Link to={`/bookings/${booking.id}`}>{booking.ride.origin} → {booking.ride.destination}</Link></h2>
     <p>Trip status: {bookingStatus(booking.ride.status)}</p>
-    <p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: booking.ride.timeZone }).format(new Date(booking.ride.departureAt))} ({booking.ride.timeZone})</p>
+    <p>{departureLabel(booking.ride)}</p>
     <p>Passenger: {booking.passenger.displayName} · {booking.seats} seat{booking.seats > 1 ? 's' : ''}</p></div>
     <div><p>{booking.currency} {Number(booking.totalPrice).toFixed(2)} total</p><Link className="button button-small" to={`/bookings/${booking.id}`}>View booking</Link></div>
   </article>;

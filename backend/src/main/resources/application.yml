@@ -8,6 +8,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/hoopr}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:3000}
+      # Bound PostgreSQL row-lock waits before a single busy ride consumes the pool.
+      connection-init-sql: SET lock_timeout = '${DB_LOCK_TIMEOUT:1500ms}'
   jpa:
     open-in-view: false
     hibernate:

@@ -33,7 +33,9 @@ public class MobileAuthController {
     public ResponseEntity<Session> login(@Valid @RequestBody AuthController.LoginRequest body, HttpServletRequest request) {
         requireNativeRequest(request);
         limiter.check(request.getRemoteAddr());
-        return session(auth.login(body.email, body.password));
+        var issued = auth.login(body.email, body.password);
+        limiter.succeeded(request.getRemoteAddr());
+        return session(issued);
     }
 
     @PostMapping("/refresh")
