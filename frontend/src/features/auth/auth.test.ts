@@ -12,6 +12,16 @@ describe('auth session client', () => {
     expect(validateCredentials('a@example.test', 'é'.repeat(37), true)).toContain('72');
     expect(validateCredentials('a@example.test', 'long-password', true)).toBeNull();
   });
+  it('exchanges a Google credential using CSRF and establishes the normal session', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(session());
+    vi.stubGlobal('fetch', fetcher);
+    const auth = await import('./auth');
+    await auth.loginWithGoogle('signed-google-token', 'DRIVER');
+    expect(fetcher.mock.calls[1][0]).toBe('/api/v1/auth/google');
+    expect(fetcher.mock.calls[1][1]?.credentials).toBe('include');
+    expect(JSON.parse(fetcher.mock.calls[1][1]?.body as string)).toEqual({ credential: 'signed-google-token', travelPreference: 'DRIVER' });
+    expect(auth.authStore.snapshot()).toEqual(user);
+  });
   it('logs in with CSRF and cookie credentials then sends bearer requests', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(session())
       .mockResolvedValueOnce(Response.json(user));

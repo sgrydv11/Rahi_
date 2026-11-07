@@ -153,3 +153,13 @@ GitHub checkpoint ad0d48f is pushed to app_v1. Hosted workflow run 42371688074 p
 - Remote redeployment remains unconfirmed. Computer-use ended because it could not verify the current Windows browser URL. No Render API credential/deploy hook is configured. User reports Chrome is signed in. Manual path is Render service Settings → confirm app_v1 branch, then Manual Deploy → Deploy latest commit. Verify logs reach V14/up-to-date and health succeeds. Do not paste credentials into chat.
 
 Release verification checkpoint e1254b7 is pushed. GitHub CI https://github.com/sgrydv11/Rahi_/actions/runs/42373391239 passed all jobs, including the packaged-server smoke test. Local main servers remain running; the isolated smoke server has been stopped. Remote Render redeployment is awaiting the user-selected manual action because browser control was stopped. Existing live service health and read-only functionality passed; its running commit has not been verified.
+
+## Google web sign-in implementation on 7 November 2026
+
+- Added Google Identity Services to both web login and registration, sharing the existing CSRF-protected login/session flow. Backend verifies Google RS256 signatures, issuer, audience, expiry, subject and verified email.
+- Added GOOGLE_CLIENT_ID backend configuration and public /api/v1/auth/google/config. Configuration is absent until the user creates a Google OAuth Web Client ID. The UI clearly marks sign-in as awaiting setup and keeps email/password available.
+- Flyway V15 adds users.google_subject and a unique index. Gmail/Workspace linking uses verified authoritative identity; third-party email collisions require the existing sign-in method. First sign-ins are serialized to avoid duplicate accounts. Existing password hashes/preferences remain intact.
+- User requested Google OAuth setup steps. Steps are documented in README.md. Real Google-account sign-in remains blocked on client ID, authorized JavaScript origins and user consent/testing configuration. This implementation covers the web frontend.
+- Frontend 53 tests and web build passed. Backend signature/security/account-linking/session/migration regressions are running. Record final results and deployment state below.
+
+Google verification results: backend regression reports total 123 tests with 0 failures and 0 errors. Full suite passed, then the final token-validator/web-security changes were retested and packaged. Frontend 53 tests and production web build passed. V15 was validated in an isolated schema. Local backend restart is applying V15 to the development database. Real Google sign-in is pending the user's public OAuth Web Client ID and origin configuration.

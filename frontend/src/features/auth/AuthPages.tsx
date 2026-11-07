@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { errorMessage, login, register, validateCredentials, travelPreferenceLabels, type TravelPreference } from './auth';
+import { errorMessage, login, loginWithGoogle, register, validateCredentials, travelPreferenceLabels, type TravelPreference } from './auth';
+import { GoogleSignIn } from './GoogleSignIn';
 import { demoMode } from '../rides/api';
 
 function AuthForm({ registering = false }: { registering?: boolean }) {
@@ -13,6 +14,16 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  async function googleSignIn(credential: string) {
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
+      await loginWithGoogle(credential, travelPreference);
+      const from: unknown = location.state?.from;
+      navigate(typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/profile', { replace: true });
+    } catch (failure) { setError(errorMessage(failure)); }
+    finally { setBusy(false); }
+  }
   if (demoMode) {
     return <section className="page narrow">
       <p className="eyebrow">Sample app</p>
@@ -44,6 +55,7 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
     <h1>{registering ? 'Join the journey.' : 'Welcome back.'}</h1>
     <p className="intro">{registering ? 'One profile for driving and riding.' : 'Your next shared journey is just around the corner.'}</p>
     <div className="panel">
+      {!success && <GoogleSignIn registering={registering} busy={busy} onCredential={credential => void googleSignIn(credential)} />}
       {success ? <div role="status"><h2>Your account is ready.</h2><p>You can now <Link to="/login">log in</Link>.</p></div>
         : <form className="auth-form" onSubmit={submit} noValidate aria-busy={busy}>
           {registering && <label>Full name<input name="fullName" autoComplete="name" required maxLength={120} value={name} onChange={e => setName(e.target.value)} disabled={busy} /></label>}

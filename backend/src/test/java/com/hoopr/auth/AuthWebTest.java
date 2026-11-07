@@ -34,6 +34,7 @@ class AuthWebTest {
     @Autowired JwtEncoder encoder;
     @Autowired JwtDecoder decoder;
     @MockitoBean AuthService auth;
+    @MockitoBean GoogleSignInService googleSignIn;
     @MockitoBean com.hoopr.ride.RideService rides;
     @MockitoBean com.hoopr.ride.RideRepository rideRepository;
     @MockitoBean com.hoopr.booking.BookingService bookings;
@@ -98,8 +99,19 @@ class AuthWebTest {
         mvc.perform(write("logout"))
                 .andExpect(status().isNoContent()).andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
     }
+    @Test void googleSignInUsesTheSameSecureSessionCookie() throws Exception {
+        when(googleSignIn.signIn("verified-credential", com.hoopr.user.TravelPreference.PASSENGER))
+                .thenReturn(new AuthService.Issued(new AuthService.Access("google-access", "Bearer", 900, profile()),
+                        "b".repeat(43), Instant.now().plusSeconds(1000)));
+        mvc.perform(write("google").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"credential\":\"verified-credential\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value("google-access"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", allOf(containsString("HttpOnly"), containsString("Secure"))));
+        mvc.perform(get("/api/v1/auth/google/config")).andExpect(status().isOk()).andExpect(jsonPath("$.clientId").value(""));
+    }
     @Test void cookieWritesRequireCsrfAndTrustedOriginEvenWithBearerHeader() throws Exception {
-        for (String path : List.of("register", "login", "refresh", "logout")) {
+        for (String path : List.of("register", "login", "refresh", "logout", "google")) {
             mvc.perform(post("/api/v1/auth/" + path).header("Origin", "http://localhost:5173"))
                     .andExpect(status().isForbidden());
             mvc.perform(write(path).with(r -> { r.removeHeader("Origin"); return r; })).andExpect(status().isForbidden());

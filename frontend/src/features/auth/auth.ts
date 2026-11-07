@@ -67,6 +67,12 @@ export async function login(email: string, password: string) {
 export async function register(email: string, password: string, fullName: string, travelPreference: TravelPreference = 'BOTH') {
   return mutate<User>('/auth/register', { email, password, fullName, travelPreference });
 }
+export async function loginWithGoogle(credential: string, travelPreference: TravelPreference = 'PASSENGER') {
+  if (refreshPending) await refreshPending.catch(() => {});
+  generation++;
+  const next = await mutate<Session>('/auth/google', { credential, travelPreference });
+  publish(next);
+}
 export async function logout() {
   generation++;
   if (refreshPending) await refreshPending.catch(() => {});

@@ -22,6 +22,7 @@ describe('foundation pages', () => {
     expect(html).toContain('App navigation');
     expect(html).toContain('>Find</span>');
     expect(html).toContain('Skip to content');
+    if (path === '/login' || path === '/register') expect(html).toContain('Continue with Google');
     if (path === '/register') {
       expect(html).toContain('Offer a seat (Driver)');
       expect(html).toContain('Find a seat (Passenger)');

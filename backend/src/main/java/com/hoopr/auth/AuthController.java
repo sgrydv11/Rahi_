@@ -26,11 +26,30 @@ public class AuthController {
     private final AuthSettings settings;
     private final LoginLimiter limiter;
     private final Clock clock;
-    public AuthController(AuthService auth, AuthSettings settings, LoginLimiter limiter, Clock clock) {
+    private final GoogleSignInService googleSignIn;
+    private final GoogleTokenVerifier googleVerifier;
+    public AuthController(AuthService auth, AuthSettings settings, LoginLimiter limiter, Clock clock,
+            GoogleSignInService googleSignIn, GoogleTokenVerifier googleVerifier) {
         this.auth = auth; this.settings = settings; this.limiter = limiter; this.clock = clock;
+        this.googleSignIn = googleSignIn; this.googleVerifier = googleVerifier;
     }
     @GetMapping("/csrf") public java.util.Map<String, String> csrf(CsrfToken token) {
         return java.util.Map.of("token", token.getToken(), "headerName", token.getHeaderName());
+    }
+    public static class GoogleRequest {
+        @NotBlank @Size(max = 10000) public String credential;
+        @NotNull public com.hoopr.user.TravelPreference travelPreference = com.hoopr.user.TravelPreference.PASSENGER;
+        @Override public String toString() { return "GoogleRequest[redacted]"; }
+    }
+    @GetMapping("/google/config") public java.util.Map<String, String> googleConfig() {
+        return java.util.Map.of("clientId", googleVerifier.clientId());
+    }
+    @PostMapping("/google") public AuthService.Access google(@Valid @RequestBody GoogleRequest body,
+            HttpServletRequest request, HttpServletResponse response) {
+        limiter.check(request.getRemoteAddr());
+        var issued = googleSignIn.signIn(body.credential, body.travelPreference);
+        limiter.succeeded(request.getRemoteAddr());
+        return respond(issued, response);
     }
     @PostMapping("/register") @ResponseStatus(HttpStatus.CREATED)
     public AuthService.Profile register(@Valid @RequestBody RegisterRequest body) {

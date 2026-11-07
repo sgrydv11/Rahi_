@@ -71,6 +71,10 @@ public class AuthService {
         boolean matches = passwords.matches(password, user == null ? dummyHash : user.passwordHash);
         if (!matches || user == null || !"ACTIVE".equals(user.status))
             throw new AuthFailure(401, "Invalid email or password.");
+        return newSession(user);
+    }
+    Issued newSession(UserAccount user) {
+        if (!"ACTIVE".equals(user.status)) throw new AuthFailure(401, "This account is unavailable.");
         RefreshSession session = new RefreshSession(); session.id = UUID.randomUUID(); session.userId = user.id;
         session.expiresAt = clock.instant().plus(settings.refreshLifetime()); sessions.save(session);
         return issue(user, session);

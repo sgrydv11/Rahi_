@@ -173,3 +173,15 @@ Phases 1–10 cover the application foundation through test checkout. Sandbox ch
 
 
 # Rahi_
+# Google sign-in for the web frontend
+
+The login and registration pages use Google Identity Services. The backend verifies signed Google ID tokens and issues the existing app session. Flyway V15 adds a unique Google subject to users. Existing passwords remain usable.
+
+1. In Google Cloud Console, create/select the FlexirRides project and open Google Auth Platform.
+2. Configure Branding, Audience and the consent screen. For external testing, add the Google accounts that will test sign-in.
+3. Create an OAuth client with application type Web application.
+4. Add authorized JavaScript origins `http://localhost`, `http://localhost:5173`, and the exact HTTPS origin of the deployed frontend. Origins contain no route such as `/login`.
+5. Set `GOOGLE_CLIENT_ID` on the backend to the public client ID ending in `.apps.googleusercontent.com`, then restart/redeploy the backend. For local startup, set it in the environment before running `scripts/start-local.ps1`.
+6. Test both login and registration. The frontend reads the client ID from `/api/v1/auth/google/config`; no frontend OAuth secret is needed. This implementation uses the Google popup button callback.
+
+Google sign-in remains unavailable until the client ID and authorized origins are configured. Existing accounts with authoritative Gmail/Workspace addresses can be linked after Google verification. Existing third-party email accounts require their original sign-in method. Production OAuth publication and consent requirements must be completed in Google Cloud before public rollout.
