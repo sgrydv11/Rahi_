@@ -163,3 +163,5 @@ Release verification checkpoint e1254b7 is pushed. GitHub CI https://github.com/
 - Frontend 53 tests and web build passed. Backend signature/security/account-linking/session/migration regressions are running. Record final results and deployment state below.
 
 Google verification results: backend regression reports total 123 tests with 0 failures and 0 errors. Full suite passed, then the final token-validator/web-security changes were retested and packaged. Frontend 53 tests and production web build passed. V15 was validated in an isolated schema. Local backend restart is applying V15 to the development database. Real Google sign-in is pending the user's public OAuth Web Client ID and origin configuration.
+
+Google checkpoint cc4da23 is pushed to app_v1. Local backend restarted successfully and applied V15 to the development public schema. GET /api/v1/auth/google/config returns an empty clientId as expected before setup. A CSRF-protected Google sign-in attempt returned the intended 503 setup-required response. Real-account verification and Render configuration remain pending the OAuth Web Client ID.
