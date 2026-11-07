@@ -47,14 +47,28 @@ async function request<T>(path: string, options: Options = {}, token?: string): 
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.key) headers['Idempotency-Key'] = options.key;
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(baseUrl + path, {
-    method: options.method ?? 'GET', headers, credentials: 'omit',
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
-  if (response.status === 204) return undefined as T;
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new ApiError(response.status, body?.detail || `Request failed (${response.status}).`);
-  return body as T;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(baseUrl + path, {
+      method: options.method ?? 'GET', headers, credentials: 'omit', signal: controller.signal,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+    if (response.status === 204) return undefined as T;
+    const body = await response.json().catch(error => {
+      if (controller.signal.aborted) throw error;
+      return null;
+    });
+    if (!response.ok) throw new ApiError(response.status, body?.detail || `Request failed (${response.status}).`);
+    return body as T;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('The server is taking too long to respond. Check your connection and refresh the latest status before trying again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function save(next: Session) {

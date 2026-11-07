@@ -30,10 +30,10 @@ The supplied Sarthi Phase 1 package is at `C:\Users\INDIA\Downloads\Rahi\Sarthi_
 | Money movement | Test-mode gateways and sandbox withdrawals | Production gap |
 | Mobile UI | Blue theme, brand, logo, menu, footer, calendar/time picker and keyboard changes implemented | Device behavior unverified |
 | Build verification | TypeScript, 10 mobile tests, Android/iOS JS export passed in prior sessions | Does not establish device correctness |
-| Latest delivered APK | Expo build `2af77503-e441-4101-a681-f6da09e0b66e` finished | User reports application failure |
+| Latest delivered APK | Expo build `2af77503-e441-4101-a681-f6da09e0b66e` finished | User confirms it works but feels insufficiently smooth |
 | Production controls | No complete verification, safety, support, finance or admin workflow identified | Missing or incomplete |
 
-The earlier failed Expo build was repaired by deduplicating `expo-font` to SDK 54-compatible version `14.0.12`. This explained a build failure. The reported installed-app failure remains undiagnosed.
+The earlier failed Expo build was repaired by deduplicating `expo-font` to SDK 54-compatible version `14.0.12`. This explained a build failure. The user clarified that the app works but feels insufficiently smooth. Performance and usability issues need targeted reproduction.
 
 Backend base URL previously configured is `https://rahi-1-c3vn.onrender.com/api/v1`. Demo records contain dated departures, so a drop in available ride counts after departures pass does not alone establish an API fault. Use dedicated test data and avoid changing real bookings during verification.
 
@@ -49,7 +49,7 @@ Planning budget is approximately 4–8 engineering hours for diagnosis and selec
 
 | ID | Status | Work and acceptance evidence |
 | --- | --- | --- |
-| A01 | ACTIVE | Reproduce the installed APK failure. Record device/OEM, Android version, exact APK/build, install versus upgrade, failing steps, expected/actual outcome, crash logs and failing requests. Identify the root cause before broad changes. If no device access exists, record the specific limitation and continue static/API investigation. |
+| A01 | ACTIVE | Reproduce the installed APK performance and usability problems. Record device/OEM, Android version, exact APK/build, install versus upgrade, failing steps, expected/actual outcome, crash logs and failing requests. Identify the root cause before broad changes. If no device access exists, record the specific limitation and continue static/API investigation. |
 | A02 | TODO | Verify backend and mobile contracts for public search, login, refresh, profile, vehicles, ride creation, booking and cancellation. Confirm embedded API configuration, demo flag, errors, authentication and startup behavior. Record endpoint results without secrets. |
 | A03 | TODO | Fix confirmed startup/session/network defects. Inspect missing request timeout/cancellation, indefinitely waiting screens, refresh failures, transient network recovery and logout cleanup. Preserve secure token rotation and distinguish offline failure from invalid credentials. Regression-check each confirmed fix. |
 | A04 | TODO | Make keyboard, navigation and forms usable on supported devices. Test focused fields, long forms, back/menu/footer, safe areas, date/time editing, AM/PM, timezone conversion and validation. Record device evidence and remaining limitations. |
@@ -113,9 +113,13 @@ For subsequent entries record commands/tests, relevant commit or files, device, 
 ## Resume handoff
 
 - Latest checkpoint is commit 5df2b63 pushed to origin/app_v1. Subsequent work added an informational Rentals Coming soon card. Device verification remains pending.
-- Next task is A01, reproduce and diagnose the latest installed Android failure, followed by A02 contract verification.
-- No root cause for the current runtime failure has been confirmed.
+- Next task is A01, reproduce performance and usability problems. User confirms the APK works but is not smooth. Await the affected interaction and phone model, then profile that path and verify API timings.
+- No specific cause of the reported rough experience has been confirmed. Do not describe the application as crashing based on the earlier report.
 - Existing uncommitted implementation must be reviewed and preserved.
 - No new build is authorized by this planning request.
 - On resuming, inspect branch/status, read this file, mark one task ACTIVE, gather evidence, implement only authorized changes, then update status and this handoff before stopping.
 - Suggested user resume message is `Continue from PRODUCTION_READINESS_TRACKER.md. Work on the next pending carpool task. Build an APK only when I explicitly ask.`
+
+User clarification on 7 November 2026: the app works, but feels insufficiently smooth. Requested the worst affected interaction and phone model. A01 now focuses on performance/usability profiling.
+
+A02 observation on 7 November 2026: health and public ride requests from this machine each exceeded 45 seconds. Cause is not yet isolated between service availability and network path. A03 partial implementation adds a 20-second mobile request timeout with cleanup and a refresh/status recovery message. TypeScript and an isolated successful-response/timeout/timer-cleanup regression check passed. Device and live API recovery verification remain pending.
