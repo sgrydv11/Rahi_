@@ -67,4 +67,25 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: backend/pom.xml
-      - run: mvn --batch-mode -f backend/pom.xml '-Dtest=*Test,*IT' test
+      - run: mvn --batch-mode -f backend/pom.xml '-Dtest=*Test,*IT' package
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Exercise the packaged server over HTTP
+        env:
+          DB_URL: ${{ env.TEST_DB_URL }}
+          DB_USERNAME: ${{ env.TEST_DB_USERNAME }}
+          DB_PASSWORD: ${{ env.TEST_DB_PASSWORD }}
+          JWT_SECRET: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          SERVER_PORT: '8082'
+        run: |
+          java -jar backend/target/hoopr-backend-0.1.0-SNAPSHOT-exec.jar > backend-smoke.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          for attempt in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:8082/api/v1/health; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:8082/api/v1/health
+          node scripts/smoke-carpool.mjs

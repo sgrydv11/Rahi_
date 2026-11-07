@@ -141,3 +141,13 @@ A02 observation on 7 November 2026: health and public ride requests from this ma
 Final verification for this implementation batch: 20 mobile tests, mobile TypeScript, 52 frontend tests plus web build, and 110 backend unit/integration tests passed. Isolated schema was retained for diagnosis. Public demo data was preserved. Workflow YAML parsed successfully; hosted execution passed in GitHub run 42371688074.
 
 GitHub checkpoint ad0d48f is pushed to app_v1. Hosted workflow run 42371688074 passed all three jobs (mobile, frontend and backend), including backend integration tests on PostgreSQL 16. Run URL https://github.com/sgrydv11/Rahi_/actions/runs/42371688074 . APK/device acceptance and production-provider-dependent work remain pending.
+
+## Server and deployment verification on 7 November 2026
+
+- Rebuilt backend executable JAR with Java 21 and all 110 unit/integration tests in an isolated releasecheck schema. All passed. Mobile 20 tests and TypeScript passed; frontend 52 tests and web build passed again.
+- Started rebuilt local backend at http://localhost:8081 and frontend at http://localhost:5173. Backend health, frontend HTTP response and frontend API proxy health returned 200.
+- Local public schema is at Flyway V14 and up to date. No new schema migration is required for this batch. Hibernate schema validation passed. Existing development and production business records were preserved.
+- Added scripts/smoke-carpool.mjs and ran it against a separate local server/schema on port 8082. Registration, login, publishing, public discovery, last-seat race, idempotent replay, owner/passenger booking access, cancellation and seat restoration passed. Test sessions logged out and the test ride was cancelled.
+- CI now packages the backend and runs the same smoke script against the actual executable server after unit/integration tests. Hosted results pending for this new change.
+- Live Render checks passed actuator database health, API health, Indore–Ujjain search, demo login, profile, bookings, wallet and logout. No live rides/bookings were modified.
+- Remote redeployment remains unconfirmed. Computer-use ended because it could not verify the current Windows browser URL. No Render API credential/deploy hook is configured. User reports Chrome is signed in. Manual path is Render service Settings → confirm app_v1 branch, then Manual Deploy → Deploy latest commit. Verify logs reach V14/up-to-date and health succeeds. Do not paste credentials into chat.
