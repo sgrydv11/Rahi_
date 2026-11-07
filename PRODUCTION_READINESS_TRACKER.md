@@ -49,11 +49,11 @@ Planning budget is approximately 4–8 engineering hours for diagnosis and selec
 
 | ID | Status | Work and acceptance evidence |
 | --- | --- | --- |
-| A01 | TODO | Reproduce the installed APK failure. Record device/OEM, Android version, exact APK/build, install versus upgrade, failing steps, expected/actual outcome, crash logs and failing requests. Identify the root cause before broad changes. If no device access exists, record the specific limitation and continue static/API investigation. |
+| A01 | ACTIVE | Reproduce the installed APK failure. Record device/OEM, Android version, exact APK/build, install versus upgrade, failing steps, expected/actual outcome, crash logs and failing requests. Identify the root cause before broad changes. If no device access exists, record the specific limitation and continue static/API investigation. |
 | A02 | TODO | Verify backend and mobile contracts for public search, login, refresh, profile, vehicles, ride creation, booking and cancellation. Confirm embedded API configuration, demo flag, errors, authentication and startup behavior. Record endpoint results without secrets. |
 | A03 | TODO | Fix confirmed startup/session/network defects. Inspect missing request timeout/cancellation, indefinitely waiting screens, refresh failures, transient network recovery and logout cleanup. Preserve secure token rotation and distinguish offline failure from invalid credentials. Regression-check each confirmed fix. |
 | A04 | TODO | Make keyboard, navigation and forms usable on supported devices. Test focused fields, long forms, back/menu/footer, safe areas, date/time editing, AM/PM, timezone conversion and validation. Record device evidence and remaining limitations. |
-| A05 | TODO | Present Carpool as the active service and Rentals as Coming soon. Keep the rental placeholder informational and inaccessible to booking or payment actions. Verify branding and navigation consistency. |
+| A05 | IMPLEMENTED | Present Carpool as the active service and Rentals as Coming soon. Keep the rental placeholder informational and inaccessible to booking or payment actions. Verify branding and navigation consistency. |
 | A06 | TODO | Prove the core journey using separate provider/passenger test accounts. Publish a future ride, search, inspect, book, verify both accounts, cancel and confirm seat restoration. Test restart and session expiry. Use sandbox payment where applicable. |
 
 Stage A exit requires reproducible failure diagnosis, verified core journeys on an actual Android device, and no unresolved startup or core-flow blocker. If device access is unavailable, report the pilot as device-unverified.
@@ -104,12 +104,15 @@ Package targets include booking-core availability of 99.9%, search P95 below 1 s
 | Date | Task | Result | Evidence or limitation |
 | --- | --- | --- | --- |
 | 2026-11-07 | Planning | Completed | Created this tracker following read-only package/code assessment. No implementation or APK build performed in this session. |
+| 2026-11-07 | Checkpoint push | Completed | Commit 5df2b63 pushed to origin/app_v1 with accumulated mobile changes and this tracker. |
+| 2026-11-07 | A01 | Active | Requested failure symptoms and phone/Android version. Standard local Android SDK adb path is absent. Runtime cause remains unconfirmed. |
+| 2026-11-07 | A05 | Implemented | Added informational Rentals Coming soon card with no booking/payment actions. Mobile TypeScript check passed. Device verification pending. |
 
 For subsequent entries record commands/tests, relevant commit or files, device, outcome, remaining defects and links/log locations. Keep credentials, tokens and private identity data out of this file.
 
 ## Resume handoff
 
-- Last completed action is creation of this plan and tracker.
+- Latest checkpoint is commit 5df2b63 pushed to origin/app_v1. Subsequent work added an informational Rentals Coming soon card. Device verification remains pending.
 - Next task is A01, reproduce and diagnose the latest installed Android failure, followed by A02 contract verification.
 - No root cause for the current runtime failure has been confirmed.
 - Existing uncommitted implementation must be reviewed and preserved.

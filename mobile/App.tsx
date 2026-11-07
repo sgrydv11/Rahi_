@@ -131,6 +131,11 @@ function NativeApp() {
           {user && <Copy>Welcome, {user.fullName}.</Copy>}
           <Button label="Find a ride" onPress={() => go({ kind: 'search' })} />
         </Card>
+        <Card>
+          <Text accessibilityRole="header" style={styles.body}>Rentals</Text>
+          <Copy>Coming soon</Copy>
+          <Copy>Self-drive car and bike rentals are coming to FlexirRides.</Copy>
+        </Card>
         {demoMode ? null : user ? <View style={styles.row}>
           <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
           <Button label="My rides" onPress={() => go({ kind: 'rides' })} />
