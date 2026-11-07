@@ -4,6 +4,7 @@ import { randomUUID } from 'expo-crypto';
 import { api, type Booking, type Page, type Pins, type Ride, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
 import { demoMode, demoRide, demoRides } from './demo';
+import { DateField } from './dateField';
 import { Button, Card, Copy, date, ErrorText, Field, labelStatus, QueryState, styles, useAction, useQuery } from './ui';
 
 const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -11,7 +12,7 @@ const future = (ride: Ride) => ride.status === 'SCHEDULED' && Date.parse(ride.de
 const ridePath = (id: string) => '/rides/' + encodeURIComponent(id);
 const message = (label: string, value?: string) => value ? <Copy>{label}: {value}</Copy> : null;
 const fields = {
-  origin: 'Leaving from', destination: 'Going to', departureDate: 'Travel date (YYYY-MM-DD)',
+  origin: 'Leaving from', destination: 'Going to', departureDate: 'Travel date',
   timeZone: 'Time zone', minimumSeats: 'Seats needed', maximumPrice: 'Maximum price per seat',
 };
 
@@ -30,7 +31,12 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
   const result = useQuery(path, async () => demoMode && !mine ? demoRides(query, page) : api<Page<Ride>>(path, { auth: mine }));
   return <>
     {mine ? <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} /> : <Card>
-      {Object.entries(fields).map(([key, label]) => <Field key={key} label={label} value={draft[key] ?? ''}
+      {Object.entries(fields).map(([key, label]) => key === 'departureDate'
+        ? <DateField key={key} label={label} mode="date"
+          value={draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined}
+          change={value => setDraft(previous => ({ ...previous, departureDate: localDate(value.toISOString()).slice(0, 10) }))}
+          clear={() => setDraft(previous => ({ ...previous, departureDate: '' }))} />
+        : <Field key={key} label={label} value={draft[key] ?? ''}
         numeric={key === 'minimumSeats' || key === 'maximumPrice'}
         change={value => setDraft(previous => ({ ...previous, [key]: value }))} />)}
       <View style={styles.row}>
@@ -147,7 +153,7 @@ export function RideDetails({ id, user, go }: { id: string; user: User | null; g
 }
 
 const rideFields = {
-  origin: 'Leaving from', destination: 'Going to', departureAt: 'Local departure (YYYY-MM-DDTHH:mm)',
+  origin: 'Leaving from', destination: 'Going to', departureAt: 'Departure',
   totalSeats: 'Seats offered', pricePerSeat: 'Price per seat', currency: 'Currency',
   pickupDescription: 'Pickup description', dropoffDescription: 'Drop-off description',
   vehicleDetails: 'Public vehicle details', notes: 'Notes',
@@ -187,6 +193,19 @@ function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; 
   return <Card>
     {Object.entries(rideFields).map(([name, label]) => {
       const key = name as keyof typeof rideFields;
+      if (key === 'departureAt') {
+        const selected = draft.departureAt ? new Date(draft.departureAt) : undefined;
+        function changeDeparture(value: Date, mode: 'date' | 'time') {
+          const departure = new Date(selected ?? Date.now());
+          if (mode === 'date') departure.setFullYear(value.getFullYear(), value.getMonth(), value.getDate());
+          else departure.setHours(value.getHours(), value.getMinutes(), 0, 0);
+          setDraft(previous => ({ ...previous, departureAt: localDate(departure.toISOString()) }));
+        }
+        return <View key={key} style={styles.field}>
+          <DateField label="Departure date" mode="date" value={selected} change={value => changeDeparture(value, 'date')} />
+          <DateField label="Departure time" mode="time" value={selected} change={value => changeDeparture(value, 'time')} />
+        </View>;
+      }
       return <Field key={key} label={label} value={draft[key]} numeric={key === 'totalSeats' || key === 'pricePerSeat'}
         change={value => setDraft(previous => ({ ...previous, [key]: value }))} />;
     })}

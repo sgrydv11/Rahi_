@@ -58,7 +58,7 @@ export function Wallet({ userId }: { userId: string }) {
     } else {
       if (!checkout.keyId?.startsWith('rzp_test_') || !checkout.orderId) throw new Error('Test checkout is unavailable.');
       await RazorpayCheckout.open({ key: checkout.keyId, order_id: checkout.orderId,
-        amount: String(operation.amountPaise), currency: 'INR', name: 'Hoopr', description: 'Test wallet top-up' });
+        amount: String(operation.amountPaise), currency: 'INR', name: 'FlexirRides', description: 'Test wallet top-up' });
       await sync(operation.id);
     }
   }

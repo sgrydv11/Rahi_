@@ -1,7 +1,8 @@
 import { Wallet } from './src/wallet';
 import { GroupOffers } from './src/group';
-import { useEffect, useState } from 'react';
-import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { BackHandler, Image, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { logout, onSessionInvalidated, restore, type User } from './src/api';
 import { Profile, SignIn, VehicleForm, Vehicles } from './src/account';
@@ -9,31 +10,74 @@ import { BookingDetails, Bookings, Notifications } from './src/bookings';
 import { demoMode } from './src/demo';
 import type { Screen } from './src/navigation';
 import { PinsForm, RideDetails, RideForm, Rides } from './src/rides';
-import { Button, Card, colors, Copy, ErrorText, styles, useAction } from './src/ui';
+import { Button, Card, colors, Copy, ErrorText, FieldFocus, styles, useAction } from './src/ui';
 
 const titles: Record<Screen['kind'], string> = {
   group: 'Open Ride Group', wallet: 'Wallet', home: 'Share the journey.', search: 'Find a ride', rides: 'My rides', bookings: 'My bookings',
   notifications: 'Notifications', profile: 'Your profile', vehicles: 'My vehicles',
-  login: 'Welcome back', register: 'Join Hoopr', ride: 'Ride details', booking: 'Booking details',
+  settings: 'Account settings', login: 'Welcome back', register: 'Join FlexirRides', ride: 'Ride details', booking: 'Booking details',
   manifest: 'Passenger bookings', pins: 'Route pins', rideForm: 'Ride offer', vehicleForm: 'Vehicle details',
 };
 const publicScreens = new Set<Screen['kind']>(['home', 'search', 'ride', 'login', 'register']);
 const home: Screen = { kind: 'home' };
+const footer = [
+  { kind: 'rides', label: 'My rides', icon: 'car-outline' },
+  { kind: 'wallet', label: 'Wallet', icon: 'wallet-outline' },
+  { kind: 'settings', label: 'Settings', icon: 'settings-outline' },
+] as const;
 
 function NativeApp() {
   const [stack, setStack] = useState<Screen[]>([home]);
   const [user, setUser] = useState<User | null>(null);
   const [restoring, setRestoring] = useState(!demoMode);
   const [restoreError, setRestoreError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  const scrollOffset = useRef(0);
+  function revealField() {
+    const input = TextInput.State.currentlyFocusedInput();
+    const viewport = scroll.current?.getNativeScrollRef();
+    if (!input || !viewport) return;
+    viewport.measureInWindow((_, top, __, height) => {
+      input.measureInWindow((_, inputTop, __, inputHeight) => {
+        if (viewport !== scroll.current?.getNativeScrollRef() || input !== TextInput.State.currentlyFocusedInput()) return;
+        const bottom = Math.min(top + height, Keyboard.metrics()?.screenY ?? Infinity);
+        const below = inputTop + inputHeight + 12 - bottom;
+        const above = inputTop - top - 12;
+        if (below > 0 || above < 0) {
+          scroll.current?.scrollTo({ y: Math.max(0, scrollOffset.current + (below > 0 ? below : above)), animated: true });
+        }
+      });
+    });
+  }
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      requestAnimationFrame(revealField);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   const action = useAction();
   const screen = stack[stack.length - 1];
-  const go = (next: Screen) => setStack(previous => [...previous, next]);
+  const go = (next: Screen) => {
+    Keyboard.dismiss();
+    setMenuOpen(false);
+    setStack(previous => previous[previous.length - 1].kind === next.kind && !('id' in next)
+      ? previous : [...previous, next]);
+  };
   const back = () => setStack(previous => previous.length > 1 ? previous.slice(0, -1) : previous);
   function signedIn(next: User) {
     setUser(next);
     setRestoreError('');
-    setStack(previous => previous.length > 1 && previous[previous.length - 2].kind === 'ride'
-      ? previous.slice(0, -1) : [home]);
+    setStack(previous => {
+      const destination = previous[previous.length - 1];
+      if (!publicScreens.has(destination.kind)) return previous;
+      const parent = previous[previous.length - 2];
+      return parent && !['home', 'login', 'register'].includes(parent.kind)
+        ? previous.slice(0, -1) : [home];
+    });
   }
   useEffect(() => {
     if (demoMode) return;
@@ -46,12 +90,13 @@ function NativeApp() {
   }, []);
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (menuOpen) { setMenuOpen(false); return true; }
       if (stack.length <= 1) return false;
       back();
       return true;
     });
     return () => listener.remove();
-  }, [stack.length]);
+  }, [stack.length, menuOpen]);
 
   function content() {
     if (restoring) return <Copy>Restoring your session…</Copy>;
@@ -69,10 +114,20 @@ function NativeApp() {
       case 'group': return user && <GroupOffers userId={user.id} openBooking={id => go({ kind: 'booking', id })} />;
       case 'notifications': return <Notifications go={go} />;
       case 'profile': return user && <Profile user={user} onUser={setUser} go={go} />;
+      case 'settings': return user && <Card>
+        <Copy>{user.email}</Copy>
+        <Button label="Edit profile" onPress={() => go({ kind: 'profile' })} />
+        <Button label="My vehicles" onPress={() => go({ kind: 'vehicles' })} />
+        <Button label="Notifications" onPress={() => go({ kind: 'notifications' })} />
+        <Button label="Sign out" disabled={action.busy} onPress={() => void action.run(async () => {
+          await logout(); setUser(null); setStack([home]);
+        })} />
+        <ErrorText message={action.error} />
+      </Card>;
       case 'vehicles': return <Vehicles go={go} />;
       case 'vehicleForm': return <VehicleForm id={screen.id} back={back} />;
       default: return <>
-        <Card><Copy>{demoMode ? 'Browse sample rides in the Hoopr demo.' : 'Find and offer shared rides with Hoopr.'}</Copy>
+        <Card><Copy>{demoMode ? 'Browse sample rides in the FlexirRides demo.' : 'Find and offer shared rides with FlexirRides.'}</Copy>
           {user && <Copy>Welcome, {user.fullName}.</Copy>}
           <Button label="Find a ride" onPress={() => go({ kind: 'search' })} />
         </Card>
@@ -97,18 +152,42 @@ function NativeApp() {
     }
   }
   const key = `${stack.length}-${screen.kind}-${'id' in screen ? screen.id ?? '' : ''}`;
+  useEffect(() => { scrollOffset.current = 0; }, [key]);
   return <SafeAreaView style={layout.surface}>
     <StatusBar barStyle="dark-content" />
     <View style={layout.header}>
-      {stack.length > 1 && <Button label="Back" onPress={back} />}
-      <Text accessibilityRole="header" style={layout.brand}>Hoopr</Text>
-      {stack.length > 1 && <Button label="Home" onPress={() => setStack([home])} />}
+      {stack.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Back" style={layout.icon} onPress={() => { setMenuOpen(false); back(); }}>
+        <Ionicons name="arrow-back" size={24} color={colors.accent} />
+      </Pressable>}
+      <View style={layout.brandGroup}>
+        <Image source={require('./assets/flexirrides-icon.png')} style={layout.logo} />
+        <Text accessibilityRole="header" style={layout.brand}>FlexirRides</Text>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Account menu" accessibilityState={{ expanded: menuOpen }}
+        style={layout.icon} onPress={() => { Keyboard.dismiss(); setMenuOpen(open => !open); }}>
+        <Ionicons name={menuOpen ? 'close' : 'menu'} size={26} color={colors.accent} />
+      </Pressable>
     </View>
-    <KeyboardAvoidingView style={layout.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled">
-        <Text accessibilityRole="header" style={styles.title}>{titles[screen.kind]}</Text>
-        {content()}
-      </ScrollView>
+    {menuOpen && <View style={layout.menu}>
+      <Button label="Profile" onPress={() => go({ kind: 'profile' })} />
+      <Button label="Account settings" onPress={() => go({ kind: 'settings' })} />
+    </View>}
+    <KeyboardAvoidingView style={layout.flex} behavior="padding">
+      <FieldFocus.Provider value={() => { if (Keyboard.isVisible()) requestAnimationFrame(revealField); }}>
+        <ScrollView ref={scroll} key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled"
+          onLayout={() => { if (Keyboard.isVisible()) revealField(); }}
+          onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
+          <Text accessibilityRole="header" style={styles.title}>{!user && !publicScreens.has(screen.kind) ? titles.login : titles[screen.kind]}</Text>
+          {content()}
+        </ScrollView>
+      </FieldFocus.Provider>
+      {!demoMode && !keyboardVisible && <View style={layout.footer}>
+        {footer.map(({ kind, label, icon }) => <Pressable key={kind} accessibilityRole="tab"
+          accessibilityState={{ selected: screen.kind === kind }} onPress={() => go({ kind })} style={layout.tab}>
+          <Ionicons name={icon} size={23} color={screen.kind === kind ? colors.accent : colors.muted} />
+          <Text style={{ color: screen.kind === kind ? colors.accent : colors.muted }}>{label}</Text>
+        </Pressable>)}
+      </View>}
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
@@ -118,6 +197,12 @@ const layout = StyleSheet.create({
   flex: { flex: 1 },
   surface: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, gap: 8, backgroundColor: '#fff' },
-  brand: { color: colors.accent, fontSize: 24, fontWeight: '800', flex: 1 },
+  brandGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logo: { width: 32, height: 32, borderRadius: 8 },
+  brand: { color: colors.accent, fontSize: 24, fontWeight: '800', flexShrink: 1 },
+  icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  menu: { alignSelf: 'flex-end', padding: 12, gap: 8, backgroundColor: '#fff' },
+  footer: { flexDirection: 'row', borderTopWidth: 1, borderColor: colors.line, backgroundColor: '#fff' },
+  tab: { flex: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center', gap: 3 },
   content: { padding: 16, gap: 14, maxWidth: 720, width: '100%', alignSelf: 'center' },
 });

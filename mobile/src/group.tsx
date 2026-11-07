@@ -124,7 +124,7 @@ function HoldCard({ hold, update, back, openBooking, restored }: {
         if (!checkout.keyId?.startsWith('rzp_test_') || !checkout.orderId) throw new Error('Test checkout is unavailable.');
         await RazorpayCheckout.open({
           key: checkout.keyId, order_id: checkout.orderId, amount: String(hold.quote.totalPaise),
-          currency: hold.quote.currency, name: 'Hoopr', description: 'Test ride fare',
+          currency: hold.quote.currency, name: 'FlexirRides', description: 'Test ride fare',
         });
         update(await groupWalletApi.sync(hold.id));
       }

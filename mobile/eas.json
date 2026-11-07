@@ -6,7 +6,13 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://rahi-1-c3vn.onrender.com/api/v1",
+        "EXPO_PUBLIC_DEMO_MODE": "false"
+      }
     },
     "production": {}
   }

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-export const colors = { background: '#f4f6f3', ink: '#172b24', accent: '#166447', muted: '#476155', line: '#c8d8cf' };
+export const colors = { background: '#f2f6fc', ink: '#172b49', accent: '#2359ac', muted: '#465d7b', line: '#c8d7ec' };
+export const FieldFocus = createContext(() => {});
 export const styles = StyleSheet.create({
   body: { color: colors.ink, fontSize: 16, lineHeight: 23 },
   title: { color: colors.ink, fontSize: 29, fontWeight: '700', marginBottom: 8 },
@@ -25,7 +26,9 @@ export function Button({ label, onPress, disabled = false }: { label: string; on
 export function Field({ label, value, change, secret, numeric }: {
   label: string; value: string; change: (value: string) => void; secret?: boolean; numeric?: boolean;
 }) {
+  const onFocus = useContext(FieldFocus);
   return <View style={styles.field}><Copy>{label}</Copy><TextInput accessibilityLabel={label} value={value}
+    onFocus={onFocus}
     onChangeText={change} secureTextEntry={secret} keyboardType={numeric ? 'numbers-and-punctuation' : 'default'}
     autoCapitalize="none" autoCorrect={false} style={styles.input} /></View>;
 }
@@ -65,4 +68,4 @@ export function QueryState({ error, reload }: { error?: string; reload: () => vo
     <ActivityIndicator accessibilityLabel="Loading" color={colors.accent} />;
 }
 export const labelStatus = (value: string) => value.replace(/_/g, ' ').toLowerCase();
-export const date = (value: string) => new Date(value).toLocaleString();
+export const date = (value: string) => new Date(value).toLocaleString(undefined, { hour12: true });

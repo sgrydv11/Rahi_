@@ -50,7 +50,7 @@ function PaymentPanel({ booking }: { booking: Booking }) {
         if (!order.keyId?.startsWith('rzp_test_') || !order.orderId) throw new Error('Test checkout is unavailable.');
         const completed = await RazorpayCheckout.open({
           key: order.keyId, order_id: order.orderId, amount: String(order.amount), currency: order.currency,
-          name: 'Hoopr', description: 'Test ride fare',
+          name: 'FlexirRides', description: 'Test ride fare',
         });
         await api(`${path}/verify`, { method: 'POST', body: {
           paymentId: completed.razorpay_payment_id, signature: completed.razorpay_signature,

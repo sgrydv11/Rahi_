@@ -1,13 +1,31 @@
 {
   "expo": {
-    "name": "Hoopr",
-    "slug": "hoopr-native",
+    "name": "FlexirRides",
+    "icon": "./assets/flexirrides-icon.png",
+    "slug": "sagar-yadav",
     "scheme": "hoopr",
     "version": "0.1.0",
-    "platforms": ["android", "ios"],
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "newArchEnabled": false,
-    "android": { "package": "com.hoopr.app" },
-    "ios": { "bundleIdentifier": "com.hoopr.app" },
-    "plugins": ["expo-secure-store"]
+    "android": {
+      "package": "com.hoopr.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.hoopr.app"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "940de3d2-d322-4618-90fd-a471acf8b416"
+      }
+    },
+    "owner": "ydvsgr11s-team"
   }
 }

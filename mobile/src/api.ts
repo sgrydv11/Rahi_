@@ -42,7 +42,7 @@ let sessionInvalidated = () => {};
 export function onSessionInvalidated(listener: () => void) { sessionInvalidated = listener; }
 
 async function request<T>(path: string, options: Options = {}, token?: string): Promise<T> {
-  if (!baseUrl || !/^https:\/\//i.test(baseUrl)) throw new Error('Set EXPO_PUBLIC_API_BASE_URL to the HTTPS Hoopr API address.');
+  if (!baseUrl || !/^https:\/\//i.test(baseUrl)) throw new Error('Set EXPO_PUBLIC_API_BASE_URL to the HTTPS FlexirRides API address.');
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.key) headers['Idempotency-Key'] = options.key;
