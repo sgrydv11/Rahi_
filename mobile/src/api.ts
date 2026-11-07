@@ -28,7 +28,7 @@ export interface Payment {
 }
 export interface Notice { id: string; kind: string; origin: string; destination: string; time: string; link: string }
 interface Session { accessToken: string; expiresIn: number; refreshToken: string; user: User }
-type Options = { method?: 'POST' | 'PATCH'; body?: unknown; key?: string; auth?: boolean };
+type Options = { method?: 'POST' | 'PATCH'; body?: unknown; key?: string; auth?: boolean; signal?: AbortSignal };
 class ApiError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
@@ -48,6 +48,9 @@ async function request<T>(path: string, options: Options = {}, token?: string): 
   if (options.key) headers['Idempotency-Key'] = options.key;
   if (token) headers.Authorization = `Bearer ${token}`;
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  options.signal?.addEventListener('abort', cancel);
+  if (options.signal?.aborted) controller.abort();
   const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
     const response = await fetch(baseUrl + path, {
@@ -57,17 +60,20 @@ async function request<T>(path: string, options: Options = {}, token?: string): 
     if (response.status === 204) return undefined as T;
     const body = await response.json().catch(error => {
       if (controller.signal.aborted) throw error;
+      if (response.ok) throw new Error('The server returned an unexpected response. Please refresh and try again.');
       return null;
     });
     if (!response.ok) throw new ApiError(response.status, body?.detail || `Request failed (${response.status}).`);
     return body as T;
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (controller.signal.aborted && !options.signal?.aborted) {
       throw new Error('The server is taking too long to respond. Check your connection and refresh the latest status before trying again.');
     }
+    if (error instanceof TypeError) throw new Error('Unable to connect. Check your internet connection and try again.');
     throw error;
   } finally {
     clearTimeout(timeout);
+    options.signal?.removeEventListener('abort', cancel);
   }
 }
 

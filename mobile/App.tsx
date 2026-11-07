@@ -79,6 +79,13 @@ function NativeApp() {
         ? previous.slice(0, -1) : [home];
     });
   }
+  async function retrySession() {
+    setRestoring(true);
+    setRestoreError('');
+    try { setUser(await restore()); }
+    catch (error) { setRestoreError(error instanceof Error ? error.message : 'Unable to restore session.'); }
+    finally { setRestoring(false); }
+  }
   useEffect(() => {
     if (demoMode) return;
     let active = true;
@@ -99,7 +106,7 @@ function NativeApp() {
   }, [stack.length, menuOpen]);
 
   function content() {
-    if (restoring) return <Copy>Restoring your session…</Copy>;
+    if (restoring && screen.kind !== 'home' && screen.kind !== 'search') return <Copy>Restoring your session…</Copy>;
     if (!user && !publicScreens.has(screen.kind)) return <SignIn create={false} onUser={signedIn} go={go} />;
     switch (screen.kind) {
       case 'login': case 'register': return <SignIn create={screen.kind === 'register'} onUser={signedIn} go={go} />;
@@ -152,7 +159,7 @@ function NativeApp() {
           <Button label="Sign in" onPress={() => go({ kind: 'login' })} />
           <Button label="Create account" onPress={() => go({ kind: 'register' })} />
         </View>}
-        <ErrorText message={action.error || restoreError} />
+        <ErrorText message={action.error} />
       </>;
     }
   }
@@ -183,12 +190,20 @@ function NativeApp() {
           onLayout={() => { if (Keyboard.isVisible()) revealField(); }}
           onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
           <Text accessibilityRole="header" style={styles.title}>{!user && !publicScreens.has(screen.kind) ? titles.login : titles[screen.kind]}</Text>
+          {restoring && (screen.kind === 'home' || screen.kind === 'search') && <Copy>Reconnecting your account… You can browse rides while we connect.</Copy>}
+          {restoreError && !restoring && <Card>
+            <ErrorText message={restoreError} />
+            <Button label="Reconnect session" onPress={() => void retrySession()} />
+          </Card>}
           {content()}
         </ScrollView>
       </FieldFocus.Provider>
       {!demoMode && !keyboardVisible && <View style={layout.footer}>
         {footer.map(({ kind, label, icon }) => <Pressable key={kind} accessibilityRole="tab"
-          accessibilityState={{ selected: screen.kind === kind }} onPress={() => go({ kind })} style={layout.tab}>
+          accessibilityState={{ selected: screen.kind === kind }} onPress={() => {
+            Keyboard.dismiss(); setMenuOpen(false);
+            setStack([home, { kind }]);
+          }} style={layout.tab}>
           <Ionicons name={icon} size={23} color={screen.kind === kind ? colors.accent : colors.muted} />
           <Text style={{ color: screen.kind === kind ? colors.accent : colors.muted }}>{label}</Text>
         </Pressable>)}

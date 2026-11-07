@@ -50,22 +50,26 @@ export function useAction() {
   }
   return { busy, error, run };
 }
-export function useQuery<T>(key: string, load: () => Promise<T>) {
+export function useQuery<T>(key: string, load: (signal: AbortSignal) => Promise<T>) {
   const [result, setResult] = useState<{ data?: T; error?: string }>({});
   const [version, setVersion] = useState(0);
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setResult({});
-    load().then(data => { if (active) setResult({ data }); }).catch(error => {
+    load(controller.signal).then(data => { if (active) setResult({ data }); }).catch(error => {
       if (active) setResult({ error: error instanceof Error ? error.message : 'Unable to load.' });
     });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [key, version]);
   return { ...result, reload: () => setVersion(value => value + 1) };
 }
 export function QueryState({ error, reload }: { error?: string; reload: () => void }) {
   return error ? <Card><ErrorText message={error} /><Button label="Retry" onPress={reload} /></Card> :
-    <ActivityIndicator accessibilityLabel="Loading" color={colors.accent} />;
+    <View style={styles.field}>
+      <ActivityIndicator accessibilityLabel="Loading" color={colors.accent} />
+      <Copy>Loading…</Copy>
+    </View>;
 }
 export const labelStatus = (value: string) => value.replace(/_/g, ' ').toLowerCase();
 export const date = (value: string) => new Date(value).toLocaleString(undefined, { hour12: true });

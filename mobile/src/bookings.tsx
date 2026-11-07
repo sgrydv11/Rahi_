@@ -9,7 +9,7 @@ import { Button, Card, Copy, date, ErrorText, Field, labelStatus, QueryState, st
 export function Bookings({ ride, go }: { ride?: string; go: Navigate }) {
   const [page, setPage] = useState(0);
   const path = (ride ? `/rides/${encodeURIComponent(ride)}/bookings` : '/bookings/me') + `?page=${page}&size=10`;
-  const result = useQuery(path, () => api<Page<Booking>>(path));
+  const result = useQuery(path, signal => api<Page<Booking>>(path, { signal }));
   if (!result.data) return <QueryState {...result} />;
   return <>
     {!result.data.content.length && <Copy>No bookings yet.</Copy>}
@@ -25,7 +25,7 @@ export function Bookings({ ride, go }: { ride?: string; go: Navigate }) {
 
 function PaymentPanel({ booking }: { booking: Booking }) {
   const path = `/bookings/${encodeURIComponent(booking.id)}/payment`;
-  const result = useQuery(path + booking.status, () => api<Payment>(path));
+  const result = useQuery(path + booking.status, signal => api<Payment>(path, { signal }));
   const action = useAction();
   if (!result.data) return <QueryState {...result} />;
   const payment = result.data;
@@ -87,7 +87,7 @@ function PaymentPanel({ booking }: { booking: Booking }) {
 
 export function BookingDetails({ id, user, go }: { id: string; user: User; go: Navigate }) {
   const path = `/bookings/${encodeURIComponent(id)}`;
-  const result = useQuery(path, () => api<Booking>(path));
+  const result = useQuery(path, signal => api<Booking>(path, { signal }));
   const action = useAction();
   const [reason, setReason] = useState('');
   const [score, setScore] = useState(0);
@@ -131,7 +131,7 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
 }
 
 export function Notifications({ go }: { go: Navigate }) {
-  const result = useQuery('notices', () => api<Notice[]>('/notifications'));
+  const result = useQuery('notices', signal => api<Notice[]>('/notifications', { signal }));
   return <>
     <Button label="Refresh notifications" onPress={result.reload} />
     {!result.data ? <QueryState {...result} /> : !result.data.length ? <Copy>No notifications yet.</Copy> :

@@ -28,9 +28,13 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const path = mine ? `/rides/me?page=${page}&size=10` : `/rides?page=${page}&size=10&${query}`;
-  const result = useQuery(path, async () => demoMode && !mine ? demoRides(query, page) : api<Page<Ride>>(path, { auth: mine }));
+  const result = useQuery(path, async signal => demoMode && !mine ? demoRides(query, page) : api<Page<Ride>>(path, { auth: mine, signal }));
   return <>
-    {mine ? <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} /> : <Card>
+    {mine ? <View style={styles.row}>
+      <Button label="Find a ride" onPress={() => go({ kind: 'search' })} />
+      <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
+      <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
+    </View> : <Card>
       {Object.entries(fields).map(([key, label]) => key === 'departureDate'
         ? <DateField key={key} label={label} mode="date"
           value={draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined}
@@ -50,7 +54,7 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
       </View>
     </Card>}
     {!result.data ? <QueryState {...result} /> : <>
-      {!result.data.content.length && <Copy>No rides found.</Copy>}
+      {!result.data.content.length && <Copy>{mine ? 'You have not offered any rides yet. Find a ride or view your passenger bookings above.' : 'No rides match your search. Try another date or clear the filters.'}</Copy>}
       {result.data.content.map(ride => <Card key={ride.id}>
         <Copy>{ride.origin} → {ride.destination}</Copy>
         <Copy>{date(ride.departureAt)} · {labelStatus(ride.status)}</Copy>
@@ -82,7 +86,7 @@ export function Route({ pins }: { pins: Pins }) {
 
 export function RideDetails({ id, user, go }: { id: string; user: User | null; go: Navigate }) {
   const path = ridePath(id);
-  const result = useQuery(path, async () => demoMode ? demoRide(id) : api<Ride>(path, { auth: Boolean(user) }));
+  const result = useQuery(path, async signal => demoMode ? demoRide(id) : api<Ride>(path, { auth: Boolean(user), signal }));
   const action = useAction();
   const [seats, setSeats] = useState(1);
   const [reason, setReason] = useState('');

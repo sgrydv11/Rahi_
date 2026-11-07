@@ -12,7 +12,7 @@ This file is the persistent plan, evidence record, and handoff for work across a
 - Create an APK only when the user explicitly commands an APK/app build. Do not submit EAS builds automatically after changes.
 - Preserve existing uncommitted work. Do not reset, discard, or overwrite unrelated changes.
 - Account limits are not visible to the agent. Do not promise that this backlog fits the remaining allowance. Record a handoff before stopping.
-- This session creates the tracker and plan. Implementation tasks below remain pending.
+- The original tracker session was planning-only. Implementation progress is recorded below.
 
 ## Current baseline and evidence
 
@@ -50,9 +50,9 @@ Planning budget is approximately 4–8 engineering hours for diagnosis and selec
 | ID | Status | Work and acceptance evidence |
 | --- | --- | --- |
 | A01 | ACTIVE | Reproduce the installed APK performance and usability problems. Record device/OEM, Android version, exact APK/build, install versus upgrade, failing steps, expected/actual outcome, crash logs and failing requests. Identify the root cause before broad changes. If no device access exists, record the specific limitation and continue static/API investigation. |
-| A02 | TODO | Verify backend and mobile contracts for public search, login, refresh, profile, vehicles, ride creation, booking and cancellation. Confirm embedded API configuration, demo flag, errors, authentication and startup behavior. Record endpoint results without secrets. |
-| A03 | TODO | Fix confirmed startup/session/network defects. Inspect missing request timeout/cancellation, indefinitely waiting screens, refresh failures, transient network recovery and logout cleanup. Preserve secure token rotation and distinguish offline failure from invalid credentials. Regression-check each confirmed fix. |
-| A04 | TODO | Make keyboard, navigation and forms usable on supported devices. Test focused fields, long forms, back/menu/footer, safe areas, date/time editing, AM/PM, timezone conversion and validation. Record device evidence and remaining limitations. |
+| A02 | ACTIVE | Verify backend and mobile contracts for public search, login, refresh, profile, vehicles, ride creation, booking and cancellation. Confirm embedded API configuration, demo flag, errors, authentication and startup behavior. Record endpoint results without secrets. |
+| A03 | IMPLEMENTED | Fix confirmed startup/session/network defects. Inspect missing request timeout/cancellation, indefinitely waiting screens, refresh failures, transient network recovery and logout cleanup. Preserve secure token rotation and distinguish offline failure from invalid credentials. Regression-check each confirmed fix. |
+| A04 | ACTIVE | Make keyboard, navigation and forms usable on supported devices. Test focused fields, long forms, back/menu/footer, safe areas, date/time editing, AM/PM, timezone conversion and validation. Record device evidence and remaining limitations. |
 | A05 | IMPLEMENTED | Present Carpool as the active service and Rentals as Coming soon. Keep the rental placeholder informational and inaccessible to booking or payment actions. Verify branding and navigation consistency. |
 | A06 | TODO | Prove the core journey using separate provider/passenger test accounts. Publish a future ride, search, inspect, book, verify both accounts, cancel and confirm seat restoration. Test restart and session expiry. Use sandbox payment where applicable. |
 
@@ -65,8 +65,8 @@ Provisional estimate is 5–10 working days, subject to Stage A findings and ava
 | ID | Status | Work and acceptance evidence |
 | --- | --- | --- |
 | B01 | TODO | Define pilot acceptance and rollout boundaries. Default corridor is Indore–Ujjain in both directions, consistent with the package. Record whether existing Dewas/Pithampur functionality remains available before changing route eligibility. Establish supported Android/iOS versions and assign each blocking defect an owner. |
-| B02 | TODO | Establish critical automated regression coverage for public/authenticated API contracts, session recovery, inventory, cancellation and UI navigation. Run existing appropriate suites and investigate failures. Avoid tests that only mirror rendering details. |
-| B03 | TODO | Verify race and retry behavior with a real PostgreSQL test database. Cover two users competing for the last seat, duplicate booking/checkout, expired holds, cancellation races and interrupted requests. Require no overselling or duplicate charge. |
+| B02 | ACTIVE | Establish critical automated regression coverage for public/authenticated API contracts, session recovery, inventory, cancellation and UI navigation. Run existing appropriate suites and investigate failures. Avoid tests that only mirror rendering details. |
+| B03 | VERIFIED | Verify race and retry behavior with a real PostgreSQL test database. Cover two users competing for the last seat, duplicate booking/checkout, expired holds, cancellation races and interrupted requests. Require no overselling or duplicate charge. |
 | B04 | TODO | Complete booking and trip recovery UX. Cover pending payment, expired holds, provider cancellation, stale data, app termination and reopening, refresh, actionable errors and empty/offline states. Server records remain authoritative. |
 | B05 | TODO | Establish staging diagnostics and handoff evidence. Add actionable redacted error/crash reporting, request correlation, environment checks and a reproducible smoke checklist. Record device/network results and pilot approval. |
 
@@ -85,7 +85,7 @@ These are substantial workstreams, provisionally 6–10 weeks for a small team w
 | C05 | TODO | Support and operations. Build minimum role-based verification, support, safety, finance and administration workflows with privileged MFA, audit trails, restricted data, escalation and intervention limits. Complete support/payment dispute drills. |
 | C06 | TODO | Privacy and security. Define retention, export/deletion, evidence access, secrets, rate limits, upload protection and threat model. Run dependency/security checks, penetration testing and remediation with evidence. |
 | C07 | TODO | Localization and accessibility. Complete English/Hindi strings, screen-reader/focus behavior, large text, contrast, touch targets and non-map alternatives across the active carpool journeys. |
-| C08 | TODO | Reliability and release infrastructure. Isolate staging/production data and credentials, add monitoring/alerts, durable background work, CI checks, migration rehearsal, backup/restore and rollback evidence. Validate hosting capacity and region against approved requirements. |
+| C08 | ACTIVE | Reliability and release infrastructure. Isolate staging/production data and credentials, add monitoring/alerts, durable background work, CI checks, migration rehearsal, backup/restore and rollback evidence. Validate hosting capacity and region against approved requirements. |
 | C09 | TODO | Production readiness and rollout. Agree load model and measure performance, crash-free sessions and availability targets. Complete provider/operations/legal/finance readiness, device field pilot and signed go/no-go. Stage rollout with monitoring and rollback ownership. |
 
 Package targets include booking-core availability of 99.9%, search P95 below 1 second, quote P95 below 1.5 seconds, and crash-free sessions above 99.5%. Define measurement windows and load before evaluating them. Treat backup RPO/RTO proposals as pending approval.
@@ -112,14 +112,30 @@ For subsequent entries record commands/tests, relevant commit or files, device, 
 
 ## Resume handoff
 
-- Latest checkpoint is commit 5df2b63 pushed to origin/app_v1. Subsequent work added an informational Rentals Coming soon card. Device verification remains pending.
-- Next task is A01, reproduce performance and usability problems. User confirms the APK works but is not smooth. Await the affected interaction and phone model, then profile that path and verify API timings.
+- Latest pushed checkpoint before this work is cb9729b on origin/app_v1. Current changes add request/session regressions, screen-request cancellation, navigation/reconnect UX and CI checks. Device verification remains pending.
+- Next tasks are A01/A04 device smoothness verification and A06 multi-account device journey. Obtain the affected interaction and phone model, then profile that path. Continue B04 interrupted-booking recovery and B05 operational diagnostics. C01 live OTP/KYC waits for provider setup.
 - No specific cause of the reported rough experience has been confirmed. Do not describe the application as crashing based on the earlier report.
 - Existing uncommitted implementation must be reviewed and preserved.
-- No new build is authorized by this planning request.
+- APK builds require an explicit user command. Current authorization covers implementation and testing.
 - On resuming, inspect branch/status, read this file, mark one task ACTIVE, gather evidence, implement only authorized changes, then update status and this handoff before stopping.
 - Suggested user resume message is `Continue from PRODUCTION_READINESS_TRACKER.md. Work on the next pending carpool task. Build an APK only when I explicitly ask.`
 
 User clarification on 7 November 2026: the app works, but feels insufficiently smooth. Requested the worst affected interaction and phone model. A01 now focuses on performance/usability profiling.
 
 A02 observation on 7 November 2026: health and public ride requests from this machine each exceeded 45 seconds. Cause is not yet isolated between service availability and network path. A03 partial implementation adds a 20-second mobile request timeout with cleanup and a refresh/status recovery message. TypeScript and an isolated successful-response/timeout/timer-cleanup regression check passed. Device and live API recovery verification remain pending.
+
+## Implementation session on 7 November 2026
+
+- User confirmed no production OTP or KYC provider accounts exist. C01 live integrations are blocked on provider setup. Other development continues.
+- A02 live checks passed for public search, mobile login, profile, passenger bookings, own rides, token refresh and logout. Health took 0.85 seconds; search/login approximately 5–6 seconds; subsequent reads approximately 0.3–1.0 seconds. No ride or booking was modified in these live checks.
+- A03 added malformed-response/offline errors, cancellation for ride/booking/notification reads when screens close, and session reconnection after temporary restoration failures. Transient failures preserve credentials; invalid refresh clears them.
+- A04 added a passenger-bookings shortcut in My rides, clearer empty/loading states and root-based footer navigation to avoid stacking repeated tab visits. Device acceptance remains pending.
+- B02 mobile tests now cover transport timeout, body timeout, cancellation, public access, malformed responses, network errors, concurrent refresh, invalid sessions and temporary server failures. All 20 mobile tests passed. TypeScript passed.
+- C08 added .github/workflows/checks.yml with mobile/frontend checks and backend unit/integration tests on a dedicated PostgreSQL service. Hosted CI execution still needs verification after push. The workflow performs regression checks only.
+- Backend verification completed on Java 21 against isolated schema regression_20261107174202 in hoopr_test. All 110 backend tests passed, including inventory races, idempotency, hold expiry, cancellation/refunds and sandbox payments. Frontend passed 52 tests and its web build. B03 is verified for the existing supported backend flows; device end-to-end testing is separate.
+
+- Frontend validation passed all 52 tests across 9 files and the production web bundle check.
+- The initial backend run reported 107 passes and 3 failures against an already-seeded test database. Failures involved expired demo departures and global search assumptions. A fresh isolated schema under hoopr_test is being used for the verification rerun, preserving public-schema demo data. Java 21 matches the project target.
+- Startup now allows home/search browsing during session restoration; account-dependent screens retain their session gate.
+
+Final verification for this implementation batch: 20 mobile tests, mobile TypeScript, 52 frontend tests plus web build, and 110 backend unit/integration tests passed. Isolated schema was retained for diagnosis. Public demo data was preserved. Workflow YAML parsed successfully; hosted execution is still unverified until GitHub runs it.
