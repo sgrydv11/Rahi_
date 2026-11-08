@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Alert, Linking, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Linking, Modal, ScrollView, View } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
 import { api, type Booking, type Notice, type Page, type Payment, type User } from './api';
 import type { Navigate } from './navigation';
@@ -91,12 +91,23 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
   const action = useAction();
   const [reason, setReason] = useState('');
   const [score, setScore] = useState(0);
+  const [review, setReview] = useState('');
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const eligible = result.data?.passenger.id === user.id && !result.data.rating
+    && result.data.status === 'CONFIRMED' && result.data.ride.status === 'COMPLETED';
+  useEffect(() => { if (eligible) setRatingOpen(true); }, [eligible]);
+  useEffect(() => {
+    if (result.data?.ride.status !== 'IN_PROGRESS' || action.busy) return;
+    const timer = setInterval(result.reload, 30000);
+    return () => clearInterval(timer);
+  }, [result.data?.ride.status, action.busy]);
   if (!result.data) return <QueryState {...result} />;
   const booking = result.data;
   const passenger = user.id === booking.passenger.id;
   function submit(kind: 'cancel' | 'rating') {
     void action.run(async () => {
-      await api(`${path}/${kind}`, { method: 'POST', body: kind === 'cancel' ? { reason } : { score } });
+      await api(`${path}/${kind}`, { method: 'POST', body: kind === 'cancel' ? { reason } : { score, review } });
+      if (kind === 'rating') setRatingOpen(false);
       result.reload();
     });
   }
@@ -109,6 +120,8 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
       <Copy>Fare: {booking.currency} {booking.totalPrice}</Copy>
       {booking.cancellationReason && <Copy>Cancellation: {booking.cancellationReason}</Copy>}
       {booking.rating && <Copy>Driver rating: {booking.rating.score} / 5</Copy>}
+      {booking.details && <><Copy>Boarding: {booking.details.boardingPoint} · Dropping: {booking.details.droppingPoint}</Copy>
+        {booking.details.passengers.map((person, index) => <Copy key={index}>{person.name} · {person.age} · {person.gender}</Copy>)}</>}
       <Button label="View ride" onPress={() => go({ kind: 'ride', id: booking.ride.id })} />
     </Card>
     {booking.ride.route && <Route pins={booking.ride.route} />}
@@ -120,11 +133,17 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
           { text: 'Keep booking', style: 'cancel' }, { text: 'Cancel booking', style: 'destructive', onPress: () => submit('cancel') },
         ])} />
     </Card>}
-    {passenger && !booking.rating && booking.status === 'CONFIRMED' && booking.ride.status === 'COMPLETED' && <Card>
-      <Copy>Rate your driver</Copy><View style={styles.row}>{[1, 2, 3, 4, 5].map(value =>
+    {eligible && <Button label="Rate your journey" onPress={() => setRatingOpen(true)} />}
+    <Modal visible={Boolean(eligible && ratingOpen)} transparent animationType="fade" onRequestClose={() => setRatingOpen(false)}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#0008' }}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}><Card>
+      <Copy>Rate your journey</Copy><View style={styles.row}>{[1, 2, 3, 4, 5].map(value =>
         <Button key={value} label={value === score ? `${value} ✓` : String(value)} onPress={() => setScore(value)} />)}</View>
+      <Field label="Review (optional, public)" value={review} change={value => setReview(value.slice(0, 1000))} multiline />
+      <ErrorText message={action.error} />
       <Button label="Submit rating" disabled={!score || action.busy} onPress={() => submit('rating')} />
-    </Card>}
+      <Button label="Later" disabled={action.busy} onPress={() => setRatingOpen(false)} />
+      </Card></ScrollView></View>
+    </Modal>
     {passenger && <PaymentPanel booking={booking} />}
     <Button label="Refresh booking" disabled={action.busy} onPress={result.reload} />
   </>;

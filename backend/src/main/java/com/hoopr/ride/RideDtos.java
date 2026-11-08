@@ -19,7 +19,13 @@ public final class RideDtos {
         @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
         @Size(max = 300) String vehicleDetails,
         @Size(max = 2000) String notes,
-        UUID vehicleId) {
+        UUID vehicleId, @jakarta.validation.Valid RidePreferences preferences) {
+        public Create(String origin, String destination, String pickupDescription, String dropoffDescription,
+                      Instant departureAt, String timeZone, Integer totalSeats, BigDecimal pricePerSeat,
+                      String currency, String vehicleDetails, String notes, UUID vehicleId) {
+            this(origin, destination, pickupDescription, dropoffDescription, departureAt, timeZone, totalSeats,
+                    pricePerSeat, currency, vehicleDetails, notes, vehicleId, null);
+        }
         public Create(String origin, String destination, String pickupDescription, String dropoffDescription,
                       Instant departureAt, String timeZone, Integer totalSeats, BigDecimal pricePerSeat,
                       String currency, String vehicleDetails, String notes) {
@@ -42,7 +48,13 @@ public final class RideDtos {
         @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal pricePerSeat,
         @Pattern(regexp = "[A-Z]{3}") String currency,
         @Size(max = 300) String vehicleDetails,
-        @Size(max = 2000) String notes) {
+        @Size(max = 2000) String notes, @jakarta.validation.Valid RidePreferences preferences) {
+        public Update(Long version, String origin, String destination, String pickupDescription, String dropoffDescription,
+                      Instant departureAt, String timeZone, Integer totalSeats, BigDecimal pricePerSeat,
+                      String currency, String vehicleDetails, String notes) {
+            this(version, origin, destination, pickupDescription, dropoffDescription, departureAt, timeZone,
+                    totalSeats, pricePerSeat, currency, vehicleDetails, notes, null);
+        }
         @com.fasterxml.jackson.annotation.JsonAnySetter
         public void unknown(String name, Object value) { throw new IllegalArgumentException("Unknown ride field"); }
     }
@@ -67,6 +79,8 @@ public final class RideDtos {
         int totalSeats, int availableSeats, BigDecimal pricePerSeat, String currency,
         String vehicleDetails, String notes, String status, long version,
         Instant createdAt, Instant updatedAt, Instant cancelledAt, String cancellationReason,
-        Instant startedAt, Instant completedAt, boolean canStart, RoutePins route) { }
+        Instant startedAt, Instant completedAt, boolean canStart, RoutePins route,
+        RidePreferences preferences, double driverRating, List<Review> reviews) { }
+    public record Review(int score, String text) { }
     public record Results(List<View> content, int page, int size, long totalElements, int totalPages) { }
 }

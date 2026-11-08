@@ -65,6 +65,7 @@ public class GroupHoldController {
         var existing = replay(passenger, key);
         if (existing.isPresent()) return match(existing.get(), request);
         Ride ride = rides.lockById(request.rideId()).orElseThrow(GroupHoldController::missing);
+        if (ride.preferences != null) throw new com.hoopr.booking.BookingFailure(409, "Use Book Seat to select stops and passenger details for this ride.");
         discounts.lockRider(passenger);
         existing = replay(passenger, key);
         if (existing.isPresent()) return match(existing.get(), request);

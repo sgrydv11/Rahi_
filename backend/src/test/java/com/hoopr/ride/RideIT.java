@@ -217,7 +217,8 @@ class RideIT {
         mvc.perform(post("/api/v1/rides").header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.driver.id").value(owner.toString()))
                 .andExpect(jsonPath("$.availableSeats").value(3)).andExpect(jsonPath("$.status").value("SCHEDULED"));
-        mvc.perform(get("/api/v1/rides")).andExpect(status().isOk())
+        mvc.perform(get("/api/v1/rides").param("origin", "Mumbai").param("destination", "Pune")
+                        .param("departureDate", tomorrow.atZone(ZoneId.of("Asia/Kolkata")).toLocalDate().toString())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].driver.displayName").value("Driver"))
                 .andExpect(jsonPath("$.content[0].driver.email").doesNotExist())
                 .andExpect(jsonPath("$.content[0].driver.phoneNumber").doesNotExist());

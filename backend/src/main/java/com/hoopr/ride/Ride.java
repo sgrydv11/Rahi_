@@ -8,6 +8,10 @@ import com.hoopr.user.UserProfile;
 
 @Entity @Table(name = "rides")
 public class Ride {
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb") public RidePreferences preferences;
+    @org.hibernate.annotations.Formula("(select coalesce(avg(b.driver_rating),0) from bookings b join rides rated on rated.id=b.ride_id where rated.driver_id=driver_id)")
+    public double driverRating;
     public UUID getId() { return id; }
     public UUID getDriverId() { return driverId; }
     public String getOrigin() { return origin; }

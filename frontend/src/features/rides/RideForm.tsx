@@ -27,8 +27,16 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       totalSeats: Number(text('totalSeats')), pricePerSeat: text('pricePerSeat'), currency: text('currency').toUpperCase(),
       vehicleDetails: text('vehicleDetails'), notes: text('notes'),
       vehicleId: text('vehicleId') || undefined,
+      preferences: {
+        boardingPoints: text('boardingPoints').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+        droppingPoints: text('droppingPoints').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+        hasCar: text('hasCar') === 'yes', ac: data.has('ac'), flexibleDropoff: data.has('flexibleDropoff'),
+        womenOnly: data.has('womenOnly'), routeType: text('routeType') as 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER',
+      },
     };
     const invalid = validateRide(body); if (invalid) { setError(invalid); return; }
+    if (!body.preferences?.hasCar) { setError('A car is required to offer a carpool ride.'); return; }
+    if (!body.preferences.boardingPoints.length || !body.preferences.droppingPoints.length) { setError('Add boarding and dropping points.'); return; }
     setBusy(true);
     try { await save(body); } catch (failure) { setError(errorMessage(failure)); } finally { setBusy(false); }
   }
@@ -37,7 +45,14 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       <legend>{ride ? 'Edit your offer' : 'Your journey details'}</legend>
       <label>Leaving from<input name="origin" required maxLength={200} defaultValue={ride?.origin} /></label>
       <label>Going to<input name="destination" required maxLength={200} defaultValue={ride?.destination} /></label>
-      <label>Departure ({timeZone})<input name="departure" type="datetime-local" required defaultValue={ride ? localDateTime(ride.departureAt) : ''} /></label>
+      <label>Departure<input name="departure" type="datetime-local" required defaultValue={ride ? localDateTime(ride.departureAt) : ''} /></label>
+      <label>Do you have a car?<select name="hasCar" required defaultValue={ride?.preferences?.hasCar ? 'yes' : ''}><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+      <label>Route type<select name="routeType" defaultValue={ride?.preferences?.routeType || 'OTHER'}><option value="HOME_TO_OFFICE">Home to Office</option><option value="OFFICE_TO_HOME">Office to Home</option><option value="OTHER">Other</option></select></label>
+      <label>Boarding points, one per line<textarea name="boardingPoints" required defaultValue={ride?.preferences?.boardingPoints.join('\n') || ride?.origin || ''} /></label>
+      <label>Dropping points, one per line<textarea name="droppingPoints" required defaultValue={ride?.preferences?.droppingPoints.join('\n') || ride?.destination || ''} /></label>
+      <label><input name="ac" type="checkbox" defaultChecked={ride?.preferences?.ac === true} />Car has AC</label>
+      <label><input name="flexibleDropoff" type="checkbox" defaultChecked={ride?.preferences?.flexibleDropoff} />Agree to nearby requested drop-off, by arrangement</label>
+      <label><input name="womenOnly" type="checkbox" defaultChecked={ride?.preferences?.womenOnly} />Women-only ride</label>
       <label>Seats offered<input name="totalSeats" type="number" required min={1} max={6} step={1} defaultValue={ride?.totalSeats ?? 1} /></label>
       <label>Price per seat<input name="pricePerSeat" type="number" required min={0} max="9999999999.99" step="0.01" defaultValue={ride?.pricePerSeat ?? '0.00'} /></label>
       <label>Currency<input name="currency" required pattern="[A-Za-z]{3}" maxLength={3} defaultValue={ride?.currency ?? 'INR'} /></label>
@@ -51,7 +66,8 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       </select></label>}
       <label className="form-wide">Vehicle details (optional)<input name="vehicleDetails" maxLength={300} placeholder="For example, blue Suzuki Swift" defaultValue={ride?.vehicleDetails ?? ''} /></label>
       <label className="form-wide">Notes (optional)<textarea name="notes" maxLength={2000} rows={4} defaultValue={ride?.notes ?? ''} /></label>
-      <p className="notice form-wide">Departure is entered in {timeZone}. Ride descriptions and notes are public. Leave out private contact details.</p>
+      <p className="notice form-wide">What You See Is What You Pay – No Hidden Charges, No Convenience Fees!</p>
+      <p className="notice form-wide">Ride descriptions and notes are public. Leave out private contact details.</p>
       {error && <p className="form-wide" role="alert">{error}</p>}
       <button className="button" type="submit">{busy ? 'Saving…' : ride ? 'Save changes' : 'Offer this ride'}</button>
     </fieldset>

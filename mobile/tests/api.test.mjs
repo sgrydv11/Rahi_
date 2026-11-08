@@ -36,6 +36,27 @@ const session = {
   user: { id: 'test-user', fullName: 'Test Rider' },
 };
 
+test('email OTP signs in without a password and persists the issued session', async () => {
+  const f = fixture(async url => url.endsWith('/request')
+    ? Response.json({ challengeId: 'challenge', expiresIn: 300, delivery: 'EMAIL' })
+    : Response.json(session));
+  await f.client.requestEmailOtp('rider@example.test', '+919876543210', 'PASSENGER');
+  assert.deepEqual(JSON.parse(f.calls[0].options.body), {
+    identifier: 'rider@example.test', mobileNumber: '+919876543210', travelPreference: 'PASSENGER',
+  });
+  assert.equal(f.calls[0].options.headers.Authorization, undefined);
+  await f.client.verifyEmailOtp('challenge', '123456');
+  assert.equal(f.calls[1].url, 'https://example.test/api/v1/mobile/auth/otp/verify');
+  assert.deepEqual(JSON.parse(f.calls[1].options.body), { challengeId: 'challenge', code: '123456' });
+  assert.equal(f.token(), 'rotated');
+});
+
+test('rejected email OTP does not establish a session', async () => {
+  const f = fixture(async () => Response.json({ message: 'The code is invalid or expired.' }, { status: 401 }));
+  await assert.rejects(f.client.verifyEmailOtp('challenge', '123456'));
+  assert.equal(f.token(), undefined);
+});
+
 test('public requests skip token refresh and normalize the base URL', async () => {
   const f = fixture(async () => Response.json({ status: 'UP' }));
   assert.equal((await f.client.api('/health', { auth: false })).status, 'UP');

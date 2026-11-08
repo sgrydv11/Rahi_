@@ -23,17 +23,24 @@ export function Button({ label, onPress, disabled = false }: { label: string; on
     <Text style={styles.buttonText}>{label}</Text>
   </Pressable>;
 }
-export function Field({ label, value, change, secret, numeric }: {
-  label: string; value: string; change: (value: string) => void; secret?: boolean; numeric?: boolean;
+export function Field({ label, value, change, secret, numeric, multiline }: {
+  label: string; value: string; change: (value: string) => void; secret?: boolean; numeric?: boolean; multiline?: boolean;
 }) {
   const onFocus = useContext(FieldFocus);
   return <View style={styles.field}><Copy>{label}</Copy><TextInput accessibilityLabel={label} value={value}
     onFocus={onFocus}
-    onChangeText={change} secureTextEntry={secret} keyboardType={numeric ? 'numbers-and-punctuation' : 'default'}
+    onChangeText={change} secureTextEntry={secret} keyboardType={numeric ? 'numbers-and-punctuation' : 'default'} multiline={multiline}
     autoCapitalize="none" autoCorrect={false} style={styles.input} /></View>;
 }
 export function ErrorText({ message }: { message?: string }) {
   return message ? <Text accessibilityRole="alert" style={styles.error}>{message}</Text> : null;
+}
+export function Choice({ label, values, selected, change }: {
+  label: string; values: { value: string; label: string }[]; selected: string; change: (value: string) => void;
+}) {
+  return <View style={styles.field}><Copy>{label}</Copy><View style={styles.row}>{values.map(option =>
+    <Button key={option.value} label={option.label + (selected === option.value ? ' ✓' : '')} onPress={() => change(option.value)} />
+  )}</View></View>;
 }
 export function useAction() {
   const locked = useRef(false);

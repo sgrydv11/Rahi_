@@ -22,12 +22,22 @@ public class RideController {
             @RequestParam(required = false) @Size(max = 200) String origin,
             @RequestParam(required = false) @Size(max = 200) String destination,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate departureDate,
-            @RequestParam(defaultValue = "UTC") @Size(max = 64) String timeZone,
+            @RequestParam(defaultValue = "Asia/Kolkata") @Size(max = 64) String timeZone,
             @RequestParam(defaultValue = "1") @Min(1) @Max(6) int minimumSeats,
             @RequestParam(required = false) @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal maximumPrice,
             @RequestParam(defaultValue = "0") @Min(0) @Max(100000) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
-        return rides.search(origin, destination, departureDate, timeZone, minimumSeats, maximumPrice, page, size);
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size,
+            @RequestParam(defaultValue = "TIME_ASC") String sort,
+            @RequestParam(required = false) String departureTime,
+            @RequestParam(required = false) String timeFrom,
+            @RequestParam(required = false) String timeTo,
+            @RequestParam(defaultValue = "false") boolean womenOnly,
+            @RequestParam(defaultValue = "false") boolean ac,
+            @RequestParam(defaultValue = "false") boolean flexibleDropoff,
+            @RequestParam(required = false) @Size(max = 200) String boardingPoint,
+            @RequestParam(required = false) @Size(max = 200) String droppingPoint) {
+        return rides.search(origin, destination, departureDate, timeZone, minimumSeats, maximumPrice, page, size,
+                sort, departureTime, timeFrom, timeTo, womenOnly, ac, flexibleDropoff, boardingPoint, droppingPoint);
     }
     @GetMapping("/me") public Results mine(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") @Min(0) @Max(100000) int page,

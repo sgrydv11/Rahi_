@@ -44,6 +44,11 @@ export function BookingDetailsPage() {
   const [booking, setBooking] = useState<Booking | null>(null); const [loading, setLoading] = useState(true);
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [confirm, setConfirm] = useState(false);
   const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    if (booking?.ride.status !== 'IN_PROGRESS' || busy) return;
+    const timer = setInterval(() => setRevision(value => value + 1), 30000);
+    return () => clearInterval(timer);
+  }, [booking?.ride.status, busy]);
   const [message, setMessage] = useState(typeof location.state?.message === 'string' ? location.state.message : '');
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');
@@ -58,12 +63,12 @@ export function BookingDetailsPage() {
     try { setBooking(await bookingsApi.cancel(id, reason)); setConfirm(false); setMessage('Cancellation recorded. Your seats have been released.'); }
     catch (failure) { setError(errorMessage(failure)); } finally { setBusy(false); }
   }
-  async function rate(score: number) {
+  async function rate(score: number, review?: string) {
     setBusy(true);
     setError('');
     setMessage('');
     try {
-      setBooking(await bookingsApi.rate(id, score));
+      setBooking(await bookingsApi.rate(id, score, review));
       setMessage('Rating saved.');
     } catch (failure) {
       setError(errorMessage(failure));
@@ -75,6 +80,8 @@ export function BookingDetailsPage() {
     {loading ? <p role="status">Loading booking…</p> : booking ? <>
       {message && <p role="status">{message}</p>}<BookingCard booking={booking} />
       <div className="panel"><p>Booking reference: {booking.id}</p><p>Price agreed: {booking.currency} {Number(booking.pricePerSeat).toFixed(2)} per seat.</p>
+        {booking.details && <><p>Boarding: {booking.details.boardingPoint} · Dropping: {booking.details.droppingPoint}</p>
+          {booking.details.passengers.map((person, index) => <p key={index}>{person.name} · {person.age} · {person.gender}</p>)}</>}
         {booking.cancelledAt && <p>Cancelled: {new Date(booking.cancelledAt).toLocaleString()}</p>}
         {booking.cancellationReason && <p>Reason: {booking.cancellationReason}</p>}
         {booking.ride.status !== 'IN_PROGRESS' && <Link to={`/rides/${booking.ride.id}`}>View ride</Link>}

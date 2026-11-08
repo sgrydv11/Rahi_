@@ -18,8 +18,9 @@ public class UserController {
     public AuthService.Profile update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody EditProfile body) {
         return auth.updateProfile(UUID.fromString(jwt.getSubject()), body.fullName(), body.travelPreference());
     }
-    public record EditProfile(@NotBlank @Size(max = 120) String fullName,
+    public record EditProfile(@NotBlank @Size(max = 120) @Pattern(regexp = "\\p{L}[\\p{L}\\p{M} .'-]{0,119}") String fullName,
                               @NotNull TravelPreference travelPreference) {
+        public EditProfile { if (fullName != null) fullName = fullName.strip(); }
         @com.fasterxml.jackson.annotation.JsonAnySetter
         public void unknown(String field, Object value) { throw new IllegalArgumentException("Unknown profile field"); }
     }

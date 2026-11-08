@@ -38,6 +38,7 @@ public class RideService {
         ride.originKey = locationKey(ride.origin); ride.destinationKey = locationKey(ride.destination);
         ride.pickupDescription = optional(body.pickupDescription()); ride.dropoffDescription = optional(body.dropoffDescription());
         ride.vehicleDetails = optional(body.vehicleDetails()); ride.notes = optional(body.notes());
+        ride.preferences = preferences(body.preferences());
         if (body.vehicleId() != null) {
             var vehicle = jdbc.query("""
                     SELECT make, model, color, passenger_capacity FROM vehicles
@@ -106,6 +107,7 @@ public class RideService {
         if (body.dropoffDescription() != null) ride.dropoffDescription = optional(body.dropoffDescription());
         if (body.vehicleDetails() != null) ride.vehicleDetails = optional(body.vehicleDetails());
         if (body.notes() != null) ride.notes = optional(body.notes());
+        if (body.preferences() != null) ride.preferences = preferences(body.preferences());
         ride.updatedAt = clock.instant(); rides.flush();
         return view(ride);
     }
@@ -225,6 +227,37 @@ public class RideService {
         catch (NoSuchAlgorithmException e) { throw new IllegalStateException("SHA-256 unavailable"); }
     }
     private static String optional(String value) { return value == null || value.isBlank() ? null : value.strip(); }
+    private static RidePreferences preferences(RidePreferences value) {
+        if (value == null) return null;
+        if (!Boolean.TRUE.equals(value.hasCar())) throw new RideFailure(400, "A car is required to offer a carpool ride.");
+        var boarding = value.boardingPoints().stream().map(String::strip).toList();
+        var dropping = value.droppingPoints().stream().map(String::strip).toList();
+        if (boarding.stream().map(String::toLowerCase).distinct().count() != boarding.size()
+                || dropping.stream().map(String::toLowerCase).distinct().count() != dropping.size())
+            throw new RideFailure(400, "Remove duplicate boarding or dropping points.");
+        return new RidePreferences(boarding, dropping, true, value.ac(), value.flexibleDropoff(), value.womenOnly(), value.routeType());
+    }
+    @Transactional(readOnly = true)
+    public Results search(String origin, String destination, LocalDate date, String timeZone,
+            int minimumSeats, BigDecimal maximumPrice, int page, int size, String sort,
+            String departureTime, String timeFrom, String timeTo, boolean womenOnly, boolean ac,
+            boolean flexibleDropoff, String boardingPoint, String droppingPoint) {
+        if (origin == null || origin.isBlank() || destination == null || destination.isBlank())
+            return new Results(List.of(), page, size, 0, 0);
+        validateLocations(origin, destination);
+        if (date == null) date = LocalDate.now(clock.withZone(zone(timeZone)));
+        if (date.getYear() < 1 || date.getYear() > 9999) throw new RideFailure(400, "Invalid travel date.");
+        String property = switch (sort) {
+            case "TIME_ASC", "TIME_DESC" -> "departureAt";
+            case "PRICE_ASC", "PRICE_DESC" -> "pricePerSeat";
+            case "RATING_ASC", "RATING_DESC" -> "driverRating";
+            default -> throw new RideFailure(400, "Choose a supported sort order.");
+        };
+        var order = Sort.by(sort.endsWith("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, property).and(Sort.by("id"));
+        var available = RideSpecifications.available(clock.instant(), origin, destination, date, zone(timeZone), minimumSeats, maximumPrice);
+        var extra = RideSpecifications.preferences(zone(timeZone), departureTime, timeFrom, timeTo, womenOnly, ac, flexibleDropoff, boardingPoint, droppingPoint);
+        return results(rides.findAll(available.and(extra), PageRequest.of(page, size, order)));
+    }
     private static Pageable paging(int page, int size) { return PageRequest.of(page, size, Sort.by("departureAt").ascending().and(Sort.by("id"))); }
     private Results results(Page<Ride> page) {
         var content = page.getContent();
@@ -239,15 +272,26 @@ public class RideService {
                     (row, index) -> { held.put(row.getObject(1, UUID.class), row.getInt(2)); return row.getInt(2); },
                     params.toArray());
         }
-        return new Results(content.stream().map(ride -> view(ride, held.getOrDefault(ride.id, 0))).toList(),
+        var reviews = reviews(content.stream().map(ride -> ride.driverId).distinct().toList());
+        return new Results(content.stream().map(ride -> view(ride, held.getOrDefault(ride.id, 0), reviews.getOrDefault(ride.driverId, List.of()))).toList(),
                 page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
     private View view(Ride ride) {
         Integer held = jdbc.queryForObject("SELECT coalesce(sum(seats),0) FROM group_seat_holds WHERE ride_id=? AND status='HELD' AND expires_at > ?",
                 Integer.class, ride.id, clock.instant().atOffset(ZoneOffset.UTC));
-        return view(ride, held == null ? 0 : held);
+        return view(ride, held == null ? 0 : held, reviews(List.of(ride.driverId)).getOrDefault(ride.driverId, List.of()));
     }
-    private View view(Ride ride, int held) {
+    private Map<UUID, List<Review>> reviews(List<UUID> drivers) {
+        Map<UUID, List<Review>> result = new HashMap<>();
+        if (drivers.isEmpty()) return result;
+        String placeholders = String.join(",", Collections.nCopies(drivers.size(), "?"));
+        jdbc.query("SELECT driver_id,driver_rating,review_text FROM (SELECT rated.driver_id,b.driver_rating,b.review_text,row_number() OVER (PARTITION BY rated.driver_id ORDER BY b.rated_at DESC,b.id) AS position FROM bookings b JOIN rides rated ON rated.id=b.ride_id WHERE rated.driver_id IN ("
+                        + placeholders + ") AND b.driver_rating IS NOT NULL) ranked WHERE position<=3", row -> {
+            result.computeIfAbsent(row.getObject(1, UUID.class), key -> new ArrayList<>()).add(new Review(row.getInt(2), row.getString(3)));
+        }, drivers.toArray());
+        return result;
+    }
+    private View view(Ride ride, int held, List<Review> reviews) {
         // Repository entity graphs fetch the safe driver profile in the page query.
         String name = ride.driverProfile == null ? "Hoopr driver" : ride.driverProfile.getFullName();
         if (name == null || name.isBlank()) name = "Hoopr driver";
@@ -257,6 +301,7 @@ public class RideService {
                 ride.totalSeats, Math.max(0, ride.availableSeats - held), ride.pricePerSeat, ride.currency, ride.vehicleDetails,
                 ride.notes, "PUBLISHED".equals(ride.status) ? "SCHEDULED" : ride.status, ride.version,
                 ride.createdAt, ride.updatedAt, ride.cancelledAt, ride.cancellationReason,
-                ride.startedAt, ride.completedAt, canStart(ride, clock.instant()), routePins(ride));
+                ride.startedAt, ride.completedAt, canStart(ride, clock.instant()), routePins(ride),
+                RidePreferences.forRide(ride), ride.driverRating, reviews);
     }
 }

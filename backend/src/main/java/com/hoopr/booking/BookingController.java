@@ -16,7 +16,7 @@ public class BookingController {
     @PostMapping("/rides/{rideId}/bookings")
     public ResponseEntity<View> create(@PathVariable UUID rideId, @AuthenticationPrincipal Jwt jwt,
             @RequestHeader("Idempotency-Key") UUID key, @Valid @RequestBody Create body) {
-        Created created = bookings.create(rideId, user(jwt), key, body.seats(), body.rideVersion());
+        Created created = bookings.create(rideId, user(jwt), key, body.seats(), body.rideVersion(), body.details());
         return ResponseEntity.status(created.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .header("Cache-Control", "no-store").body(created.booking());
     }
@@ -27,7 +27,7 @@ public class BookingController {
     @GetMapping("/bookings/{id}") public View details(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) { return bookings.details(id, user(jwt)); }
     @PostMapping("/bookings/{id}/rating")
     public View rate(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Rate body) {
-        return bookings.rate(id, user(jwt), body.score());
+        return bookings.rate(id, user(jwt), body.score(), body.review());
     }
     @PostMapping("/bookings/{id}/cancel")
     public View cancel(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Cancel body) {

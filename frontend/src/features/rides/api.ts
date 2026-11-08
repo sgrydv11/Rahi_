@@ -6,6 +6,10 @@ export const demoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export interface Point { latitude: number; longitude: number }
 export interface RoutePins { pickup: Point; dropoff: Point }
+export interface RidePreferences {
+  boardingPoints: string[]; droppingPoints: string[]; hasCar: boolean | null; ac: boolean | null;
+  flexibleDropoff: boolean; womenOnly: boolean; routeType: 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER';
+}
 
 export interface Ride {
   id: string; driver: { id: string; displayName: string }; origin: string; destination: string;
@@ -15,6 +19,7 @@ export interface Ride {
   createdAt: string; updatedAt: string; cancelledAt: string | null; cancellationReason: string | null;
   startedAt?: string | null; completedAt?: string | null; canStart?: boolean;
   route?: RoutePins | null;
+  preferences?: RidePreferences; driverRating?: number; reviews?: { score: number; text?: string }[];
 }
 export interface RidePage { content: Ride[]; page: number; size: number; totalElements: number; totalPages: number }
 export interface RideInput {
@@ -22,6 +27,7 @@ export interface RideInput {
   departureAt: string; timeZone: string; totalSeats: number; pricePerSeat: string; currency: string;
   vehicleDetails: string; notes: string;
   vehicleId?: string;
+  preferences?: RidePreferences;
 }
 export const ridesApi = {
   search: (query: URLSearchParams, signal?: AbortSignal) => demoMode
@@ -67,8 +73,7 @@ export function departureLabel(ride: Pick<Ride, 'departureAt' | 'timeZone'>) {
   const date = new Date(ride.departureAt);
   if (!Number.isFinite(date.getTime())) return 'Departure time unavailable';
   try {
-    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: ride.timeZone })
-      .format(date) + ` (${ride.timeZone})`;
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: ride.timeZone }).format(date);
   } catch {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })
       .format(date) + ' (UTC; original time zone unavailable)';

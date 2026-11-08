@@ -1,20 +1,26 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Linking, View } from 'react-native';
-import { randomUUID } from 'expo-crypto';
-import { api, type Booking, type Page, type Pins, type Ride, type User, type Vehicle } from './api';
+import { api, type Page, type Pins, type Ride, type RidePreferences, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
 import { demoMode, demoRide, demoRides } from './demo';
 import { DateField } from './dateField';
-import { Button, Card, Copy, date, ErrorText, Field, labelStatus, QueryState, styles, useAction, useQuery } from './ui';
+import { SeatBooking } from './seatBooking';
+import { Button, Card, Choice, Copy, date, ErrorText, Field, labelStatus, QueryState, styles, useAction, useQuery } from './ui';
 
 const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const future = (ride: Ride) => ride.status === 'SCHEDULED' && Date.parse(ride.departureAt) > Date.now();
 const ridePath = (id: string) => '/rides/' + encodeURIComponent(id);
 const message = (label: string, value?: string) => value ? <Copy>{label}: {value}</Copy> : null;
-const fields = {
-  origin: 'Leaving from', destination: 'Going to', departureDate: 'Travel date',
-  timeZone: 'Time zone', minimumSeats: 'Seats needed', maximumPrice: 'Maximum price per seat',
-};
+function day(offset = 0) {
+  const date = new Date(); date.setDate(date.getDate() + offset);
+  return localDate(date.toISOString()).slice(0, 10);
+}
+const sortOptions = [
+  { value: 'TIME_ASC', label: 'Time ↑' }, { value: 'TIME_DESC', label: 'Time ↓' },
+  { value: 'PRICE_ASC', label: 'Price ↑' }, { value: 'PRICE_DESC', label: 'Price ↓' },
+  { value: 'RATING_ASC', label: 'Rating ↑' }, { value: 'RATING_DESC', label: 'Rating ↓' },
+];
+const yesNo = [{ value: '', label: 'Any' }, { value: 'true', label: 'Yes' }];
 
 export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (page: number) => void }) {
   return <View style={styles.row}>
@@ -24,41 +30,75 @@ export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (p
 }
 
 export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
-  const [draft, setDraft] = useState<Record<string, string>>({ timeZone: tz(), minimumSeats: '1' });
+  const [draft, setDraft] = useState<Record<string, string>>({ departureDate: day(), timeZone: tz(), sort: 'TIME_ASC' });
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
-  const path = mine ? `/rides/me?page=${page}&size=10` : `/rides?page=${page}&size=10&${query}`;
-  const result = useQuery(path, async signal => demoMode && !mine ? demoRides(query, page) : api<Page<Ride>>(path, { auth: mine, signal }));
+  const [filters, setFilters] = useState(false);
+  const [error, setError] = useState('');
+  const path = mine ? '/rides/me?page=' + page + '&size=10' : '/rides?page=' + page + '&size=10&' + query;
+  const result = useQuery(path, async signal => {
+    if (!mine && !query) return { content: [], page: 0, totalPages: 0 } as Page<Ride>;
+    return demoMode && !mine ? demoRides(query, page) : api<Page<Ride>>(path, { auth: mine, signal });
+  });
+  function apply(values = draft) {
+    if (!values.origin?.trim() || !values.destination?.trim()) { setError('Select both From City and To City.'); return; }
+    if (values.origin.trim().toLowerCase() === values.destination.trim().toLowerCase()) { setError('Choose different cities.'); return; }
+    if (values.departureTime && (values.timeFrom || values.timeTo)) { setError('Choose a direct time or a range, not both.'); return; }
+    setError(''); setPage(0);
+    setQuery(Object.entries(values).filter(([, value]) => value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
+  }
+  function update(key: string, value: string) { setDraft(previous => ({ ...previous, [key]: value })); }
+  const travelDate = draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined;
+  function timeField(key: string, label: string) {
+    return <DateField label={label} mode="time" value={draft[key] && draft[key] !== '24:00' ? new Date(draft.departureDate + 'T' + draft[key]) : undefined}
+      change={value => update(key, String(value.getHours()).padStart(2, '0') + ':' + String(value.getMinutes()).padStart(2, '0'))}
+      clear={() => update(key, '')} />;
+  }
+  if (!mine && !query) return <Card>
+    <Field label="From City" value={draft.origin || ''} change={value => update('origin', value)} />
+    <Field label="To City" value={draft.destination || ''} change={value => update('destination', value)} />
+    <View style={styles.row}><Button label="Today" onPress={() => update('departureDate', day())} /><Button label="Tomorrow" onPress={() => update('departureDate', day(1))} /></View>
+    <DateField label="Calendar" mode="date" value={travelDate} change={value => update('departureDate', localDate(value.toISOString()).slice(0, 10))} />
+    <Choice label="Women-only rides" values={yesNo} selected={draft.womenOnly || ''} change={value => update('womenOnly', value)} />
+    <ErrorText message={error} />
+    <Button label="Search rides" onPress={() => apply()} />
+  </Card>;
   return <>
     {mine ? <View style={styles.row}>
       <Button label="Find a ride" onPress={() => go({ kind: 'search' })} />
       <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
       <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
-    </View> : <Card>
-      {Object.entries(fields).map(([key, label]) => key === 'departureDate'
-        ? <DateField key={key} label={label} mode="date"
-          value={draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined}
-          change={value => setDraft(previous => ({ ...previous, departureDate: localDate(value.toISOString()).slice(0, 10) }))}
-          clear={() => setDraft(previous => ({ ...previous, departureDate: '' }))} />
-        : <Field key={key} label={label} value={draft[key] ?? ''}
-        numeric={key === 'minimumSeats' || key === 'maximumPrice'}
-        change={value => setDraft(previous => ({ ...previous, [key]: value }))} />)}
-      <View style={styles.row}>
-        <Button label="Search rides" onPress={() => {
-          setPage(0);
-          setQuery(Object.entries(draft).filter(([, value]) => value.trim()).map(([key, value]) =>
-            `${key}=${encodeURIComponent(value.trim())}`).join('&'));
-          result.reload();
+    </View> : <>
+      <Copy>{draft.origin} → {draft.destination} · {draft.departureDate}</Copy>
+      <Button label="Change search" onPress={() => { setQuery(''); setError(''); }} />
+      <Choice label="Sort rides" values={sortOptions} selected={draft.sort} change={value => {
+        const next = { ...draft, sort: value }; setDraft(next); apply(next);
+      }} />
+      <Button label={filters ? 'Hide filters' : 'Filter rides'} onPress={() => setFilters(value => !value)} />
+      {filters && <Card>
+        {timeField('departureTime', 'Direct departure time')}
+        <Choice label="Time range" selected={(draft.timeFrom || '') + ',' + (draft.timeTo || '')}
+          values={[{ value: ',', label: 'Any time' }, { value: '07:00,12:00', label: '7 AM – 12 PM' },
+            { value: '12:00,16:00', label: '12 PM – 4 PM' }, { value: '16:00,20:00', label: '4 PM – 8 PM' }, { value: '20:00,24:00', label: '8 PM – 12 AM' }]}
+          change={value => { const [from, to] = value.split(','); setDraft(previous => ({ ...previous, departureTime: '', timeFrom: from, timeTo: to })); }} />
+        {timeField('timeFrom', 'From time')}{timeField('timeTo', 'To time')}
+        <Field label="Boarding point" value={draft.boardingPoint || ''} change={value => update('boardingPoint', value)} />
+        <Field label="Dropping point" value={draft.droppingPoint || ''} change={value => update('droppingPoint', value)} />
+        <Choice label="AC" values={yesNo} selected={draft.ac || ''} change={value => update('ac', value)} />
+        <Choice label="Flexible nearby drop-off" values={yesNo} selected={draft.flexibleDropoff || ''} change={value => update('flexibleDropoff', value)} />
+        <Button label="Apply filters" onPress={() => {
+          const next = { ...draft, timeTo: draft.timeTo === '00:00' ? '24:00' : draft.timeTo || '' }; setDraft(next); apply(next); result.reload();
         }} />
-        <Button label="Clear filters" onPress={() => { setDraft({ timeZone: tz(), minimumSeats: '1' }); setQuery(''); setPage(0); }} />
-      </View>
-    </Card>}
+      </Card>}
+      <ErrorText message={error} />
+    </>}
     {!result.data ? <QueryState {...result} /> : <>
-      {!result.data.content.length && <Copy>{mine ? 'You have not offered any rides yet. Find a ride or view your passenger bookings above.' : 'No rides match your search. Try another date or clear the filters.'}</Copy>}
+      {!result.data.content.length && <Copy>{mine ? 'You have not offered any rides yet.' : 'No rides match this route, date and filters.'}</Copy>}
       {result.data.content.map(ride => <Card key={ride.id}>
-        <Copy>{ride.origin} → {ride.destination}</Copy>
-        <Copy>{date(ride.departureAt)} · {labelStatus(ride.status)}</Copy>
+        <Copy>{ride.origin} → {ride.destination}</Copy><Copy>{date(ride.departureAt)}</Copy>
         <Copy>{ride.currency} {ride.pricePerSeat} per seat · {ride.availableSeats} available</Copy>
+        <Copy>{ride.driverRating ? ride.driverRating.toFixed(1) + ' / 5' : 'No ratings yet'}{ride.preferences?.ac ? ' · AC' : ''}{ride.preferences?.womenOnly ? ' · Women only' : ''}</Copy>
+        {ride.reviews?.map((review, index) => <Copy key={index}>{review.score}/5 {review.text || ''}</Copy>)}
         <Button label="View ride" onPress={() => go({ kind: 'ride', id: ride.id })} />
       </Card>)}
       <Pagination data={result.data} setPage={setPage} />
@@ -88,9 +128,7 @@ export function RideDetails({ id, user, go }: { id: string; user: User | null; g
   const path = ridePath(id);
   const result = useQuery(path, async signal => demoMode ? demoRide(id) : api<Ride>(path, { auth: Boolean(user), signal }));
   const action = useAction();
-  const [seats, setSeats] = useState(1);
   const [reason, setReason] = useState('');
-  const bookingKey = useRef<{ id: string; seats: number; version: number; key: string } | null>(null);
   if (!result.data) return <QueryState {...result} />;
   const ride = result.data;
   const owner = user?.id === ride.driver.id;
@@ -103,17 +141,7 @@ export function RideDetails({ id, user, go }: { id: string; user: User | null; g
       result.reload();
     });
   }
-  function book() {
-    const prior = bookingKey.current;
-    const key = prior && prior.id === id && prior.seats === seats && prior.version === ride.version ? prior.key : randomUUID();
-    bookingKey.current = { id, seats, version: ride.version, key };
-    void action.run(async () => {
-      const booking = await api<Booking>(`${path}/bookings`, {
-        method: 'POST', key, body: { seats, rideVersion: ride.version },
-      });
-      go({ kind: 'booking', id: booking.id });
-    });
-  }
+
   return <>
     <Card><Copy>{ride.origin} → {ride.destination}</Copy><Copy>{date(ride.departureAt)} · {labelStatus(ride.status)}</Copy>
       <Copy>Driver: {ride.driver.displayName}</Copy>
@@ -139,19 +167,7 @@ export function RideDetails({ id, user, go }: { id: string; user: User | null; g
         ])} />
       </>}
     </Card>}
-    {!demoMode && !owner && future(ride) && ride.availableSeats > 0 && <Card>
-      {!user ? <Button label="Sign in to book" onPress={() => go({ kind: 'login' })} /> : <>
-        <Copy>Seats: {seats} · {ride.currency} {(seats * ride.pricePerSeat).toFixed(2)}</Copy>
-        <View style={styles.row}>
-          <Button label="Fewer seats" disabled={seats <= 1 || action.busy} onPress={() => setSeats(seats - 1)} />
-          <Button label="More seats" disabled={seats >= ride.availableSeats || action.busy} onPress={() => setSeats(seats + 1)} />
-        </View>
-        <Button label="Review and book" disabled={action.busy || seats > ride.availableSeats} onPress={() =>
-          Alert.alert('Confirm booking', `Book ${seats} seat(s) for ${ride.currency} ${(seats * ride.pricePerSeat).toFixed(2)}?`, [
-            { text: 'Back', style: 'cancel' }, { text: 'Book seats', onPress: book },
-          ])} />
-      </>}
-    </Card>}
+    {!demoMode && !owner && future(ride) && ride.availableSeats > 0 && <SeatBooking ride={ride} user={user} go={go} />}
     <Button label="Refresh ride" onPress={result.reload} disabled={action.busy} />
   </>;
 }
@@ -168,6 +184,11 @@ function localDate(value?: string) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; go: Navigate }) {
+  const [preferences, setPreferences] = useState<RidePreferences>(ride?.preferences || {
+    boardingPoints: [], droppingPoints: [], hasCar: null, ac: false, flexibleDropoff: false, womenOnly: false, routeType: 'HOME_TO_OFFICE',
+  });
+  const [boarding, setBoarding] = useState(ride?.preferences?.boardingPoints.join('\n') || ride?.origin || '');
+  const [dropping, setDropping] = useState(ride?.preferences?.droppingPoints.join('\n') || ride?.destination || '');
   const [draft, setDraft] = useState({
     origin: ride?.origin ?? '', destination: ride?.destination ?? '', departureAt: localDate(ride?.departureAt),
     totalSeats: String(ride?.totalSeats ?? 1), pricePerSeat: String(ride?.pricePerSeat ?? 0), currency: ride?.currency ?? 'INR',
@@ -184,9 +205,12 @@ function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; 
         throw new Error('Enter a valid future local departure.');
       if (!draft.pricePerSeat.trim() || !/^\d+(\.\d{1,2})?$/.test(draft.pricePerSeat))
         throw new Error('Enter a valid fare with up to two decimal places.');
+      if (!preferences.hasCar) throw new Error('A car is required to offer a carpool ride.');
+      const stops = { boardingPoints: boarding.split(/\r?\n/).map(value => value.trim()).filter(Boolean), droppingPoints: dropping.split(/\r?\n/).map(value => value.trim()).filter(Boolean) };
+      if (!stops.boardingPoints.length || !stops.droppingPoints.length) throw new Error('Add boarding and dropping points.');
       const saved = await api<Ride>(ride ? ridePath(ride.id) : '/rides', {
         method: ride ? 'PATCH' : 'POST', body: {
-          ...draft, departureAt: departure.toISOString(), timeZone: tz(), currency: draft.currency.trim().toUpperCase(),
+          ...draft, preferences: { ...preferences, ...stops }, departureAt: departure.toISOString(), timeZone: tz(), currency: draft.currency.trim().toUpperCase(),
           totalSeats: Number(draft.totalSeats), pricePerSeat: Number(draft.pricePerSeat),
           ...(ride ? { version: ride.version } : vehicleId ? { vehicleId } : {}),
         },
@@ -195,6 +219,12 @@ function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; 
     });
   }
   return <Card>
+    <Copy>What You See Is What You Pay – No Hidden Charges, No Convenience Fees!</Copy>
+    <Choice label="Do you have a car?" values={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} selected={String(preferences.hasCar)} change={value => setPreferences(previous => ({ ...previous, hasCar: value === 'true' }))} />
+    <Choice label="Route type" values={[{ value: 'HOME_TO_OFFICE', label: 'Home to Office' }, { value: 'OFFICE_TO_HOME', label: 'Office to Home' }, { value: 'OTHER', label: 'Other' }]} selected={preferences.routeType} change={value => setPreferences(previous => ({ ...previous, routeType: value as RidePreferences['routeType'] }))} />
+    <Field label="Boarding points, one per line" value={boarding} change={setBoarding} multiline />
+    <Field label="Dropping points, one per line" value={dropping} change={setDropping} multiline />
+    {(['ac', 'flexibleDropoff', 'womenOnly'] as const).map(key => <Choice key={key} label={key === 'ac' ? 'Car has AC' : key === 'womenOnly' ? 'Women-only ride' : 'Agree to nearby requested drop-off, by arrangement'} values={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} selected={String(preferences[key])} change={value => setPreferences(previous => ({ ...previous, [key]: value === 'true' }))} />)}
     {Object.entries(rideFields).map(([name, label]) => {
       const key = name as keyof typeof rideFields;
       if (key === 'departureAt') {

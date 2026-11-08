@@ -15,15 +15,16 @@ import { Button, Card, colors, Copy, ErrorText, FieldFocus, styles, useAction } 
 const titles: Record<Screen['kind'], string> = {
   group: 'Open Ride Group', wallet: 'Wallet', home: 'Share the journey.', search: 'Find a ride', rides: 'My rides', bookings: 'My bookings',
   notifications: 'Notifications', profile: 'Your profile', vehicles: 'My vehicles',
-  settings: 'Account settings', login: 'Welcome back', register: 'Join FlexirRides', ride: 'Ride details', booking: 'Booking details',
+  settings: 'Account', login: 'Welcome back', register: 'Join FlexirRides', ride: 'Ride details', booking: 'Booking details',
   manifest: 'Passenger bookings', pins: 'Route pins', rideForm: 'Ride offer', vehicleForm: 'Vehicle details',
 };
 const publicScreens = new Set<Screen['kind']>(['home', 'search', 'ride', 'login', 'register']);
 const home: Screen = { kind: 'home' };
 const footer = [
-  { kind: 'rides', label: 'My rides', icon: 'car-outline' },
-  { kind: 'wallet', label: 'Wallet', icon: 'wallet-outline' },
-  { kind: 'settings', label: 'Settings', icon: 'settings-outline' },
+  { kind: 'home', label: 'Home', icon: 'home-outline' },
+  { kind: 'bookings', label: 'My Bookings', icon: 'ticket-outline' },
+  { kind: 'rides', label: 'Offers', icon: 'car-outline' },
+  { kind: 'settings', label: 'Account', icon: 'person-outline' },
 ] as const;
 
 function NativeApp() {
@@ -31,7 +32,6 @@ function NativeApp() {
   const [user, setUser] = useState<User | null>(null);
   const [restoring, setRestoring] = useState(!demoMode);
   const [restoreError, setRestoreError] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scroll = useRef<ScrollView>(null);
   const scrollOffset = useRef(0);
@@ -63,7 +63,6 @@ function NativeApp() {
   const screen = stack[stack.length - 1];
   const go = (next: Screen) => {
     Keyboard.dismiss();
-    setMenuOpen(false);
     setStack(previous => previous[previous.length - 1].kind === next.kind && !('id' in next)
       ? previous : [...previous, next]);
   };
@@ -97,13 +96,12 @@ function NativeApp() {
   }, []);
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (menuOpen) { setMenuOpen(false); return true; }
       if (stack.length <= 1) return false;
       back();
       return true;
     });
     return () => listener.remove();
-  }, [stack.length, menuOpen]);
+  }, [stack.length]);
 
   function content() {
     if (restoring && screen.kind !== 'home' && screen.kind !== 'search') return <Copy>Restoring your session…</Copy>;
@@ -146,7 +144,6 @@ function NativeApp() {
         {demoMode ? null : user ? <View style={styles.row}>
           <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
           <Button label="My rides" onPress={() => go({ kind: 'rides' })} />
-          <Button label="Open Ride Group" onPress={() => go({ kind: 'group' })} />
           <Button label="Wallet" onPress={() => go({ kind: 'wallet' })} />
           <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
           <Button label="Notifications" onPress={() => go({ kind: 'notifications' })} />
@@ -168,22 +165,14 @@ function NativeApp() {
   return <SafeAreaView style={layout.surface}>
     <StatusBar barStyle="dark-content" />
     <View style={layout.header}>
-      {stack.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Back" style={layout.icon} onPress={() => { setMenuOpen(false); back(); }}>
+      {stack.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Back" style={layout.icon} onPress={back}>
         <Ionicons name="arrow-back" size={24} color={colors.accent} />
       </Pressable>}
       <View style={layout.brandGroup}>
         <Image source={require('./assets/flexirrides-icon.png')} style={layout.logo} />
         <Text accessibilityRole="header" style={layout.brand}>FlexirRides</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Account menu" accessibilityState={{ expanded: menuOpen }}
-        style={layout.icon} onPress={() => { Keyboard.dismiss(); setMenuOpen(open => !open); }}>
-        <Ionicons name={menuOpen ? 'close' : 'menu'} size={26} color={colors.accent} />
-      </Pressable>
     </View>
-    {menuOpen && <View style={layout.menu}>
-      <Button label="Profile" onPress={() => go({ kind: 'profile' })} />
-      <Button label="Account settings" onPress={() => go({ kind: 'settings' })} />
-    </View>}
     <KeyboardAvoidingView style={layout.flex} behavior="padding">
       <FieldFocus.Provider value={() => { if (Keyboard.isVisible()) requestAnimationFrame(revealField); }}>
         <ScrollView ref={scroll} key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled"
@@ -201,8 +190,8 @@ function NativeApp() {
       {!demoMode && !keyboardVisible && <View style={layout.footer}>
         {footer.map(({ kind, label, icon }) => <Pressable key={kind} accessibilityRole="tab"
           accessibilityState={{ selected: screen.kind === kind }} onPress={() => {
-            Keyboard.dismiss(); setMenuOpen(false);
-            setStack([home, { kind }]);
+            Keyboard.dismiss();
+            setStack(kind === 'home' ? [home] : [home, { kind }]);
           }} style={layout.tab}>
           <Ionicons name={icon} size={23} color={screen.kind === kind ? colors.accent : colors.muted} />
           <Text style={{ color: screen.kind === kind ? colors.accent : colors.muted }}>{label}</Text>

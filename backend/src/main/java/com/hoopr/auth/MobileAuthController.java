@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.*;
 public class MobileAuthController {
     private final AuthService auth;
     private final LoginLimiter limiter;
+    private final EmailOtpService otp;
 
-    public MobileAuthController(AuthService auth, LoginLimiter limiter) {
+    public MobileAuthController(AuthService auth, LoginLimiter limiter, EmailOtpService otp) {
         this.auth = auth;
         this.limiter = limiter;
+        this.otp = otp;
     }
 
     @PostMapping("/register")
@@ -35,6 +37,17 @@ public class MobileAuthController {
         limiter.check(request.getRemoteAddr());
         var issued = auth.login(body.email, body.password);
         limiter.succeeded(request.getRemoteAddr());
+        return session(issued);
+    }
+    @PostMapping("/otp/request")
+    public EmailOtpService.Challenge requestOtp(@Valid @RequestBody OtpRequests.Request body, HttpServletRequest request) {
+        requireNativeRequest(request); limiter.check(request.getRemoteAddr());
+        return otp.request(body.identifier, body.mobileNumber, body.travelPreference);
+    }
+    @PostMapping("/otp/verify")
+    public ResponseEntity<Session> verifyOtp(@Valid @RequestBody OtpRequests.Verify body, HttpServletRequest request) {
+        requireNativeRequest(request); limiter.check(request.getRemoteAddr());
+        var issued = otp.verify(body.challengeId, body.code); limiter.succeeded(request.getRemoteAddr());
         return session(issued);
     }
 

@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router';
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../../features/auth/AuthContext';
@@ -11,13 +11,7 @@ export function AppLayout() {
   const { user, loading } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [moreOpen, setMoreOpen] = useState(false);
-  const location = useLocation();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    setMoreOpen(false);
-  }, [location.pathname]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -41,13 +35,12 @@ export function AppLayout() {
     try { await logout(); } catch (failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); }
   }
-  const moreIsActive = ['/profile', '/notifications', '/vehicles']
-    .some(path => location.pathname === path || location.pathname.startsWith(`${path}/`));
+
 
   return <div className="app-shell">
     <a className="skip-link" href="#main">Skip to content</a>
     <header className="site-header">
-      <Link className="brand" to="/" aria-label="Hoopr home">hoopr<span aria-hidden="true">↗</span></Link>
+      <Link className="brand" to="/" aria-label="FlexirRides home">FlexirRides<span aria-hidden="true">↗</span></Link>
       <nav aria-label="Main navigation">
         <NavLink to="/rides" end>Find a ride</NavLink>
         {loading ? <span role="status">Loading…</span> : user ? <>
@@ -55,46 +48,30 @@ export function AppLayout() {
           <NavLink to="/rides/mine">My rides</NavLink>
           <NavLink to="/bookings/mine">My bookings</NavLink>
           <NavLink to="/notifications">Notifications</NavLink>
-          <NavLink to="/profile">My profile</NavLink>
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
         </> : demoMode ? <span className="demo-nav-note">Sample app</span> : <><NavLink to="/login">Log in</NavLink>
-          <NavLink className="button button-small" to="/register">Join Hoopr</NavLink></>}
+          <NavLink className="button button-small" to="/register">Join FlexirRides</NavLink></>}
       </nav>
     </header>
     {error && <p role="alert">{error}</p>}
     {demoMode && <p className="demo-banner" role="status">Sample app · Browse demo rides. Accounts and bookings are disabled.</p>}
     <main id="main" tabIndex={-1}><Outlet /></main>
-    <footer><span className="footer-brand">hoopr</span><span>Good company. Shared journeys.</span><span>Shared journeys</span></footer>
+    <footer><span className="footer-brand">FlexirRides</span><span>Good company. Shared journeys.</span><span>Shared journeys</span></footer>
     <nav className="mobile-nav" aria-label="App navigation">
-      <MobileNavLink to="/rides" label="Find" icon="find" end />
-      {loading ? <span className="mobile-nav-loading" role="status">Loading…</span> : user ? <>
-        <MobileNavLink to="/rides/new" label="Offer" icon="offer" end />
-        <MobileNavLink to="/rides/mine" label="My rides" icon="rides" end />
-        <MobileNavLink to="/bookings/mine" label="Bookings" icon="bookings" />
-        <button className={`mobile-nav-item${moreIsActive ? ' active' : ''}`} type="button"
-          aria-expanded={moreOpen} aria-controls="mobile-more-menu" onClick={() => setMoreOpen(open => !open)}>
-          <MobileIcon name="more" /><span className="mobile-nav-label">More</span>
-        </button>
-        {moreOpen && <div className="mobile-more-menu" id="mobile-more-menu" role="menu" aria-label="More">
-          <NavLink role="menuitem" to="/profile" onClick={() => setMoreOpen(false)}>My profile</NavLink>
-          <NavLink role="menuitem" to="/notifications" onClick={() => setMoreOpen(false)}>Notifications</NavLink>
-          <NavLink role="menuitem" to="/vehicles" onClick={() => setMoreOpen(false)}>My vehicles</NavLink>
-          <button role="menuitem" type="button" disabled={busy} onClick={() => { setMoreOpen(false); void signOut(); }}>
-            {busy ? 'Logging out…' : 'Log out'}
-          </button>
-        </div>}
-      </> : demoMode ? <span className="mobile-nav-loading">Sample mode</span> : <>
-        <MobileNavLink to="/login" label="Log in" icon="rides" end />
-        <MobileNavLink to="/register" label="Join" icon="offer" end />
-      </>}
+      <MobileNavLink to="/" label="Home" icon="home" end />
+      <MobileNavLink to="/bookings/mine" label="My Bookings" icon="bookings" />
+      <MobileNavLink to="/rides/mine" label="Offers" icon="offer" />
+      <MobileNavLink to="/profile" label="Account" icon="account" />
     </nav>
   </div>;
 }
 
-type MobileIconName = 'find' | 'offer' | 'rides' | 'bookings' | 'more';
+type MobileIconName = 'home' | 'account' | 'find' | 'offer' | 'rides' | 'bookings' | 'more';
 
 function MobileIcon({ name }: { name: MobileIconName }) {
   const paths: Record<MobileIconName, string> = {
+    home: 'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',
+    account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9a8 8 0 0 1 16 0',
     find: 'M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm5-2 5 5',
     offer: 'M12 5v14M5 12h14',
     rides: 'M5 17h14l1-5-2-5H6l-2 5 1 5Zm0 0v2m14-2v2M5 13h14M7 17h.01M17 17h.01',

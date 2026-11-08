@@ -57,7 +57,8 @@ class RideWebTest {
         verifyNoInteractions(service);
     }
     @Test void searchIsPublicButMineRequiresLogin() throws Exception {
-        when(service.search(any(), any(), any(), anyString(), anyInt(), any(), anyInt(), anyInt()))
+        when(service.search(any(), any(), any(), anyString(), anyInt(), any(), anyInt(), anyInt(),
+                anyString(), any(), any(), any(), anyBoolean(), anyBoolean(), anyBoolean(), any(), any()))
                 .thenReturn(new RideDtos.Results(List.of(), 0, 20, 0, 0));
         mvc.perform(get("/api/v1/rides")).andExpect(status().isOk()).andExpect(jsonPath("$.content").isArray());
         mvc.perform(get("/api/v1/rides/me")).andExpect(status().isUnauthorized());

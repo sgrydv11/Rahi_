@@ -24,7 +24,7 @@ async function account(label) {
   const email = `${label}.${run}@smoke.flexirrides.test`;
   const password = `Smoke!${randomUUID()}`;
   const registration = await request('/mobile/auth/register', {
-    method: 'POST', body: { email, password, fullName: `Smoke ${label}`, travelPreference: 'BOTH' },
+    method: 'POST', body: { email, password, fullName: `Smoke ${label.replace(/[0-9]/g, '')}`, travelPreference: 'BOTH' },
   });
   assert.equal(registration.status, 201);
   const login = await request('/mobile/auth/login', { method: 'POST', body: { email, password } });
@@ -43,20 +43,26 @@ try {
       origin: 'Indore', destination: 'Ujjain',
       departureAt: new Date(Date.now() + 86400000).toISOString(), timeZone: 'Asia/Kolkata',
       totalSeats: 1, pricePerSeat: 120, currency: 'INR', notes: `Local smoke ${run}`,
+      preferences: { boardingPoints: ['Station'], droppingPoints: ['Tower'], hasCar: true, ac: true,
+        flexibleDropoff: true, womenOnly: false, routeType: 'HOME_TO_OFFICE' },
     },
   });
   assert.equal(offered.status, 201);
   const ride = offered.data;
   assert.equal((await request(`/rides/${ride.id}`)).status, 200);
-  const search = await request('/rides?origin=Indore&destination=Ujjain');
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ride.departureAt));
+  const date = ['year', 'month', 'day'].map(type => parts.find(part => part.type === type).value).join('-');
+  const search = await request('/rides?origin=Indore&destination=Ujjain&departureDate=' + date);
   assert.equal(search.status, 200);
   assert.ok(search.data.content.some(entry => entry.id === ride.id));
   const candidates = [first, second].map(session => ({ session, key: randomUUID() }));
+  const bookingBody = { seats: 1, rideVersion: ride.version, details: { boardingPoint: 'Station', droppingPoint: 'Tower',
+    passengers: [{ name: 'Smoke Passenger', age: 25, gender: 'FEMALE' }] } };
   const attempts = await Promise.all(candidates.map(async candidate => ({
     ...candidate,
     result: await request(`/rides/${ride.id}/bookings`, {
       token: candidate.session.accessToken, key: candidate.key, method: 'POST',
-      body: { seats: 1, rideVersion: ride.version },
+      body: bookingBody,
     }),
   })));
   assert.deepEqual(attempts.map(attempt => attempt.result.status).sort(), [201, 409]);
@@ -64,7 +70,7 @@ try {
   const booking = winner.result.data;
   const replay = await request(`/rides/${ride.id}/bookings`, {
     token: winner.session.accessToken, key: winner.key, method: 'POST',
-    body: { seats: 1, rideVersion: ride.version },
+    body: bookingBody,
   });
   assert.equal(replay.status, 200);
   assert.equal(replay.data.id, booking.id);

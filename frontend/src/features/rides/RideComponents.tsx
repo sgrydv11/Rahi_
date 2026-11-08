@@ -3,7 +3,10 @@ import { departureLabel, money, type Ride } from './api';
 export function RideCard({ ride }: { ride: Ride }) {
   return <article className="panel ride-card">
     <div><p className="eyebrow">{ride.status}</p><h2><Link to={`/rides/${ride.id}`}>{ride.origin} → {ride.destination}</Link></h2>
-      <p>{departureLabel(ride)}</p><p>Driver: {ride.driver.displayName}</p></div>
+      <p>{departureLabel(ride)}</p><p>Driver: {ride.driver.displayName}</p>
+      <p>{ride.driverRating ? `${ride.driverRating.toFixed(1)} / 5` : 'No ratings yet'}{ride.preferences?.ac ? ' · AC' : ''}{ride.preferences?.womenOnly ? ' · Women only' : ''}{ride.preferences?.flexibleDropoff ? ' · Flexible drop-off' : ''}</p>
+      {ride.reviews?.map((review, index) => <blockquote key={index}>{review.score}/5 {review.text}</blockquote>)}
+    </div>
     <div><p><strong>{money(ride)}</strong> per seat</p><p>{ride.availableSeats} of {ride.totalSeats} seats available</p>
       <Link className="button button-small" to={`/rides/${ride.id}`}>View ride</Link></div>
   </article>;

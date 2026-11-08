@@ -165,3 +165,37 @@ Release verification checkpoint e1254b7 is pushed. GitHub CI https://github.com/
 Google verification results: backend regression reports total 123 tests with 0 failures and 0 errors. Full suite passed, then the final token-validator/web-security changes were retested and packaged. Frontend 53 tests and production web build passed. V15 was validated in an isolated schema. Local backend restart is applying V15 to the development database. Real Google sign-in is pending the user's public OAuth Web Client ID and origin configuration.
 
 Google checkpoint cc4da23 is pushed to app_v1. Local backend restarted successfully and applied V15 to the development public schema. GET /api/v1/auth/google/config returns an empty clientId as expected before setup. A CSRF-protected Google sign-in attempt returned the intended 503 setup-required response. Real-account verification and Render configuration remain pending the OAuth Web Client ID.
+
+User-authorized Android preview APK build completed successfully on 7 November 2026. Expo build c133660a-1edb-42a9-a8df-46485f57eb67. Install URL https://expo.dev/accounts/ydvsgr11s-team/projects/sagar-yadav/builds/c133660a-1edb-42a9-a8df-46485f57eb67 . Uses the configured Render API. Google sign-in remains a web-only implementation pending OAuth configuration. Device installation and runtime acceptance remain pending.
+
+## Requested ride and OTP changes — 9 November 2026
+
+Work in progress on app_v1. No deployment or APK has yet been produced for this batch.
+
+- Implemented: email OTP signup/login (no name/password UI), mobile collection unverified, guest email verification; women-only rides; staged boarding/drop and passenger details; server-owned fares; city-gated search, date shortcuts/calendar, time/range, sort and preference filters; car/AC/route/flexible-stop offering; public reviews and completion rating; four footer tabs and hidden timezone UI.
+- Added Flyway V16 (ride preferences, passenger snapshots and review text) and V17 (email challenges and unverified mobile). Existing records preserved with legacy compatibility.
+- Verified: 53 frontend tests and production build; 20 mobile tests and TypeScript; focused backend OTP and ride integration/security tests. Full backend suite/package currently running in isolated hoopr_test schema.
+- User confirmed email OTP first, SMS later, and Women means women-only rides. Real email sending requires Resend API key and sender domain in Render. Never commit or print these secrets. Setup guide is EMAIL_OTP_SETUP.md.
+- Pending: full backend regression, new OTP client regressions, packaged-server smoke, browser/device acceptance, push, Render deployment/migrations and explicit-request Android preview build. Email delivery and real-account end-to-end verification await user provider setup.
+- Mobile-number login is not enabled while SMS is unavailable. Do not claim the collected number is verified. Existing password APIs are retained for older installed APK compatibility; new UI uses email OTP.
+
+### Consolidated request coverage
+
+| Request | Implementation | Acceptance remaining |
+| --- | --- | --- |
+| BUG-001 / CR-001 / CR-002 / CR-017 | Input validation; name-free email OTP signup and login; mobile collected | Real email provider delivery; mobile login/SMS deferred |
+| CR-003 | Guest verifies email and collects mobile before booking | Live sender/device journey |
+| CR-004 / CR-016 / CR-018 | Server-owned fare, offered stop selection, passenger name/age/gender and recent passenger reuse | Device journey |
+| BUG-005 / CR-005 / CR-006 / CR-007 | City-gated search; Today/Tomorrow/Calendar; exact time/ranges; women-only | Device usability |
+| CR-008 / CR-009 / CR-010 / CR-015 | Separate results, six sorts, time/stop/AC/flexible filters | Device usability |
+| CR-011 / CR-021 / CR-022 | Car declaration, stops, nearby-drop preference, transparent price message and route types | Driver acceptance |
+| CR-013 / CR-014 | Four footer tabs; top account/settings removed; timezone hidden | Device layout |
+| CR-019 / CR-020 | Reviews in results and completion-rating modal | Completion/device journey |
+
+Final automated reports after affected-test rerun: 131 backend tests, zero failures/errors; 54 web tests and web build; 22 mobile tests and TypeScript; Android and iOS bundle exports passed. Initial full backend run found whitespace name validation regression and an obsolete search mock; both corrected, affected 36 tests passed. Packaged-server smoke is in progress on schema smoke_20261109003829, port 8082.
+
+Expo Android preview build submitted: e766971b-f75a-4c3e-8b35-82bf6b02d6cc. Build source contains current mobile changes. Await final status before reporting a download.
+
+Render browser access remains unavailable: broad inventory was rejected by automatic review because private Gmail was open; targeted Chrome Render access reported browser unavailable. No Render API/deploy hook is configured. Do not claim production deployment has succeeded. Browser acceptance verified local city/date results navigation and email/mobile-only registration form. Resend sender setup and real OTP delivery remain pending.
+
+Packaged server smoke passed registration, legacy-compatible login, publish/search/details, last-seat concurrency, idempotent replay, private history, cancellation and inventory restoration on isolated schema. Unconfigured native email OTP correctly returned HTTP 503. Smoke account fixture names were updated to satisfy the newly enforced name validation. Existing local main server is being restarted with V16/V17; no production database was modified in local verification.

@@ -9,6 +9,9 @@ import java.util.UUID;
 
 @Entity @Table(name = "bookings")
 public class Booking {
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "journey_details", columnDefinition = "jsonb") public BookingDtos.JourneyDetails journeyDetails;
+    @Column(name = "review_text", length = 1000) public String reviewText;
     @Id public UUID id;
     @Column(name = "ride_id", nullable = false, updatable = false) public UUID rideId;
     @Column(name = "passenger_id", nullable = false, updatable = false) public UUID passengerId;

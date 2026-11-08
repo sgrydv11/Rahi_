@@ -73,6 +73,14 @@ export async function loginWithGoogle(credential: string, travelPreference: Trav
   const next = await mutate<Session>('/auth/google', { credential, travelPreference });
   publish(next);
 }
+export function requestEmailOtp(identifier: string, mobileNumber?: string, travelPreference: TravelPreference = 'PASSENGER') {
+  return mutate<{ challengeId: string; expiresIn: number; delivery: string }>('/auth/otp/request', { identifier, mobileNumber, travelPreference });
+}
+export async function verifyEmailOtp(challengeId: string, code: string) {
+  if (refreshPending) await refreshPending.catch(() => {});
+  generation++;
+  const next = await mutate<Session>('/auth/otp/verify', { challengeId, code }); publish(next);
+}
 export async function logout() {
   generation++;
   if (refreshPending) await refreshPending.catch(() => {});

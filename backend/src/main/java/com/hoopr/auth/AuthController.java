@@ -18,7 +18,7 @@ public class AuthController {
         @NotBlank @Size(max = 72) public String password;
     }
     public static class RegisterRequest extends LoginRequest {
-        @NotBlank @Size(max = 120) public String fullName;
+        @NotBlank @Size(max = 120) @Pattern(regexp = "\\p{L}[\\p{L}\\p{M} .'-]{0,119}") public String fullName;
         @NotNull public com.hoopr.user.TravelPreference travelPreference = com.hoopr.user.TravelPreference.BOTH;
         @Override public String toString() { return "RegisterRequest[redacted]"; }
     }
@@ -28,10 +28,12 @@ public class AuthController {
     private final Clock clock;
     private final GoogleSignInService googleSignIn;
     private final GoogleTokenVerifier googleVerifier;
+    private final EmailOtpService otp;
     public AuthController(AuthService auth, AuthSettings settings, LoginLimiter limiter, Clock clock,
-            GoogleSignInService googleSignIn, GoogleTokenVerifier googleVerifier) {
+            GoogleSignInService googleSignIn, GoogleTokenVerifier googleVerifier, EmailOtpService otp) {
         this.auth = auth; this.settings = settings; this.limiter = limiter; this.clock = clock;
         this.googleSignIn = googleSignIn; this.googleVerifier = googleVerifier;
+        this.otp = otp;
     }
     @GetMapping("/csrf") public java.util.Map<String, String> csrf(CsrfToken token) {
         return java.util.Map.of("token", token.getToken(), "headerName", token.getHeaderName());
@@ -48,6 +50,17 @@ public class AuthController {
             HttpServletRequest request, HttpServletResponse response) {
         limiter.check(request.getRemoteAddr());
         var issued = googleSignIn.signIn(body.credential, body.travelPreference);
+        limiter.succeeded(request.getRemoteAddr());
+        return respond(issued, response);
+    }
+    @PostMapping("/otp/request") public EmailOtpService.Challenge requestOtp(@Valid @RequestBody OtpRequests.Request body, HttpServletRequest request) {
+        limiter.check(request.getRemoteAddr());
+        return otp.request(body.identifier, body.mobileNumber, body.travelPreference);
+    }
+    @PostMapping("/otp/verify") public AuthService.Access verifyOtp(@Valid @RequestBody OtpRequests.Verify body,
+            HttpServletRequest request, HttpServletResponse response) {
+        limiter.check(request.getRemoteAddr());
+        var issued = otp.verify(body.challengeId, body.code);
         limiter.succeeded(request.getRemoteAddr());
         return respond(issued, response);
     }

@@ -16,7 +16,9 @@ const ride: Ride = {
 describe('ride UI', () => {
   it('renders a labelled creation form with seat and money limits and no owner input', () => {
     const html = renderToString(<RideForm save={async () => {}} />);
-    expect(html).toContain('Leaving from'); expect(html).toContain('Going to'); expect(html).toContain('Departure (');
+    expect(html).toContain('Leaving from'); expect(html).toContain('Going to'); expect(html).toContain('Departure');
+    expect(html).toContain('Do you have a car?'); expect(html).toContain('Boarding points');
+    expect(html).toContain('Car has AC'); expect(html).toContain('Home to Office');
     expect(html).toContain('min="1"'); expect(html).toContain('max="6"'); expect(html).toContain('step="0.01"');
     expect(html).toContain('Offer this ride'); expect(html).not.toContain('name="driverId"');
   });

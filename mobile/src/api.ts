@@ -6,16 +6,24 @@ export interface User { id: string; fullName: string; email: string; role: strin
 export interface Page<T> { content: T[]; page: number; totalPages: number }
 export interface Point { latitude: number; longitude: number }
 export interface Pins { pickup: Point; dropoff: Point }
+export interface RidePreferences {
+  boardingPoints: string[]; droppingPoints: string[]; hasCar: boolean | null; ac: boolean | null;
+  flexibleDropoff: boolean; womenOnly: boolean; routeType: 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER';
+}
+export interface Passenger { name: string; age: number; gender: 'FEMALE' | 'MALE' | 'OTHER' }
+export interface JourneyDetails { boardingPoint: string; droppingPoint: string; passengers: Passenger[] }
 export interface Ride {
   id: string; origin: string; destination: string; driver: { id: string; displayName: string };
   departureAt: string; timeZone: string; status: string; totalSeats: number; availableSeats: number;
   pricePerSeat: number; currency: string; version: number; canStart: boolean;
   pickupDescription?: string; dropoffDescription?: string; vehicleDetails?: string; notes?: string;
   cancellationReason?: string; route?: Pins; startedAt?: string; completedAt?: string;
+  preferences?: RidePreferences; driverRating?: number; reviews?: { score: number; text?: string }[];
 }
 export interface Booking {
   id: string; status: string; seats: number; totalPrice: number; currency: string; canCancel: boolean;
-  passenger: { id: string; displayName: string }; rating?: { score: number }; cancellationReason?: string;
+  passenger: { id: string; displayName: string }; rating?: { score: number; review?: string }; cancellationReason?: string;
+  details?: JourneyDetails;
   ride: { id: string; driverId: string; origin: string; destination: string; departureAt: string; status: string; route?: Pins };
 }
 export interface Vehicle {
@@ -110,6 +118,14 @@ export async function login(email: string, password: string) {
 export async function register(email: string, password: string, fullName: string, travelPreference: Preference) {
   await request<User>('/mobile/auth/register', { method: 'POST', body: { email, password, fullName, travelPreference } });
   return login(email, password);
+}
+export function requestEmailOtp(identifier: string, mobileNumber?: string, travelPreference: Preference = 'PASSENGER') {
+  return request<{ challengeId: string; expiresIn: number; delivery: string }>('/mobile/auth/otp/request', {
+    method: 'POST', body: { identifier, mobileNumber, travelPreference },
+  });
+}
+export async function verifyEmailOtp(challengeId: string, code: string) {
+  return (await save(await request<Session>('/mobile/auth/otp/verify', { method: 'POST', body: { challengeId, code } }))).user;
 }
 export async function logout() {
   if (pending) await pending.catch(() => {});

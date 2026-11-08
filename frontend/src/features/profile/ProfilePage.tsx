@@ -15,6 +15,9 @@ export function ProfilePage() {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    if (!/^\p{L}[\p{L}\p{M} .'-]{0,119}$/u.test(String(data.get('fullName') || '').trim())) {
+      setError('Enter a valid name using letters, spaces, apostrophes or hyphens.'); return;
+    }
     setBusy(true);
     setSaved(false);
     setError('');

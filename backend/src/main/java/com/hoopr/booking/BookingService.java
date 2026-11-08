@@ -28,12 +28,16 @@ public class BookingService {
     }
     @Transactional
     public Created create(UUID rideId, UUID passenger, UUID requestKey, int seats, Long expectedVersion) {
+        return create(rideId, passenger, requestKey, seats, expectedVersion, null);
+    }
+    @Transactional
+    public Created create(UUID rideId, UUID passenger, UUID requestKey, int seats, Long expectedVersion, JourneyDetails details) {
         active(passenger);
         Ride ride = lockRide(rideId);
         var replay = bookings.findByPassengerIdAndIdempotencyKey(passenger, requestKey);
         if (replay.isPresent()) {
             Booking previous = replay.get();
-            if (!previous.rideId.equals(rideId) || previous.seatsBooked != seats)
+            if (!previous.rideId.equals(rideId) || previous.seatsBooked != seats || !Objects.equals(previous.journeyDetails, details))
                 throw new BookingFailure(409, "Idempotency key was already used for a different booking request.");
             return new Created(view(previous), true);
         }
@@ -43,6 +47,15 @@ public class BookingService {
         futureScheduled(ride);
         requireConsistentSeats(ride);
         if (seats < 1 || seats > 6 || seats > ride.totalSeats) throw new BookingFailure(400, "Choose a valid number of seats for this ride.");
+        if (ride.preferences != null && details == null) throw new BookingFailure(400, "Select boarding, dropping and passenger details.");
+        if (details != null) {
+            var preferences = RidePreferences.forRide(ride);
+            if (!preferences.boardingPoints().contains(details.boardingPoint()) || !preferences.droppingPoints().contains(details.droppingPoint()))
+                throw new BookingFailure(400, "Select boarding and dropping points offered by the driver.");
+            if (details.passengers().size() != seats) throw new BookingFailure(400, "Provide details for each passenger seat.");
+            if (preferences.womenOnly() && details.passengers().stream().anyMatch(person -> person.gender() != Gender.FEMALE))
+                throw new BookingFailure(400, "This ride is for women passengers only.");
+        }
         if (bookings.existsByRideIdAndPassengerIdAndStatus(rideId, passenger, "CONFIRMED"))
             throw new BookingFailure(409, "You already have an active booking on this ride. View My Bookings.");
         if (groupSeats.hasHold(rideId, passenger, clock.instant().atOffset(ZoneOffset.UTC)))
@@ -51,6 +64,7 @@ public class BookingService {
         Booking booking = new Booking(); booking.id = UUID.randomUUID(); booking.rideId = rideId;
         booking.ride = ride; booking.passengerId = passenger; booking.passengerProfile = profiles.findById(passenger).orElse(null);
         booking.seatsBooked = (short) seats; booking.pricePerSeatSnapshot = ride.pricePerSeat;
+        booking.journeyDetails = details;
         booking.currency = ride.currency; booking.status = "CONFIRMED"; booking.idempotencyKey = requestKey;
         booking.createdAt = booking.updatedAt = clock.instant();
         ride.availableSeats -= (short) seats; ride.updatedAt = clock.instant();
@@ -77,6 +91,12 @@ public class BookingService {
     }
     @Transactional
     public View rate(UUID id, UUID passenger, int score) {
+        return rate(id, passenger, score, null);
+    }
+    @Transactional
+    public View rate(UUID id, UUID passenger, int score, String review) {
+        review = optional(review);
+        if (review != null && review.length() > 1000) throw new BookingFailure(400, "Review must be at most 1000 characters.");
         active(passenger);
         UUID rideId = bookings.rideIdFor(id).orElseThrow(() -> new BookingFailure(404, "Booking not found."));
         Ride ride = lockRide(rideId);
@@ -88,10 +108,11 @@ public class BookingService {
         if (score < 1 || score > 5)
             throw new BookingFailure(400, "Choose a score from 1 to 5.");
         if (booking.driverRating != null) {
-            if (booking.driverRating == score) return view(booking);
+            if (booking.driverRating == score && Objects.equals(booking.reviewText, review)) return view(booking);
             throw new BookingFailure(409, "A rating has already been submitted for this booking.");
         }
         booking.driverRating = score;
+        booking.reviewText = review;
         booking.ratedAt = booking.updatedAt = clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         bookings.flush();
         return view(booking);
@@ -148,13 +169,13 @@ public class BookingService {
                 ride.getTimeZone(), "PUBLISHED".equals(ride.getStatus()) ? "SCHEDULED" : ride.getStatus(), RideDtos.routePins(ride));
         boolean canCancel = "CONFIRMED".equals(booking.status) && List.of("SCHEDULED", "PUBLISHED").contains(ride.getStatus())
                 && ride.getDepartureAt().isAfter(clock.instant());
-        Rating rating = booking.driverRating == null ? null : new Rating(booking.driverRating, booking.ratedAt);
+        Rating rating = booking.driverRating == null ? null : new Rating(booking.driverRating, booking.ratedAt, booking.reviewText);
         return new View(booking.id, journey, new Person(booking.passengerId, name), booking.seatsBooked,
                 booking.pricePerSeatSnapshot, booking.paidFarePaise == null
                         ? booking.pricePerSeatSnapshot.multiply(java.math.BigDecimal.valueOf(booking.seatsBooked))
                         : java.math.BigDecimal.valueOf(booking.paidFarePaise, 2),
                 booking.currency, booking.status, booking.version, canCancel, booking.createdAt, booking.updatedAt,
-                booking.cancelledAt, booking.cancellationReason, rating);
+                booking.cancelledAt, booking.cancellationReason, rating, booking.journeyDetails);
     }
     private Results results(Page<Booking> page) {
         return new Results(page.getContent().stream().map(this::view).toList(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());

@@ -35,6 +35,7 @@ class AuthWebTest {
     @Autowired JwtDecoder decoder;
     @MockitoBean AuthService auth;
     @MockitoBean GoogleSignInService googleSignIn;
+    @MockitoBean EmailOtpService emailOtp;
     @MockitoBean com.hoopr.ride.RideService rides;
     @MockitoBean com.hoopr.ride.RideRepository rideRepository;
     @MockitoBean com.hoopr.booking.BookingService bookings;
@@ -111,7 +112,7 @@ class AuthWebTest {
         mvc.perform(get("/api/v1/auth/google/config")).andExpect(status().isOk()).andExpect(jsonPath("$.clientId").value(""));
     }
     @Test void cookieWritesRequireCsrfAndTrustedOriginEvenWithBearerHeader() throws Exception {
-        for (String path : List.of("register", "login", "refresh", "logout", "google")) {
+        for (String path : List.of("register", "login", "refresh", "logout", "google", "otp/request", "otp/verify")) {
             mvc.perform(post("/api/v1/auth/" + path).header("Origin", "http://localhost:5173"))
                     .andExpect(status().isForbidden());
             mvc.perform(write(path).with(r -> { r.removeHeader("Origin"); return r; })).andExpect(status().isForbidden());
@@ -121,6 +122,24 @@ class AuthWebTest {
         mvc.perform(post("/api/v1/auth/logout").header("Origin", "http://localhost:5173").header("Authorization", "Bearer anything"))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(auth);
+    }
+    @Test void emailOtpUsesSecureWebSessionAndValidatesCodes() throws Exception {
+        UUID challenge = UUID.randomUUID();
+        when(emailOtp.request("alice@example.test", "+919876543210", com.hoopr.user.TravelPreference.PASSENGER))
+                .thenReturn(new EmailOtpService.Challenge(challenge, 300, "EMAIL"));
+        mvc.perform(write("otp/request").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"alice@example.test\",\"mobileNumber\":\"+919876543210\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.delivery").value("EMAIL"));
+        when(emailOtp.verify(challenge, "123456")).thenReturn(new AuthService.Issued(
+                new AuthService.Access("otp-access", "Bearer", 900, profile()), "c".repeat(43), Instant.now().plusSeconds(1000)));
+        mvc.perform(write("otp/verify").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"challengeId\":\"" + challenge + "\",\"code\":\"123456\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value("otp-access"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", allOf(containsString("HttpOnly"), containsString("Secure"))));
+        mvc.perform(write("otp/verify").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"challengeId\":\"" + challenge + "\",\"code\":\"bad\"}"))
+                .andExpect(status().isBadRequest());
     }
     @Test void corsPermitsOnlyTrustedOrigins() throws Exception {
         mvc.perform(options("/api/v1/auth/login").header("Origin", "http://localhost:5173")

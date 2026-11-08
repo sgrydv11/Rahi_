@@ -94,7 +94,8 @@ public class SecurityConfig {
                 .csrf(c -> c.csrfTokenRepository(csrfRepo).csrfTokenRequestHandler(csrfHandler)
                         .ignoringRequestMatchers(r -> "POST".equals(r.getMethod()) &&
                                 Set.of("/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
-                                        "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout")
+                                        "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout",
+                                        "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify")
                                         .contains(r.getRequestURI().substring(r.getContextPath().length())))
                         // Only bearer-authenticated business requests bypass CSRF, never cookie auth routes.
                         .ignoringRequestMatchers(r -> !r.getRequestURI().startsWith(r.getContextPath() + "/api/v1/auth/")
@@ -111,10 +112,12 @@ public class SecurityConfig {
                 }, CsrfFilter.class)
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.POST, "/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
-                                "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout").permitAll()
+                                "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout",
+                                "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/google/config").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
-                                "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/google").permitAll()
+                                "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/google",
+                                "/api/v1/auth/otp/request", "/api/v1/auth/otp/verify").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me", "/api/v1/vehicles/{id}").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/vehicles").hasAnyRole("USER", "ADMIN")

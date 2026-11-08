@@ -20,13 +20,20 @@ describe('foundation pages', () => {
     expect(html).toContain(title);
     expect(html).toContain('Main navigation');
     expect(html).toContain('App navigation');
-    expect(html).toContain('>Find</span>');
+    expect(html).toContain('>Home</span>');
+    expect(html).toContain('My Bookings');
+    expect(html).toContain('>Offers</span>');
+    expect(html).toContain('>Account</span>');
     expect(html).toContain('Skip to content');
     if (path === '/login' || path === '/register') expect(html).toContain('Continue with Google');
     if (path === '/register') {
       expect(html).toContain('Offer a seat (Driver)');
       expect(html).toContain('Find a seat (Passenger)');
       expect(html).toContain('Both — offer and find seats');
+      expect(html).toContain('Mobile number');
+      expect(html).not.toContain('Full name');
+      expect(html).not.toContain('type="password"');
     }
+    if (path === '/rides') { expect(html).toContain('Today'); expect(html).toContain('Tomorrow'); expect(html).toContain('Women-only'); expect(html).not.toContain('time zone'); }
   });
 });

@@ -5,6 +5,21 @@ describe('auth session client', () => {
   const user = { id: 'test-user', email: 'a@example.test', fullName: 'Alice', role: 'USER', travelPreference: 'BOTH' };
   const csrf = () => Response.json({ token: 'csrf-value', headerName: 'X-XSRF-TOKEN' });
   const session = () => Response.json({ accessToken: 'access-value', expiresIn: 900, user });
+  it('requests an email code and verifies it with CSRF before establishing a session', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(Response.json({ challengeId: 'challenge', expiresIn: 300, delivery: 'EMAIL' }))
+      .mockResolvedValueOnce(session());
+    vi.stubGlobal('fetch', fetcher);
+    const auth = await import('./auth');
+    await auth.requestEmailOtp('a@example.test', '+919876543210');
+    expect(JSON.parse(fetcher.mock.calls[1][1]?.body as string)).toEqual({
+      identifier: 'a@example.test', mobileNumber: '+919876543210', travelPreference: 'PASSENGER',
+    });
+    await auth.verifyEmailOtp('challenge', '123456');
+    expect(fetcher.mock.calls[2][0]).toBe('/api/v1/auth/otp/verify');
+    expect(new Headers(fetcher.mock.calls[2][1]?.headers).get('X-XSRF-TOKEN')).toBe('csrf-value');
+    expect(auth.authStore.snapshot()).toEqual(user);
+  });
   it('validates email, length and BCrypt byte boundaries', async () => {
     const { validateCredentials } = await import('./auth');
     expect(validateCredentials('bad', 'long-password', true)).toContain('email');

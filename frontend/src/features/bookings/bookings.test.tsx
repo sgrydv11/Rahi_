@@ -10,8 +10,8 @@ const ride = { id: 'ride', driver: { id: 'driver' }, status: 'SCHEDULED', depart
 describe('booking controls', () => {
   beforeEach(() => { state.user = null; });
   const render = (value = ride) => renderToString(<MemoryRouter><BookSeats ride={value} /></MemoryRouter>);
-  it('asks visitors to log in and hides booking on cancelled rides', () => {
-    expect(render()).toContain('Log in to book seats'); expect(render({ ...ride, status: 'CANCELLED' })).toBe('');
+  it('starts the booking verification flow and hides booking on cancelled rides', () => {
+    expect(render()).toContain('Book Seat'); expect(render({ ...ride, status: 'CANCELLED' })).toBe('');
   });
   it('never offers self-booking or seats on a full ride', () => {
     state.user = { id: 'driver' }; expect(render()).toBe('');
@@ -25,10 +25,9 @@ describe('booking controls', () => {
     state.user = { id: 'passenger' };
     expect(render({ ...ride, departureAt: '2000-01-01T10:00:00Z' })).toBe('');
   });
-  it('shows available seat choices, the total, and review before confirmation', () => {
+  it('requires Book Seat before showing stop and passenger choices', () => {
     state.user = { id: 'passenger' }; const html = render();
-    expect(html).toContain('Review booking'); expect(html).toContain('INR'); expect(html).toContain('125.50');
-    expect(html).toContain('value="2"'); expect(html).not.toContain('value="3"'); expect(html).toContain('No payment is collected');
+    expect(html).toContain('Book Seat'); expect(html).not.toContain('name="amount"');
   });
 });
 

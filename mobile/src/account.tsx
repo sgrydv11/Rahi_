@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { api, login, register, type Preference, type User, type Vehicle } from './api';
+import { api, requestEmailOtp, verifyEmailOtp, type Preference, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
 import { Button, Card, Copy, ErrorText, Field, QueryState, styles, useAction, useQuery } from './ui';
 
@@ -13,23 +13,47 @@ function Preferences({ value, change }: { value: Preference; change: (value: Pre
 }
 export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user: User) => void; go: Navigate }) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [preference, setPreference] = useState<Preference>('BOTH');
+  const [mobile, setMobile] = useState('');
+  const [code, setCode] = useState('');
+  const [challenge, setChallenge] = useState('');
+  const [wait, setWait] = useState(0);
+  const [preference, setPreference] = useState<Preference>('PASSENGER');
   const action = useAction();
-  function submit() {
-    void action.run(async () => {
-      if (!email.trim() || !password || (create && (!name.trim() || password.length < 12)))
-        throw new Error(create ? 'Enter a name, email and password of at least 12 characters.' : 'Enter your email and password.');
-      onUser(await (create ? register(email.trim(), password, name.trim(), preference) : login(email.trim(), password)));
-    });
+  useEffect(() => {
+    if (!wait) return;
+    const timer = setTimeout(() => setWait(value => Math.max(0, value - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [wait]);
+  async function send() {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 254)
+      throw new Error('Enter a valid email address.');
+    const number = mobile.replace(/[ ()-]/g, '');
+    if (create && !/^(?:[6-9][0-9]{9}|\+[1-9][0-9]{7,14})$/.test(number))
+      throw new Error('Enter a valid mobile number with country code for numbers outside India.');
+    const next = await requestEmailOtp(email.trim(), number || undefined, preference);
+    setChallenge(next.challengeId); setCode(''); setWait(60);
   }
   return <Card>
-    {create && <><Field label="Full name" value={name} change={setName} /><Preferences value={preference} change={setPreference} /></>}
-    <Field label="Email" value={email} change={setEmail} />
-    <Field label="Password" value={password} change={setPassword} secret />
+    {!challenge ? <>
+      <Field label="Email address" value={email} change={setEmail} />
+      {create && <>
+        <Field label="Mobile number" value={mobile} change={setMobile} />
+        <Preferences value={preference} change={setPreference} />
+        <Copy>We verify your email now. Mobile verification will follow when SMS is available.</Copy>
+      </>}
+      <Button label={action.busy ? 'Sending…' : 'Send email OTP'} disabled={action.busy}
+        onPress={() => void action.run(send)} />
+    </> : <>
+      <Copy>Enter the code sent to your email. It expires in 5 minutes.</Copy>
+      <Field label="Email code" value={code} numeric change={value => setCode(value.replace(/\D/g, '').slice(0, 6))} />
+      <Button label={action.busy ? 'Verifying…' : 'Verify and continue'} disabled={action.busy} onPress={() => void action.run(async () => {
+        if (!/^[0-9]{6}$/.test(code)) throw new Error('Enter the six-digit email code.');
+        onUser(await verifyEmailOtp(challenge, code));
+      })} />
+      <Button label={wait ? 'Resend in ' + wait + 's' : 'Resend code'} disabled={action.busy || wait > 0} onPress={() => void action.run(send)} />
+      <Button label="Change email" disabled={action.busy} onPress={() => { setChallenge(''); setCode(''); }} />
+    </>}
     <ErrorText message={action.error} />
-    <Button label={create ? 'Register' : 'Sign in'} disabled={action.busy} onPress={submit} />
     <Button label={create ? 'Already have an account?' : 'Create an account'} disabled={action.busy}
       onPress={() => go({ kind: create ? 'login' : 'register' })} />
   </Card>;
@@ -47,6 +71,7 @@ export function Profile({ user, onUser, go }: { user: User; onUser: (user: User)
     <ErrorText message={action.error} />
     {saved && <Copy>Profile saved.</Copy>}
     <Button label="Save profile" disabled={action.busy} onPress={() => void action.run(async () => {
+      if (!/^\p{L}[\p{L}\p{M} .'-]{0,119}$/u.test(name.trim())) throw new Error('Enter a valid name using letters, spaces, apostrophes or hyphens.');
       onUser(await api<User>('/users/me', { method: 'PATCH', body: { fullName: name.trim(), travelPreference: preference } }));
       setSaved(true);
     })} />
