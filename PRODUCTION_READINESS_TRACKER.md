@@ -199,3 +199,17 @@ Expo Android preview build submitted: e766971b-f75a-4c3e-8b35-82bf6b02d6cc. Buil
 Render browser access remains unavailable: broad inventory was rejected by automatic review because private Gmail was open; targeted Chrome Render access reported browser unavailable. No Render API/deploy hook is configured. Do not claim production deployment has succeeded. Browser acceptance verified local city/date results navigation and email/mobile-only registration form. Resend sender setup and real OTP delivery remain pending.
 
 Packaged server smoke passed registration, legacy-compatible login, publish/search/details, last-seat concurrency, idempotent replay, private history, cancellation and inventory restoration on isolated schema. Unconfigured native email OTP correctly returned HTTP 503. Smoke account fixture names were updated to satisfy the newly enforced name validation. Existing local main server is being restarted with V16/V17; no production database was modified in local verification.
+
+Checkpoint 6208577 is pushed to origin/app_v1. Local main API is healthy on 8081, frontend 5173, and public development schema is at V17. Expo Android APK build e766971b-f75a-4c3e-8b35-82bf6b02d6cc succeeded; install URL https://expo.dev/accounts/ydvsgr11s-team/projects/sagar-yadav/builds/e766971b-f75a-4c3e-8b35-82bf6b02d6cc . No physical-device acceptance yet.
+
+Render access recovered by targeting the existing known Render tab in the in-app browser (Chrome is unavailable). Auto-deploy dep-dbocia2vcj2c73985240 for 6208577 is running. Production logs confirm V16/V17 were successfully applied to public schema, now V17. Wait for successful health and final deployment status before marking complete. GitHub workflow 42513701757 has passed mobile/frontend; backend is running. Live OTP delivery still awaits Resend setup.
+
+### Release outcome — 9 November 2026
+
+- Render deployment dep-dbocia2vcj2c73985240 for 6208577 succeeded and is Live. Production logs confirm both additive migrations applied, public schema now V17.
+- Live checks passed: API health UP, missing-city search returns zero rides, Indore–Ujjain selected-date search returns rides with preferences, invalid OTP identifier returns HTTP 400. No live account/booking/ride was created by these checks.
+- GitHub workflow https://github.com/sgrydv11/Rahi_/actions/runs/42513701757 completed successfully: mobile, frontend, backend including packaged-server HTTP smoke.
+- Expo Android preview APK succeeded: https://expo.dev/accounts/ydvsgr11s-team/projects/sagar-yadav/builds/e766971b-f75a-4c3e-8b35-82bf6b02d6cc . Physical Android installation and acceptance remain pending. iOS bundle export passed; no signed iOS app was requested/built in this batch.
+- Local frontend http://localhost:5173 and backend http://localhost:8081 are running, development DB V17. Temporary smoke server stopped.
+- Still pending: user configures RESEND_API_KEY and OTP_EMAIL_FROM in Render following EMAIL_OTP_SETUP.md; then real signup/login/guest OTP delivery acceptance. Mobile number collection is unverified; SMS and mobile-number sign-in remain deferred. Google sign-in still needs its prior OAuth configuration.
+- Do not describe this as full production acceptance: real provider delivery and physical-device end-to-end checks have not happened. No OTP or API key is stored in the tracker.
