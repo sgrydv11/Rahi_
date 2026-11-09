@@ -3,7 +3,7 @@ services:
     name: hoopr-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: .
     healthCheckPath: /actuator/health
     envVars:
       - key: DB_URL

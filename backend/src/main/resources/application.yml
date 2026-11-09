@@ -43,7 +43,7 @@ hoopr:
   auth:
     jwt-secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:hoopr}
-    origins: ${FRONTEND_ORIGINS:http://localhost:5173,https://localhost}
+    origins: ${FRONTEND_ORIGINS:http://localhost:5173,https://localhost},${RENDER_EXTERNAL_URL:http://localhost:5173}
     cookie-secure: ${AUTH_COOKIE_SECURE:true}
     cookie-same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
     refresh-lifetime: ${AUTH_REFRESH_LIFETIME:30d}

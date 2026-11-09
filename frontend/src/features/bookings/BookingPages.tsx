@@ -45,10 +45,17 @@ export function BookingDetailsPage() {
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [confirm, setConfirm] = useState(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    if (booking?.ride.status !== 'IN_PROGRESS' || busy) return;
-    const timer = setInterval(() => setRevision(value => value + 1), 30000);
-    return () => clearInterval(timer);
-  }, [booking?.ride.status, busy]);
+    if (!booking || booking.status !== 'CONFIRMED' || busy || confirm || loading ||
+        !['SCHEDULED', 'IN_PROGRESS'].includes(booking.ride.status)) return;
+    const controller = new AbortController();
+    const timer = setInterval(() => {
+      if (booking.ride.status === 'SCHEDULED' && Date.parse(booking.ride.departureAt) > Date.now()) return;
+      void bookingsApi.details(id, controller.signal).then(value => {
+        if (!controller.signal.aborted) setBooking(value);
+      }).catch(() => { /* Preserve the current details during a temporary outage. */ });
+    }, 30000);
+    return () => { clearInterval(timer); controller.abort(); };
+  }, [id, booking, busy, confirm, loading]);
   const [message, setMessage] = useState(typeof location.state?.message === 'string' ? location.state.message : '');
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');

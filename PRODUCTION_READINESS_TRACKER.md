@@ -219,3 +219,11 @@ Render access recovered by targeting the existing known Render tab in the in-app
 User requested proceeding without an OTP service. Web and mobile now use email/password sign-in. Signup remains name-free and collects an unverified mobile number. Guests must sign in or create an account before booking; email and SMS verification are deferred. OTP delivery is off by default (`EMAIL_OTP_ENABLED=false`). Existing database schema V17 and ride features remain in place. No APK was requested for this follow-up; the prior APK still has the OTP UI. Web 54 tests/build and mobile 22 tests/TypeScript passed. Backend authentication verification and release rollout follow.
 
 Backend authentication suite and executable package passed. No new migration required. Pushing this checkpoint triggers the existing Render auto-deploy.
+
+## Full app regression audit — 9 November 2026
+
+See docs/verification-2026-11-09.md for the test matrix and reproduction notes. Passed 131 backend tests, 54 web tests, 22 mobile tests, package/build checks, and the isolated HTTP smoke test. Browser testing passed the driver/passenger lifecycle and account screens. Fixed the booking screen missing a completion update when opened before departure; the new Playwright regression verifies the modal and public review without a manual reload. Added the web favicon and fixed home-page branding. Graphify code map is local. OTP remains paused. No APK, production deployment, or production database write was made during this audit. Device and real provider checks remain pending.
+
+## Combined web and API release — 9 November 2026
+
+Added the Vite production build to the Render Docker image and configured explicit browser page routes. The frontend uses the same host as the API, with the Render origin trusted for cookie authentication. Local packaged verification passed deep links, assets, health, protected API access, same-origin password sign-in, and rejection of an untrusted origin. Existing database schema and mobile API URL are unchanged. Render requires Docker context `.` and Dockerfile `backend/Dockerfile`.

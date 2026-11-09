@@ -97,10 +97,14 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
     && result.data.status === 'CONFIRMED' && result.data.ride.status === 'COMPLETED';
   useEffect(() => { if (eligible) setRatingOpen(true); }, [eligible]);
   useEffect(() => {
-    if (result.data?.ride.status !== 'IN_PROGRESS' || action.busy) return;
-    const timer = setInterval(result.reload, 30000);
+    const booking = result.data;
+    if (!booking || booking.status !== 'CONFIRMED' || action.busy ||
+        !['SCHEDULED', 'IN_PROGRESS'].includes(booking.ride.status)) return;
+    const timer = setInterval(() => {
+      if (booking.ride.status === 'IN_PROGRESS' || Date.parse(booking.ride.departureAt) <= Date.now()) result.reload();
+    }, 30000);
     return () => clearInterval(timer);
-  }, [result.data?.ride.status, action.busy]);
+  }, [result.data, action.busy]);
   if (!result.data) return <QueryState {...result} />;
   const booking = result.data;
   const passenger = user.id === booking.passenger.id;

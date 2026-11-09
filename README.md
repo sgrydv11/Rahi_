@@ -84,9 +84,9 @@ npm test
 npm run preview
 ```
 
-## Deploy the backend to Render
+## Deploy the web app and API to Render
 
-The root `render.yaml` defines the backend web service, built from `backend/Dockerfile`. In Render, create a Blueprint from this repository and select the `render.yaml` file. The Docker image builds with Java 21 and listens on Render's `PORT`. The service health check uses `/actuator/health`.
+The root `render.yaml` defines a single service for the web app and API. Set the Dockerfile path to `backend/Dockerfile` and the Docker build context to the repository root (`.`). The image builds the Vite frontend and packages it into the Java 21 server. The service listens on Render's `PORT` and checks `/actuator/health`.
 
 Create a PostgreSQL database in Render (or use an existing PostgreSQL database), then set these service environment variables in the Render Dashboard:
 
@@ -96,7 +96,7 @@ Create a PostgreSQL database in Render (or use an existing PostgreSQL database),
 | `DB_USERNAME` | Database user |
 | `DB_PASSWORD` | Database password |
 | `JWT_SECRET` | Base64-encoded random secret with at least 32 bytes |
-| `FRONTEND_ORIGINS` | Exact deployed frontend origin, e.g. `https://your-app.example.com` (no path or trailing slash) |
+| `FRONTEND_ORIGINS` | Additional trusted web origins, if needed. The Render service URL is included automatically. |
 
 Generate a JWT secret locally in PowerShell; enter the output in Render without saving it in the repository:
 
@@ -108,7 +108,7 @@ $bytes = New-Object byte[] 32
 
 Keep `AUTH_COOKIE_SECURE=true`. `AUTH_COOKIE_SAME_SITE=Lax` works when the frontend and API are same-site; if they are on different sites, set it to `None` (which requires Secure). If enabling Stripe test checkout, also set `STRIPE_SECRET_KEY` and `STRIPE_FRONTEND_ORIGIN` to the frontend's deployed origin. Render's PostgreSQL connection string is not itself a JDBC URL: use its internal hostname/database with `jdbc:postgresql://` and provide the database credentials separately.
 
-After deployment, verify `https://<service-name>.onrender.com/actuator/health` and `https://<service-name>.onrender.com/api/v1/health`. Add the backend URL to the deployed frontend's `VITE_API_BASE_URL` as `<backend-origin>/api/v1`, then rebuild/redeploy the frontend. Flyway applies migrations at backend startup.
+After deployment, verify `/`, a direct visit to `/login`, and `/api/v1/health` on the service URL. The web build uses the relative `/api/v1` path, so password auth and its cookies stay on the same origin. Flyway applies migrations at backend startup.
 
 ## Structure
 

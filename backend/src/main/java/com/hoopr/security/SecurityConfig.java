@@ -111,6 +111,10 @@ public class SecurityConfig {
                     }
                 }, CsrfFilter.class)
                 .authorizeHttpRequests(a -> a
+                        .requestMatchers(HttpMethod.GET, com.hoopr.config.WebAppRoutes.PAGES).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, com.hoopr.config.WebAppRoutes.PAGES).permitAll()
+                        .requestMatchers(HttpMethod.GET, com.hoopr.config.WebAppRoutes.ASSETS).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, com.hoopr.config.WebAppRoutes.ASSETS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
                                 "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout",
                                 "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify").permitAll()
