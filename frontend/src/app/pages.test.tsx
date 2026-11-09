@@ -32,7 +32,8 @@ describe('foundation pages', () => {
       expect(html).toContain('Both — offer and find seats');
       expect(html).toContain('Mobile number');
       expect(html).not.toContain('Full name');
-      expect(html).not.toContain('type="password"');
+      expect(html).toContain('type="password"');
+      expect(html).not.toContain('Send email OTP');
     }
     if (path === '/rides') { expect(html).toContain('Today'); expect(html).toContain('Tomorrow'); expect(html).toContain('Women-only'); expect(html).not.toContain('time zone'); }
   });

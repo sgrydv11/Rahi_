@@ -115,8 +115,8 @@ export async function restore() {
 export async function login(email: string, password: string) {
   return (await save(await request<Session>('/mobile/auth/login', { method: 'POST', body: { email, password } }))).user;
 }
-export async function register(email: string, password: string, fullName: string, travelPreference: Preference) {
-  await request<User>('/mobile/auth/register', { method: 'POST', body: { email, password, fullName, travelPreference } });
+export async function register(email: string, password: string, fullName: string, travelPreference: Preference, mobileNumber?: string) {
+  await request<User>('/mobile/auth/register', { method: 'POST', body: { email, password, fullName, travelPreference, mobileNumber } });
   return login(email, password);
 }
 export function requestEmailOtp(identifier: string, mobileNumber?: string, travelPreference: Preference = 'PASSENGER') {

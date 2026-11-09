@@ -213,3 +213,9 @@ Render access recovered by targeting the existing known Render tab in the in-app
 - Local frontend http://localhost:5173 and backend http://localhost:8081 are running, development DB V17. Temporary smoke server stopped.
 - Still pending: user configures RESEND_API_KEY and OTP_EMAIL_FROM in Render following EMAIL_OTP_SETUP.md; then real signup/login/guest OTP delivery acceptance. Mobile number collection is unverified; SMS and mobile-number sign-in remain deferred. Google sign-in still needs its prior OAuth configuration.
 - Do not describe this as full production acceptance: real provider delivery and physical-device end-to-end checks have not happened. No OTP or API key is stored in the tracker.
+
+## OTP pause — 9 November 2026
+
+User requested proceeding without an OTP service. Web and mobile now use email/password sign-in. Signup remains name-free and collects an unverified mobile number. Guests must sign in or create an account before booking; email and SMS verification are deferred. OTP delivery is off by default (`EMAIL_OTP_ENABLED=false`). Existing database schema V17 and ride features remain in place. No APK was requested for this follow-up; the prior APK still has the OTP UI. Web 54 tests/build and mobile 22 tests/TypeScript passed. Backend authentication verification and release rollout follow.
+
+Backend authentication suite and executable package passed. No new migration required. Pushing this checkpoint triggers the existing Render auto-deploy.

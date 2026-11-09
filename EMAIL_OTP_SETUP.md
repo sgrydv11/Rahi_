@@ -1,5 +1,7 @@
 # Email OTP setup for Render
 
+**Paused:** Current clients use email and password. This guide is for a future OTP rollout. The backend sender is off by default; enabling it later also requires setting `EMAIL_OTP_ENABLED=true` and reintroducing the OTP screens.
+
 Email OTP is the current release method. SMS verification is deferred. Registration collects a mobile number but does not mark it verified. Sign in with email until SMS is configured.
 
 1. Create a [Resend account](https://resend.com/signup).

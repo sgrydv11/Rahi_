@@ -51,11 +51,18 @@ public class AuthService {
     }
     @Transactional
     public Profile register(String email, String password, String name, TravelPreference travelPreference) {
+        return register(email, password, name, travelPreference, null);
+    }
+    @Transactional
+    public Profile register(String email, String password, String name, TravelPreference travelPreference, String mobileNumber) {
         Objects.requireNonNull(travelPreference, "Travel preference is required");
         validatePassword(password);
         email = normalize(email);
         if (users.findByEmail(email).isPresent()) throw new AuthFailure(409, "Email is already registered.");
         UserAccount user = new UserAccount();
+        user.mobileNumber = EmailOtpService.mobile(mobileNumber);
+        if (user.mobileNumber != null && users.existsByMobileNumber(user.mobileNumber))
+            throw new AuthFailure(409, "Mobile number is already registered.");
         user.id = UUID.randomUUID(); user.email = email; user.passwordHash = passwords.encode(password);
         user.role = "USER"; user.status = "ACTIVE"; user.createdAt = user.updatedAt = clock.instant();
         users.saveAndFlush(user);

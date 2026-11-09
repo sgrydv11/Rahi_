@@ -5,7 +5,6 @@ import { errorMessage } from '../auth/auth';
 import { ApiError } from '../../lib/api/client';
 import { canManage, demoMode, type Ride } from '../rides/api';
 import { bookingsApi, type JourneyDetails } from './api';
-import { OtpSignIn } from '../auth/OtpSignIn';
 
 export function BookSeats({ ride }: { ride: Ride }) {
   const { user } = useAuth(); const navigate = useNavigate();
@@ -39,8 +38,10 @@ export function BookSeats({ ride }: { ride: Ride }) {
   if (!ride.availableSeats) return <p className="notice">This ride is fully booked.</p>;
   if (demoMode) return <p className="notice">Seat booking is not available in this sample app.</p>;
   if (!started) return <button className="button" onClick={() => setStarted(true)}>Book Seat</button>;
-  if (!user) return <section className="panel"><h2>Verify to book</h2><p>Enter your mobile number and verify your email. SMS verification is coming later.</p>
-    <OtpSignIn registering onAuthenticated={() => navigate(`/rides/${ride.id}`, { replace: true })} /></section>;
+  if (!user) return <section className="panel"><h2>Sign in to book</h2><div className="ride-actions">
+    <Link to="/login" state={{ from: `/rides/${ride.id}` }}>Log in</Link>
+    <Link to="/register" state={{ from: `/rides/${ride.id}` }}>Create account</Link>
+  </div></section>;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!Number.isInteger(seats) || seats < 1 || seats > ride.availableSeats) { setError('Choose a valid number of available seats.'); return; }

@@ -19,6 +19,7 @@ public class AuthController {
     }
     public static class RegisterRequest extends LoginRequest {
         @NotBlank @Size(max = 120) @Pattern(regexp = "\\p{L}[\\p{L}\\p{M} .'-]{0,119}") public String fullName;
+        @Size(max = 24) public String mobileNumber;
         @NotNull public com.hoopr.user.TravelPreference travelPreference = com.hoopr.user.TravelPreference.BOTH;
         @Override public String toString() { return "RegisterRequest[redacted]"; }
     }
@@ -67,7 +68,11 @@ public class AuthController {
     @PostMapping("/register") @ResponseStatus(HttpStatus.CREATED)
     public AuthService.Profile register(@Valid @RequestBody RegisterRequest body) {
         if (body.password.length() < 12) throw new AuthFailure(400, "Password must contain at least 12 characters.");
-        return auth.register(body.email, body.password, body.fullName, body.travelPreference);
+        return registerAccount(auth, body);
+    }
+    static AuthService.Profile registerAccount(AuthService auth, RegisterRequest body) {
+        return body.mobileNumber == null ? auth.register(body.email, body.password, body.fullName, body.travelPreference)
+                : auth.register(body.email, body.password, body.fullName, body.travelPreference, body.mobileNumber);
     }
     @PostMapping("/login") public AuthService.Access login(@Valid @RequestBody LoginRequest body,
             HttpServletRequest request, HttpServletResponse response) {

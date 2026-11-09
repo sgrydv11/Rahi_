@@ -17,7 +17,10 @@ public class OtpMailer {
     private final RestClient client;
     private final String apiKey;
     private final String from;
-    public OtpMailer(@Value("${RESEND_API_KEY:}") String apiKey, @Value("${OTP_EMAIL_FROM:}") String from) {
+    private final boolean enabled;
+    public OtpMailer(@Value("${RESEND_API_KEY:}") String apiKey, @Value("${OTP_EMAIL_FROM:}") String from,
+                     @Value("${EMAIL_OTP_ENABLED:false}") boolean enabled) {
+        this.enabled = enabled;
         this.apiKey = apiKey; this.from = from;
         var factory = new SimpleClientHttpRequestFactory() {
             @Override protected void prepareConnection(HttpURLConnection connection, String method) throws IOException {
@@ -29,6 +32,7 @@ public class OtpMailer {
                 .defaultHeader("Authorization", "Bearer " + apiKey).build();
     }
     public void deliver(String email, String code) {
+        if (!enabled) throw new AuthFailure(503, "Email OTP is paused. Sign in with your email and password.");
         if (apiKey.isBlank() || from.isBlank())
             throw new AuthFailure(503, "Email verification is awaiting email delivery setup. Please try again later.");
         try {

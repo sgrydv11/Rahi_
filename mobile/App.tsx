@@ -63,8 +63,13 @@ function NativeApp() {
   const screen = stack[stack.length - 1];
   const go = (next: Screen) => {
     Keyboard.dismiss();
-    setStack(previous => previous[previous.length - 1].kind === next.kind && !('id' in next)
-      ? previous : [...previous, next]);
+    setStack(previous => {
+      const current = previous[previous.length - 1].kind;
+      if (current === next.kind && !('id' in next)) return previous;
+      if (['login', 'register'].includes(current) && ['login', 'register'].includes(next.kind))
+        return [...previous.slice(0, -1), next];
+      return [...previous, next];
+    });
   };
   const back = () => setStack(previous => previous.length > 1 ? previous.slice(0, -1) : previous);
   function signedIn(next: User) {
@@ -107,7 +112,7 @@ function NativeApp() {
     if (restoring && screen.kind !== 'home' && screen.kind !== 'search') return <Copy>Restoring your session…</Copy>;
     if (!user && !publicScreens.has(screen.kind)) return <SignIn create={false} onUser={signedIn} go={go} />;
     switch (screen.kind) {
-      case 'login': case 'register': return <SignIn create={screen.kind === 'register'} onUser={signedIn} go={go} />;
+      case 'login': case 'register': return <SignIn key={screen.kind} create={screen.kind === 'register'} onUser={signedIn} go={go} />;
       case 'search': case 'rides': return <Rides mine={screen.kind === 'rides'} go={go} />;
       case 'ride': return <RideDetails id={screen.id} user={user} go={go} />;
       case 'rideForm': return <RideForm id={screen.id} go={next => setStack(previous => [...previous.slice(0, -1), next])} />;

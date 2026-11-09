@@ -28,7 +28,7 @@ public class MobileAuthController {
         requireNativeRequest(request);
         if (body.password.length() < 12) throw new AuthFailure(400, "Password must contain at least 12 characters.");
         return ResponseEntity.status(HttpStatus.CREATED).header("Cache-Control", "no-store")
-                .body(auth.register(body.email, body.password, body.fullName, body.travelPreference));
+                .body(AuthController.registerAccount(auth, body));
     }
 
     @PostMapping("/login")
