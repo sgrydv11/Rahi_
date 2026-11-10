@@ -8,6 +8,7 @@ export interface Point { latitude: number; longitude: number }
 export interface RoutePins { pickup: Point; dropoff: Point }
 export interface RidePreferences {
   boardingPoints: string[]; droppingPoints: string[]; hasCar: boolean | null; ac: boolean | null;
+  requiresApproval?: boolean;
   flexibleDropoff: boolean; womenOnly: boolean; routeType: 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER';
 }
 

@@ -84,6 +84,7 @@ public class RideService {
         active(owner);
         Ride ride = editable(id, owner, body.version());
         requireUnreserved(ride);
+        bookings.requireNoPendingRequests(ride.id);
         if ((body.origin() != null && !ride.origin.equals(body.origin().strip())) ||
                 (body.destination() != null && !ride.destination.equals(body.destination().strip()))) {
             ride.pickupLatitude = ride.pickupLongitude = ride.dropoffLatitude = ride.dropoffLongitude = null;
@@ -235,7 +236,7 @@ public class RideService {
         if (boarding.stream().map(String::toLowerCase).distinct().count() != boarding.size()
                 || dropping.stream().map(String::toLowerCase).distinct().count() != dropping.size())
             throw new RideFailure(400, "Remove duplicate boarding or dropping points.");
-        return new RidePreferences(boarding, dropping, true, value.ac(), value.flexibleDropoff(), value.womenOnly(), value.routeType());
+        return new RidePreferences(boarding, dropping, true, value.ac(), value.flexibleDropoff(), value.womenOnly(), value.routeType(), value.requiresApproval());
     }
     @Transactional(readOnly = true)
     public Results search(String origin, String destination, LocalDate date, String timeZone,

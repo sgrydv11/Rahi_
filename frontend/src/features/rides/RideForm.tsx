@@ -31,6 +31,7 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
         boardingPoints: text('boardingPoints').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
         droppingPoints: text('droppingPoints').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
         hasCar: text('hasCar') === 'yes', ac: data.has('ac'), flexibleDropoff: data.has('flexibleDropoff'),
+        requiresApproval: data.has('requiresApproval'),
         womenOnly: data.has('womenOnly'), routeType: text('routeType') as 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER',
       },
     };
@@ -53,6 +54,7 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       <label><input name="ac" type="checkbox" defaultChecked={ride?.preferences?.ac === true} />Car has AC</label>
       <label><input name="flexibleDropoff" type="checkbox" defaultChecked={ride?.preferences?.flexibleDropoff} />Agree to nearby requested drop-off, by arrangement</label>
       <label><input name="womenOnly" type="checkbox" defaultChecked={ride?.preferences?.womenOnly} />Women-only ride</label>
+      <label><input name="requiresApproval" type="checkbox" defaultChecked={ride?.preferences?.requiresApproval} /> Review booking requests before confirming seats</label>
       <label>Seats offered<input name="totalSeats" type="number" required min={1} max={6} step={1} defaultValue={ride?.totalSeats ?? 1} /></label>
       <label>Price per seat<input name="pricePerSeat" type="number" required min={0} max="9999999999.99" step="0.01" defaultValue={ride?.pricePerSeat ?? '0.00'} /></label>
       <label>Currency<input name="currency" required pattern="[A-Za-z]{3}" maxLength={3} defaultValue={ride?.currency ?? 'INR'} /></label>

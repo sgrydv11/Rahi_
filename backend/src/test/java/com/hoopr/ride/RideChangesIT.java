@@ -56,6 +56,32 @@ class RideChangesIT {
     RideDtos.Results search(String sort, String direct, String from, String to, boolean women, boolean ac, String boarding) {
         return rides.search(origin, "Ujjain", tomorrow, "Asia/Kolkata", 1, null, 0, 20, sort, direct, from, to, women, ac, false, boarding, null);
     }
+    @Test void approvalRequestsDoNotReserveSeatsAndOnlyOneDriverAcceptanceCanWin() throws Exception {
+        var driver = users.get(0);
+        var ride = offer(driver, 9, "120", new RidePreferences(List.of("Station"), List.of("Tower"), true, true,
+                false, false, RidePreferences.RouteType.OTHER, true));
+        var passenger = new BookingDtos.Passenger("Test Rider", 25, BookingDtos.Gender.FEMALE);
+        var details = new BookingDtos.JourneyDetails("Station", "Tower", List.of(passenger, passenger));
+        var first = bookings.create(ride.id(), users.get(1), UUID.randomUUID(), 2, ride.version(), details).booking();
+        var second = bookings.create(ride.id(), users.get(2), UUID.randomUUID(), 2, ride.version(), details).booking();
+        assertEquals("PENDING", first.status());
+        assertNotNull(first.requestExpiresAt());
+        assertEquals(2, rides.details(ride.id(), null).availableSeats());
+        assertEquals(403, assertThrows(BookingFailure.class, () -> bookings.decide(first.id(), users.get(1), true)).status);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var attempts = executor.invokeAll(List.of(first.id(), second.id()).stream().map(id ->
+                    (java.util.concurrent.Callable<Integer>) () -> {
+                        try { bookings.decide(id, driver, true); return 200; }
+                        catch (BookingFailure failure) { return failure.status; }
+                    }).toList());
+            assertEquals(List.of(200, 409), List.of(attempts.get(0).get(), attempts.get(1).get()).stream().sorted().toList());
+        }
+        assertEquals(0, rides.details(ride.id(), null).availableSeats());
+        var pending = "PENDING".equals(bookings.details(first.id(), driver).status()) ? first : second;
+        jdbc.update("UPDATE bookings SET request_expires_at = now() - interval '1 minute' WHERE id = ?", pending.id());
+        assertEquals("EXPIRED", bookings.details(pending.id(), driver).status());
+        assertEquals(409, assertThrows(BookingFailure.class, () -> bookings.decide(pending.id(), driver, true)).status);
+    }
     @Test void noCitiesReturnsNoRidesAndFiltersUseActualStoredPreferences() {
         var first = offer(users.get(0), 9, "200", prefs(true, true));
         offer(users.get(1), 22, "100", prefs(false, false));

@@ -114,7 +114,7 @@ function NativeApp() {
     switch (screen.kind) {
       case 'login': case 'register': return <SignIn key={screen.kind} create={screen.kind === 'register'} onUser={signedIn} go={go} />;
       case 'search': case 'rides': return <Rides mine={screen.kind === 'rides'} go={go} />;
-      case 'ride': return <RideDetails id={screen.id} user={user} go={go} />;
+      case 'ride': return <RideDetails id={screen.id} requestedSeats={screen.requestedSeats} user={user} go={go} />;
       case 'rideForm': return <RideForm id={screen.id} go={next => setStack(previous => [...previous.slice(0, -1), next])} />;
       case 'pins': return <PinsForm id={screen.id} back={back} />;
       case 'bookings': return <Bookings go={go} />;

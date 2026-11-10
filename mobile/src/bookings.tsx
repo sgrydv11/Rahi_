@@ -108,9 +108,9 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
   if (!result.data) return <QueryState {...result} />;
   const booking = result.data;
   const passenger = user.id === booking.passenger.id;
-  function submit(kind: 'cancel' | 'rating') {
+  function submit(kind: 'cancel' | 'rating' | 'accept' | 'decline') {
     void action.run(async () => {
-      await api(`${path}/${kind}`, { method: 'POST', body: kind === 'cancel' ? { reason } : { score, review } });
+      await api(`${path}/${kind}`, { method: 'POST', body: kind === 'cancel' ? { reason } : kind === 'rating' ? { score, review } : undefined });
       if (kind === 'rating') setRatingOpen(false);
       result.reload();
     });
@@ -130,10 +130,18 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
     </Card>
     {booking.ride.route && <Route pins={booking.ride.route} />}
     <ErrorText message={action.error} />
+    {booking.status === 'PENDING' && <Card>
+      <Copy>Awaiting driver approval. Seats are reserved only after acceptance.</Copy>
+      {booking.requestExpiresAt && <Copy>Request expires {date(booking.requestExpiresAt)}.</Copy>}
+      {user.id === booking.ride.driverId && <>
+        <Button label="Accept request" disabled={action.busy} onPress={() => submit('accept')} />
+        <Button label="Decline request" disabled={action.busy} onPress={() => submit('decline')} />
+      </>}
+    </Card>}
     {passenger && booking.canCancel && <Card>
       <Field label="Cancellation reason (optional)" value={reason} change={setReason} />
       <Button label="Cancel booking" disabled={action.busy} onPress={() =>
-        Alert.alert('Cancel your booking?', 'Your seats will be released.', [
+        Alert.alert('Cancel your booking?', booking.status === 'PENDING' ? 'Your request will be withdrawn.' : 'Your seats will be released.', [
           { text: 'Keep booking', style: 'cancel' }, { text: 'Cancel booking', style: 'destructive', onPress: () => submit('cancel') },
         ])} />
     </Card>}
@@ -148,7 +156,7 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
       <Button label="Later" disabled={action.busy} onPress={() => setRatingOpen(false)} />
       </Card></ScrollView></View>
     </Modal>
-    {passenger && <PaymentPanel booking={booking} />}
+    {passenger && booking.status !== 'PENDING' && <PaymentPanel booking={booking} />}
     <Button label="Refresh booking" disabled={action.busy} onPress={result.reload} />
   </>;
 }

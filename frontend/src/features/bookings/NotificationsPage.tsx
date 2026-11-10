@@ -4,6 +4,9 @@ import { authenticatedRequest, errorMessage } from '../auth/auth';
 
 const titles: Record<string, string> = {
   BOOKING_CONFIRMED: 'Booking confirmed',
+  BOOKING_REQUESTED: 'Booking requested',
+  BOOKING_DECLINED: 'Booking declined',
+  BOOKING_EXPIRED: 'Booking request expired',
   CANCELLED_BY_PASSENGER: 'Booking cancelled by passenger',
   CANCELLED_BY_DRIVER: 'Booking cancelled by driver',
   DEPARTURE_REMINDER: 'Upcoming departure',

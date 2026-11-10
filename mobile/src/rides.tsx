@@ -20,6 +20,7 @@ const sortOptions = [
   { value: 'PRICE_ASC', label: 'Price ↑' }, { value: 'PRICE_DESC', label: 'Price ↓' },
   { value: 'RATING_ASC', label: 'Rating ↑' }, { value: 'RATING_DESC', label: 'Rating ↓' },
 ];
+const seatOptions = [1, 2, 3, 4, 5, 6].map(value => ({ value: String(value), label: String(value) }));
 const yesNo = [{ value: '', label: 'Any' }, { value: 'true', label: 'Yes' }];
 
 export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (page: number) => void }) {
@@ -30,8 +31,9 @@ export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (p
 }
 
 export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
-  const [draft, setDraft] = useState<Record<string, string>>({ departureDate: day(), timeZone: tz(), sort: 'TIME_ASC' });
+  const [draft, setDraft] = useState<Record<string, string>>({ departureDate: day(), timeZone: tz(), sort: 'TIME_ASC', minimumSeats: '1' });
   const [query, setQuery] = useState('');
+  const requestedSeats = Number(new URLSearchParams(query).get('minimumSeats') || 1);
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState(false);
   const [error, setError] = useState('');
@@ -43,9 +45,10 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
   function apply(values = draft) {
     if (!values.origin?.trim() || !values.destination?.trim()) { setError('Select both From City and To City.'); return; }
     if (values.origin.trim().toLowerCase() === values.destination.trim().toLowerCase()) { setError('Choose different cities.'); return; }
+    if (values.returnDate && values.returnDate < values.departureDate) { setError('Choose a return date on or after departure.'); return; }
     if (values.departureTime && (values.timeFrom || values.timeTo)) { setError('Choose a direct time or a range, not both.'); return; }
     setError(''); setPage(0);
-    setQuery(Object.entries(values).filter(([, value]) => value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
+    setQuery(Object.entries(values).filter(([key, value]) => key !== 'returnDate' && value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
   }
   function update(key: string, value: string) { setDraft(previous => ({ ...previous, [key]: value })); }
   const travelDate = draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined;
@@ -59,6 +62,9 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
     <Field label="To City" value={draft.destination || ''} change={value => update('destination', value)} />
     <View style={styles.row}><Button label="Today" onPress={() => update('departureDate', day())} /><Button label="Tomorrow" onPress={() => update('departureDate', day(1))} /></View>
     <DateField label="Calendar" mode="date" value={travelDate} change={value => update('departureDate', localDate(value.toISOString()).slice(0, 10))} />
+    <DateField label="Return date (optional)" mode="date" value={draft.returnDate ? new Date(draft.returnDate + 'T12:00') : undefined}
+      change={value => update('returnDate', localDate(value.toISOString()).slice(0, 10))} clear={() => update('returnDate', '')} />
+    <Choice label="Passengers" values={seatOptions} selected={draft.minimumSeats} change={value => update('minimumSeats', value)} />
     <Choice label="Women-only rides" values={yesNo} selected={draft.womenOnly || ''} change={value => update('womenOnly', value)} />
     <ErrorText message={error} />
     <Button label="Search rides" onPress={() => apply()} />
@@ -69,7 +75,12 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
       <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
       <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
     </View> : <>
-      <Copy>{draft.origin} → {draft.destination} · {draft.departureDate}</Copy>
+      <Copy>{draft.origin} → {draft.destination} · {draft.departureDate} · {requestedSeats} {requestedSeats === 1 ? 'passenger' : 'passengers'}</Copy>
+      {draft.returnDate && <Button label={`Find return rides on ${draft.returnDate}`} onPress={() => {
+        const next = { origin: draft.destination, destination: draft.origin, departureDate: draft.returnDate,
+          minimumSeats: draft.minimumSeats, womenOnly: draft.womenOnly || '', sort: 'TIME_ASC', timeZone: tz() };
+        setDraft(next); apply(next);
+      }} />}
       <Button label="Change search" onPress={() => { setQuery(''); setError(''); }} />
       <Choice label="Sort rides" values={sortOptions} selected={draft.sort} change={value => {
         const next = { ...draft, sort: value }; setDraft(next); apply(next);
@@ -96,10 +107,11 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
       {!result.data.content.length && <Copy>{mine ? 'You have not offered any rides yet.' : 'No rides match this route, date and filters.'}</Copy>}
       {result.data.content.map(ride => <Card key={ride.id}>
         <Copy>{ride.origin} → {ride.destination}</Copy><Copy>{date(ride.departureAt)}</Copy>
+        {ride.preferences?.requiresApproval && <Copy>Driver approval required</Copy>}
         <Copy>{ride.currency} {ride.pricePerSeat} per seat · {ride.availableSeats} available</Copy>
         <Copy>{ride.driverRating ? ride.driverRating.toFixed(1) + ' / 5' : 'No ratings yet'}{ride.preferences?.ac ? ' · AC' : ''}{ride.preferences?.womenOnly ? ' · Women only' : ''}</Copy>
         {ride.reviews?.map((review, index) => <Copy key={index}>{review.score}/5 {review.text || ''}</Copy>)}
-        <Button label="View ride" onPress={() => go({ kind: 'ride', id: ride.id })} />
+        <Button label="View ride" onPress={() => go({ kind: 'ride', id: ride.id, requestedSeats })} />
       </Card>)}
       <Pagination data={result.data} setPage={setPage} />
     </>}
@@ -124,7 +136,7 @@ export function Route({ pins }: { pins: Pins }) {
   </Card>;
 }
 
-export function RideDetails({ id, user, go }: { id: string; user: User | null; go: Navigate }) {
+export function RideDetails({ id, requestedSeats = 1, user, go }: { id: string; requestedSeats?: number; user: User | null; go: Navigate }) {
   const path = ridePath(id);
   const result = useQuery(path, async signal => demoMode ? demoRide(id) : api<Ride>(path, { auth: Boolean(user), signal }));
   const action = useAction();
@@ -167,7 +179,7 @@ export function RideDetails({ id, user, go }: { id: string; user: User | null; g
         ])} />
       </>}
     </Card>}
-    {!demoMode && !owner && future(ride) && ride.availableSeats > 0 && <SeatBooking ride={ride} user={user} go={go} />}
+    {!demoMode && !owner && future(ride) && ride.availableSeats > 0 && <SeatBooking ride={ride} requestedSeats={requestedSeats} user={user} go={go} />}
     <Button label="Refresh ride" onPress={result.reload} disabled={action.busy} />
   </>;
 }
@@ -221,6 +233,8 @@ function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; 
   return <Card>
     <Copy>What You See Is What You Pay – No Hidden Charges, No Convenience Fees!</Copy>
     <Choice label="Do you have a car?" values={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} selected={String(preferences.hasCar)} change={value => setPreferences(previous => ({ ...previous, hasCar: value === 'true' }))} />
+    <Choice label="Booking mode" values={[{ value: 'instant', label: 'Instant booking' }, { value: 'approval', label: 'Review requests' }]}
+      selected={preferences.requiresApproval ? 'approval' : 'instant'} change={value => setPreferences(previous => ({ ...previous, requiresApproval: value === 'approval' }))} />
     <Choice label="Route type" values={[{ value: 'HOME_TO_OFFICE', label: 'Home to Office' }, { value: 'OFFICE_TO_HOME', label: 'Office to Home' }, { value: 'OTHER', label: 'Other' }]} selected={preferences.routeType} change={value => setPreferences(previous => ({ ...previous, routeType: value as RidePreferences['routeType'] }))} />
     <Field label="Boarding points, one per line" value={boarding} change={setBoarding} multiline />
     <Field label="Dropping points, one per line" value={dropping} change={setDropping} multiline />

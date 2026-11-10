@@ -34,7 +34,8 @@ public final class BookingDtos {
                           String status, com.hoopr.ride.RideDtos.RoutePins route) { }
     public record View(UUID id, Journey ride, Person passenger, int seats, BigDecimal pricePerSeat,
         BigDecimal totalPrice, String currency, String status, long version, boolean canCancel,
-        Instant createdAt, Instant updatedAt, Instant cancelledAt, String cancellationReason, Rating rating, JourneyDetails details) { }
+        Instant createdAt, Instant updatedAt, Instant cancelledAt, String cancellationReason, Rating rating,
+        JourneyDetails details, Instant requestExpiresAt) { }
     public record Results(List<View> content, int page, int size, long totalElements, int totalPages) { }
     public record Created(View booking, boolean replayed) { }
 }

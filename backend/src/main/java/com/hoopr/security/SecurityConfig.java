@@ -134,6 +134,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/bookings/me", "/api/v1/bookings/{id}", "/api/v1/rides/{id}/bookings").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/rides/{id}/bookings", "/api/v1/bookings/{id}/cancel").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/rating").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/accept", "/api/v1/bookings/{id}/decline").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{id}/payment").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{id}/payment/order", "/api/v1/bookings/{id}/payment/verify",
                                 "/api/v1/bookings/{id}/payment/sync", "/api/v1/bookings/{id}/payment/refund").hasAnyRole("USER", "ADMIN")

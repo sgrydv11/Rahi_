@@ -6,9 +6,10 @@ import { ApiError } from '../../lib/api/client';
 import { canManage, demoMode, type Ride } from '../rides/api';
 import { bookingsApi, type JourneyDetails } from './api';
 
-export function BookSeats({ ride }: { ride: Ride }) {
+export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedSeats?: number }) {
+  const returnPath = `/rides/${ride.id}${requestedSeats > 1 ? `?seats=${requestedSeats}` : ''}`;
   const { user } = useAuth(); const navigate = useNavigate();
-  const [seats, setSeats] = useState(1); const [confirm, setConfirm] = useState(false);
+  const [seats, setSeats] = useState(() => Math.max(1, Math.min(requestedSeats, ride.availableSeats))); const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const [started, setStarted] = useState(false);
   const [recent, setRecent] = useState<JourneyDetails['passengers']>([]);
@@ -37,10 +38,13 @@ export function BookSeats({ ride }: { ride: Ride }) {
   if (user?.id === ride.driver.id || !canManage(ride)) return null;
   if (!ride.availableSeats) return <p className="notice">This ride is fully booked.</p>;
   if (demoMode) return <p className="notice">Seat booking is not available in this sample app.</p>;
-  if (!started) return <button className="button" onClick={() => setStarted(true)}>Book Seat</button>;
+  if (!started) return <>
+    {requestedSeats > ride.availableSeats && <p className="notice">Only {ride.availableSeats} seats remain. You can choose a smaller group.</p>}
+    <button className="button" onClick={() => setStarted(true)}>{ride.preferences?.requiresApproval ? 'Request seats' : 'Book Seat'}</button>
+  </>;
   if (!user) return <section className="panel"><h2>Sign in to book</h2><div className="ride-actions">
-    <Link to="/login" state={{ from: `/rides/${ride.id}` }}>Log in</Link>
-    <Link to="/register" state={{ from: `/rides/${ride.id}` }}>Create account</Link>
+    <Link to="/login" state={{ from: returnPath }}>Log in</Link>
+    <Link to="/register" state={{ from: returnPath }}>Create account</Link>
   </div></section>;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,7 +63,7 @@ export function BookSeats({ ride }: { ride: Ride }) {
     if (!confirm) { review.current = details; setConfirm(true); return; }
     const pending = request.current ?? { key: crypto.randomUUID(), seats, version: ride.version, details }; request.current = pending;
     setBusy(true); setError('');
-    try { const booking = await bookingsApi.create(ride.id, pending.seats, pending.key, pending.version, pending.details); navigate(`/bookings/${booking.id}`, { state: { message: booking.status === 'CONFIRMED' ? 'Your seats are confirmed.' : 'This request was already recorded. Check its current booking status below.' } }); }
+    try { const booking = await bookingsApi.create(ride.id, pending.seats, pending.key, pending.version, pending.details); navigate(`/bookings/${booking.id}`, { state: { message: booking.status === 'CONFIRMED' ? 'Your seats are confirmed.' : booking.status === 'PENDING' ? 'Request sent. Your seats are not reserved until the driver accepts.' : 'This request was already recorded. Check its current booking status below.' } }); }
     catch (failure) {
       if (failure instanceof ApiError && failure.status >= 400 && failure.status < 500) { request.current = null; setConfirm(false); }
       setError(errorMessage(failure));
@@ -81,9 +85,11 @@ export function BookSeats({ ride }: { ride: Ride }) {
       <label>Gender<select name={`gender${index}`} required defaultValue=""><option value="">Select gender</option><option value="FEMALE">Female</option>{!ride.preferences?.womenOnly && <><option value="MALE">Male</option><option value="OTHER">Other</option></>}</select></label>
     </fieldset>)}
     <p>Total: <strong>{ride.currency} {(Number(ride.pricePerSeat) * seats).toFixed(2)}</strong>. No payment is collected here.</p>
-    {confirm && <p role="status">Confirm {seats} seat{seats > 1 ? 's' : ''} on this ride. Availability is checked when you confirm.</p>}
+    {confirm && <p role="status">{ride.preferences?.requiresApproval
+      ? `Request ${seats} seat${seats > 1 ? 's' : ''}. The driver must accept before seats are reserved.`
+      : `Confirm ${seats} seat${seats > 1 ? 's' : ''}. Availability is checked when you confirm.`}</p>}
     {error && <p role="alert">{error} Reload the ride if availability has changed.</p>}
-    <div className="ride-actions"><button className="button" disabled={busy}>{busy ? 'Booking…' : confirm ? 'Confirm booking' : 'Review booking'}</button>
+    <div className="ride-actions"><button className="button" disabled={busy}>{busy ? 'Booking…' : confirm ? (ride.preferences?.requiresApproval ? 'Send request' : 'Confirm booking') : 'Review booking'}</button>
       {confirm && !request.current && <button type="button" className="button button-secondary" disabled={busy} onClick={() => setConfirm(false)}>Change seats</button>}
     </div>
     <Link to="/bookings/mine">View My Bookings before starting another request</Link>

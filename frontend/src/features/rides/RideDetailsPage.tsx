@@ -10,6 +10,8 @@ export function RideDetailsPage() {
   const { id = '' } = useParams();
   const { user } = useAuth();
   const location = useLocation();
+  const seatParam = new URLSearchParams(location.search).get('seats');
+  const requestedSeats = seatParam && /^[1-6]$/.test(seatParam) ? Number(seatParam) : 1;
   const [ride, setRide] = useState<Ride | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ export function RideDetailsPage() {
       {ride.route && <RoutePreview pins={ride.route} />}
       {user?.id === ride.driver.id && canManage(ride) && ride.availableSeats === ride.totalSeats &&
         <RouteEditor key={ride.id} ride={ride} onSaved={updated => { setRide(updated); setMessage('Route updated.'); }} />}
-      <BookSeats key={ride.id} ride={ride} />
+      <BookSeats key={`${ride.id}-${requestedSeats}`} ride={ride} requestedSeats={requestedSeats} />
       {user?.id === ride.driver.id && <div className="ride-actions">
         <Link to="/rides/mine">My rides</Link>
         <Link to={`/rides/${ride.id}/bookings`}>View passenger bookings</Link>

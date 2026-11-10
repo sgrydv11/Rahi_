@@ -7,6 +7,7 @@ export interface Page<T> { content: T[]; page: number; totalPages: number }
 export interface Point { latitude: number; longitude: number }
 export interface Pins { pickup: Point; dropoff: Point }
 export interface RidePreferences {
+  requiresApproval?: boolean;
   boardingPoints: string[]; droppingPoints: string[]; hasCar: boolean | null; ac: boolean | null;
   flexibleDropoff: boolean; womenOnly: boolean; routeType: 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER';
 }
@@ -21,6 +22,7 @@ export interface Ride {
   preferences?: RidePreferences; driverRating?: number; reviews?: { score: number; text?: string }[];
 }
 export interface Booking {
+  requestExpiresAt?: string | null;
   id: string; status: string; seats: number; totalPrice: number; currency: string; canCancel: boolean;
   passenger: { id: string; displayName: string }; rating?: { score: number; review?: string }; cancellationReason?: string;
   details?: JourneyDetails;

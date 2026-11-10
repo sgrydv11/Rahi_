@@ -29,6 +29,7 @@ public class Booking {
     @Column(name = "cancelled_by") public UUID cancelledBy;
     @Column(name = "cancellation_reason", length = 500) public String cancellationReason;
     @Column(name = "cancelled_at") public Instant cancelledAt;
+    @Column(name = "request_expires_at") public Instant requestExpiresAt;
     @Column(name = "driver_rating") public Integer driverRating;
     @Column(name = "rated_at") public Instant ratedAt;
     @Column(name = "created_at", nullable = false) public Instant createdAt;

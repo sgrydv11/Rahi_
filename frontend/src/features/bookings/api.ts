@@ -8,6 +8,7 @@ export interface Booking {
   canCancel: boolean; createdAt: string; updatedAt: string; cancelledAt: string | null; cancellationReason: string | null;
   rating: { score: number; ratedAt: string; review?: string } | null;
   details?: JourneyDetails;
+  requestExpiresAt?: string | null;
 }
 export interface JourneyDetails {
   boardingPoint: string; droppingPoint: string;
@@ -21,6 +22,7 @@ export const bookingsApi = {
   mine: (page = 0, signal?: AbortSignal) => authenticatedRequest<BookingPage>(`/bookings/me?page=${page}&size=10`, { signal }),
   manifest: (ride: string, page = 0, signal?: AbortSignal) => authenticatedRequest<BookingPage>(`/rides/${encodeURIComponent(ride)}/bookings?page=${page}&size=10`, { signal }),
   details: (id: string, signal?: AbortSignal) => authenticatedRequest<Booking>(`/bookings/${encodeURIComponent(id)}`, { signal }),
+  decide: (id: string, decision: 'accept' | 'decline') => authenticatedRequest<Booking>(`/bookings/${encodeURIComponent(id)}/${decision}`, { method: 'POST' }),
   cancel: (id: string, reason: string) => authenticatedRequest<Booking>(`/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
   rate: (id: string, score: number, review?: string) => authenticatedRequest<Booking>(`/bookings/${encodeURIComponent(id)}/rating`, {
     method: 'POST', body: JSON.stringify({ score, review }),

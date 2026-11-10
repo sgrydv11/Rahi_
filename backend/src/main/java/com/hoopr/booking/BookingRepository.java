@@ -8,6 +8,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @EntityGraph(attributePaths = {"ride", "passengerProfile"})
     Optional<Booking> findByPassengerIdAndIdempotencyKey(UUID passengerId, UUID idempotencyKey);
     boolean existsByRideIdAndPassengerIdAndStatus(UUID rideId, UUID passengerId, String status);
+    boolean existsByRideIdAndPassengerIdAndStatusAndRequestExpiresAtAfter(UUID rideId, UUID passengerId, String status, java.time.Instant now);
+    boolean existsByRideIdAndStatusAndRequestExpiresAtAfter(UUID rideId, String status, java.time.Instant now);
     @Override @EntityGraph(attributePaths = {"ride", "passengerProfile"})
     Optional<Booking> findById(UUID id);
     @EntityGraph(attributePaths = {"ride", "passengerProfile"})

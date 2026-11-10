@@ -7,7 +7,11 @@ public record RidePreferences(
         @NotNull @Size(min = 1, max = 20) List<@NotBlank @Size(max = 200) String> boardingPoints,
         @NotNull @Size(min = 1, max = 20) List<@NotBlank @Size(max = 200) String> droppingPoints,
         @NotNull Boolean hasCar, Boolean ac, boolean flexibleDropoff, boolean womenOnly,
-        @NotNull RouteType routeType) {
+        @NotNull RouteType routeType, boolean requiresApproval) {
+    public RidePreferences(List<String> boardingPoints, List<String> droppingPoints, Boolean hasCar, Boolean ac,
+            boolean flexibleDropoff, boolean womenOnly, RouteType routeType) {
+        this(boardingPoints, droppingPoints, hasCar, ac, flexibleDropoff, womenOnly, routeType, false);
+    }
     public enum RouteType { HOME_TO_OFFICE, OFFICE_TO_HOME, OTHER }
     public static RidePreferences forRide(Ride ride) {
         return ride.preferences == null ? new RidePreferences(List.of(ride.origin), List.of(ride.destination),

@@ -34,7 +34,7 @@ public class NotificationController {
                 .addValue("until", Timestamp.from(now.plus(24, ChronoUnit.HOURS)));
         return jdbc.query("""
                 WITH visible_bookings AS (
-                    SELECT b.id, b.passenger_id, b.created_at, b.cancelled_at, b.status,
+                    SELECT b.id, b.passenger_id, b.created_at, b.updated_at, b.cancelled_at, b.status, b.request_expires_at,
                            r.id AS ride_id, r.driver_id, r.source_name, r.destination_name,
                            r.departure_at, r.status AS ride_status
                     FROM bookings b JOIN rides r ON r.id = b.ride_id
@@ -42,7 +42,15 @@ public class NotificationController {
                 ), events AS (
                     SELECT id, ride_id, driver_id, source_name, destination_name,
                            'BOOKING_CONFIRMED' AS kind, created_at AS event_at
-                    FROM visible_bookings
+                    FROM visible_bookings WHERE request_expires_at IS NULL
+                    UNION ALL
+                    SELECT id, ride_id, driver_id, source_name, destination_name,
+                           CASE WHEN status = 'CONFIRMED' THEN 'BOOKING_CONFIRMED'
+                                WHEN status = 'DECLINED' THEN 'BOOKING_DECLINED'
+                                WHEN request_expires_at <= :now THEN 'BOOKING_EXPIRED'
+                                ELSE 'BOOKING_REQUESTED' END,
+                           CASE WHEN status = 'PENDING' AND request_expires_at <= :now THEN request_expires_at ELSE updated_at END
+                    FROM visible_bookings WHERE request_expires_at IS NOT NULL AND status IN ('PENDING', 'CONFIRMED', 'DECLINED')
                     UNION ALL
                     SELECT id, ride_id, driver_id, source_name, destination_name, status, cancelled_at
                     FROM visible_bookings WHERE cancelled_at IS NOT NULL

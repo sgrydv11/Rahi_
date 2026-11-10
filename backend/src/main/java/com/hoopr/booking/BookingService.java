@@ -58,6 +58,9 @@ public class BookingService {
         }
         if (bookings.existsByRideIdAndPassengerIdAndStatus(rideId, passenger, "CONFIRMED"))
             throw new BookingFailure(409, "You already have an active booking on this ride. View My Bookings.");
+        Instant now = clock.instant();
+        if (bookings.existsByRideIdAndPassengerIdAndStatusAndRequestExpiresAtAfter(rideId, passenger, "PENDING", now))
+            throw new BookingFailure(409, "You already have a pending request for this ride. View My Bookings.");
         if (groupSeats.hasHold(rideId, passenger, clock.instant().atOffset(ZoneOffset.UTC)))
             throw new BookingFailure(409, "Cancel your active seat hold before booking this ride.");
         if (ride.availableSeats - groupSeats.heldSeats(rideId, clock.instant()) < seats) throw new BookingFailure(409, "Not enough seats remain. Reload the ride and try again.");
@@ -66,10 +69,44 @@ public class BookingService {
         booking.seatsBooked = (short) seats; booking.pricePerSeatSnapshot = ride.pricePerSeat;
         booking.journeyDetails = details;
         booking.currency = ride.currency; booking.status = "CONFIRMED"; booking.idempotencyKey = requestKey;
-        booking.createdAt = booking.updatedAt = clock.instant();
-        ride.availableSeats -= (short) seats; ride.updatedAt = clock.instant();
+        booking.createdAt = booking.updatedAt = now;
+        if (RidePreferences.forRide(ride).requiresApproval()) {
+            booking.status = "PENDING";
+            Instant limit = now.plus(Duration.ofHours(24));
+            booking.requestExpiresAt = ride.departureAt.isBefore(limit) ? ride.departureAt : limit;
+        } else {
+            ride.availableSeats -= (short) seats; ride.updatedAt = now;
+        }
         Booking saved = bookings.saveAndFlush(booking); // Flushes both rows, including ride @Version.
         return new Created(view(saved), false);
+    }
+    @Transactional
+    public View decide(UUID id, UUID owner, boolean accept) {
+        active(owner);
+        Ride ride = lockRide(bookings.rideIdFor(id).orElseThrow(() -> new BookingFailure(404, "Booking not found.")));
+        if (!ride.driverId.equals(owner)) throw new BookingFailure(403, "Only the ride owner can review requests.");
+        Booking booking = find(id);
+        String decision = accept ? "CONFIRMED" : "DECLINED";
+        if (booking.requestExpiresAt != null && decision.equals(booking.status)) return view(booking);
+        if (!"PENDING".equals(effectiveStatus(booking))) throw new BookingFailure(409, "This booking request is no longer pending.");
+        if (accept) {
+            futureScheduled(ride);
+            requireConsistentSeats(ride);
+            if (users.findById(booking.passengerId).filter(u -> "ACTIVE".equals(u.status)).isEmpty())
+                throw new BookingFailure(409, "The passenger account is unavailable.");
+            if (ride.availableSeats - groupSeats.heldSeats(ride.id, clock.instant()) < booking.seatsBooked)
+                throw new BookingFailure(409, "Not enough seats remain to accept this request.");
+            ride.availableSeats -= booking.seatsBooked;
+            ride.updatedAt = clock.instant();
+        }
+        booking.status = decision;
+        booking.updatedAt = clock.instant();
+        bookings.flush();
+        return view(booking);
+    }
+    public void requireNoPendingRequests(UUID rideId) {
+        if (bookings.existsByRideIdAndStatusAndRequestExpiresAtAfter(rideId, "PENDING", clock.instant()))
+            throw new BookingFailure(409, "Review pending requests before editing this ride.");
     }
     @Transactional(readOnly = true)
     public Results mine(UUID passenger, int page, int size) {
@@ -125,6 +162,11 @@ public class BookingService {
         Ride ride = lockRide(rideId);
         Booking booking = find(id);
         if (!booking.passengerId.equals(passenger)) throw new BookingFailure(403, "Only the passenger can cancel this booking.");
+        if ("PENDING".equals(effectiveStatus(booking))) {
+            cancelRecord(booking, "CANCELLED_BY_PASSENGER", passenger, reason);
+            bookings.flush();
+            return view(booking);
+        }
         if (!"CONFIRMED".equals(booking.status)) return view(booking); // Never restores seats twice.
         futureScheduled(ride); requireConsistentSeats(ride);
         cancelRecord(booking, "CANCELLED_BY_PASSENGER", passenger, reason);
@@ -138,6 +180,9 @@ public class BookingService {
         for (Booking booking : bookings.findByRideIdAndStatusOrderById(ride.id, "CONFIRMED").stream()
                 .sorted(Comparator.comparing(b -> b.passengerId)).toList())
             cancelRecord(booking, "CANCELLED_BY_DRIVER", owner, reason);
+        for (Booking booking : bookings.findByRideIdAndStatusOrderById(ride.id, "PENDING")) {
+            if ("PENDING".equals(effectiveStatus(booking))) cancelRecord(booking, "CANCELLED_BY_DRIVER", owner, reason);
+        }
         groupSeats.cancelForRide(ride.id);
         ride.availableSeats = ride.totalSeats;
     }
@@ -167,15 +212,19 @@ public class BookingService {
         if (name == null || name.isBlank()) name = "Hoopr passenger"; else name = name.strip().split("\\s+", 2)[0];
         var journey = new Journey(ride.getId(), ride.getDriverId(), ride.getOrigin(), ride.getDestination(), ride.getDepartureAt(),
                 ride.getTimeZone(), "PUBLISHED".equals(ride.getStatus()) ? "SCHEDULED" : ride.getStatus(), RideDtos.routePins(ride));
-        boolean canCancel = "CONFIRMED".equals(booking.status) && List.of("SCHEDULED", "PUBLISHED").contains(ride.getStatus())
+        String status = effectiveStatus(booking);
+        boolean canCancel = List.of("CONFIRMED", "PENDING").contains(status) && List.of("SCHEDULED", "PUBLISHED").contains(ride.getStatus())
                 && ride.getDepartureAt().isAfter(clock.instant());
         Rating rating = booking.driverRating == null ? null : new Rating(booking.driverRating, booking.ratedAt, booking.reviewText);
         return new View(booking.id, journey, new Person(booking.passengerId, name), booking.seatsBooked,
                 booking.pricePerSeatSnapshot, booking.paidFarePaise == null
                         ? booking.pricePerSeatSnapshot.multiply(java.math.BigDecimal.valueOf(booking.seatsBooked))
                         : java.math.BigDecimal.valueOf(booking.paidFarePaise, 2),
-                booking.currency, booking.status, booking.version, canCancel, booking.createdAt, booking.updatedAt,
-                booking.cancelledAt, booking.cancellationReason, rating, booking.journeyDetails);
+                booking.currency, status, booking.version, canCancel, booking.createdAt, booking.updatedAt,
+                booking.cancelledAt, booking.cancellationReason, rating, booking.journeyDetails, booking.requestExpiresAt);
+    }
+    private String effectiveStatus(Booking booking) {
+        return "PENDING".equals(booking.status) && !booking.requestExpiresAt.isAfter(clock.instant()) ? "EXPIRED" : booking.status;
     }
     private Results results(Page<Booking> page) {
         return new Results(page.getContent().stream().map(this::view).toList(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());

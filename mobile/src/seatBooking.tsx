@@ -6,11 +6,11 @@ import type { Navigate } from './navigation';
 import { Button, Card, Choice, Copy, ErrorText, Field, styles, useAction } from './ui';
 
 interface DraftPassenger { name: string; age: string; gender: string }
-export function SeatBooking({ ride, user, go }: { ride: Ride; user: User | null; go: Navigate }) {
+export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride; requestedSeats?: number; user: User | null; go: Navigate }) {
   const [stage, setStage] = useState<'start' | 'stops' | 'passengers' | 'review'>('start');
   const [boarding, setBoarding] = useState('');
   const [dropping, setDropping] = useState('');
-  const [passengers, setPassengers] = useState<DraftPassenger[]>([{ name: '', age: '', gender: '' }]);
+  const [passengers, setPassengers] = useState<DraftPassenger[]>(() => Array.from({ length: Math.min(requestedSeats, ride.availableSeats) }, () => ({ name: '', age: '', gender: '' })));
   const [recent, setRecent] = useState<Passenger[]>([]);
   const request = useRef<{ signature: string; key: string } | null>(null);
   const action = useAction();
@@ -35,9 +35,12 @@ export function SeatBooking({ ride, user, go }: { ride: Ride; user: User | null;
       name: person.name.trim(), age: Number(person.age), gender: person.gender as Passenger['gender'],
     })) };
   }
-  if (stage === 'start') return <Button label="Book Seat" onPress={() => {
-    if (!user) go({ kind: 'register' }); else setStage('stops');
-  }} />;
+  if (stage === 'start') return <>
+    {requestedSeats > ride.availableSeats && <Copy>Only {ride.availableSeats} seats remain. You can choose a smaller group.</Copy>}
+    <Button label={ride.preferences?.requiresApproval ? 'Request seats' : 'Book Seat'} onPress={() => {
+      if (!user) go({ kind: 'register' }); else setStage('stops');
+    }} />
+  </>;
   function edit(index: number, field: keyof DraftPassenger, value: string) {
     setPassengers(previous => previous.map((person, position) => position === index ? { ...person, [field]: value } : person));
   }
@@ -69,7 +72,7 @@ export function SeatBooking({ ride, user, go }: { ride: Ride; user: User | null;
       <Copy>{boarding} → {dropping}</Copy>
       {passengers.map((person, index) => <Copy key={index}>{person.name} · {person.age} · {person.gender}</Copy>)}
       <Copy>Total: {ride.currency} {(passengers.length * ride.pricePerSeat).toFixed(2)}. No convenience fees or hidden charges.</Copy>
-      <Button label={action.busy ? 'Booking…' : 'Confirm booking'} disabled={action.busy} onPress={() => void action.run(async () => {
+      <Button label={action.busy ? 'Booking…' : ride.preferences?.requiresApproval ? 'Send request' : 'Confirm booking'} disabled={action.busy} onPress={() => void action.run(async () => {
         const body = { seats: passengers.length, rideVersion: ride.version, details: details() };
         const signature = JSON.stringify(body);
         if (request.current?.signature !== signature) request.current = { signature, key: randomUUID() };

@@ -4,6 +4,8 @@ import { errorMessage } from '../auth/auth';
 import { ridesApi, type RidePage } from './api';
 import { Pagination, RideCard } from './RideComponents';
 
+const seatOptions = [1, 2, 3, 4, 5, 6];
+
 function day(offset = 0) {
   const date = new Date(); date.setDate(date.getDate() + offset);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -17,11 +19,20 @@ export function RideSearchPage() {
   const [error, setError] = useState('');
   const query = params.toString();
   const selected = Boolean(params.get('origin')?.trim() && params.get('destination')?.trim());
+  const seats = seatOptions.find(value => String(value) === params.get('minimumSeats')) ?? 1;
+  const returnDate = params.get('returnDate');
+  const returnQuery = selected && returnDate ? new URLSearchParams({
+    origin: params.get('destination')!, destination: params.get('origin')!, departureDate: returnDate,
+    minimumSeats: String(seats), page: '0', size: '10', timeZone: params.get('timeZone') || 'Asia/Kolkata',
+  }) : null;
+  if (returnQuery && params.get('womenOnly') === 'true') returnQuery.set('womenOnly', 'true');
   useEffect(() => {
     if (!selected) { setResult(null); setLoading(false); return; }
     const controller = new AbortController();
     setLoading(true); setError('');
-    ridesApi.search(new URLSearchParams(query), controller.signal).then(value => { if (!controller.signal.aborted) setResult(value); })
+    const searchParams = new URLSearchParams(query);
+    searchParams.delete('returnDate');
+    ridesApi.search(searchParams, controller.signal).then(value => { if (!controller.signal.aborted) setResult(value); })
       .catch(failure => { if (!controller.signal.aborted) { setError(errorMessage(failure)); setResult(null); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -31,6 +42,8 @@ export function RideSearchPage() {
     const next = new URLSearchParams();
     for (const [key, value] of new FormData(event.currentTarget).entries()) if (String(value).trim()) next.set(key, String(value).trim());
     if (next.get('origin')?.toLowerCase() === next.get('destination')?.toLowerCase()) { setError('Choose different cities.'); return; }
+    const returnDay = next.get('returnDate');
+    if (returnDay && returnDay < (next.get('departureDate') || day())) { setError('Choose a return date on or after departure.'); return; }
     next.set('timeZone', Intl.DateTimeFormat().resolvedOptions().timeZone);
     next.set('page', '0'); next.set('size', '10'); setParams(next);
   }
@@ -58,10 +71,18 @@ export function RideSearchPage() {
         {calendar && <label>Custom date<input type="date" required min={day()} value={date} onChange={event => setDate(event.target.value)} /></label>}
         <p>{date}</p>
       </fieldset>
+      <label>Return date (optional)<input type="date" name="returnDate" min={date} /></label>
       <label><input name="womenOnly" type="checkbox" value="true" />Women-only rides</label>
+      <label>Passengers<select name="minimumSeats" defaultValue={seats}>
+        {seatOptions.map(value => <option key={value} value={value}>{value}</option>)}
+      </select></label>
       <button className="button" type="submit">Search rides</button>
     </form> : <>
-      <p>{params.get('origin')} → {params.get('destination')} · {params.get('departureDate') || day()} <Link to="/rides">Change search</Link></p>
+      <p>{params.get('origin')} → {params.get('destination')} · {params.get('departureDate') || day()} <Link to={`/rides?minimumSeats=${seats}`}>Change search</Link></p>
+      {returnQuery && <p><Link to={`/rides?${returnQuery}`}>Find return rides on {returnDate}</Link></p>}
+      <label>Passengers<select value={seats} onChange={event => change('minimumSeats', event.target.value)}>
+        {seatOptions.map(value => <option key={value} value={value}>{value}</option>)}
+      </select></label>
       <label>Sort<select value={params.get('sort') || 'TIME_ASC'} onChange={event => change('sort', event.target.value)}>
         <option value="TIME_ASC">Time ascending</option><option value="TIME_DESC">Time descending</option>
         <option value="PRICE_ASC">Price ascending</option><option value="PRICE_DESC">Price descending</option>
@@ -86,7 +107,7 @@ export function RideSearchPage() {
     <div className="ride-results" aria-busy={loading}>
       {loading ? <p role="status">Finding rides…</p> : result && <>
         <p role="status">{result.totalElements ? `${result.totalElements} rides found` : 'No rides found. Try another date or route.'}</p>
-        {result.content.map(ride => <RideCard ride={ride} key={ride.id} />)}
+        {result.content.map(ride => <RideCard ride={ride} requestedSeats={seats} key={ride.id} />)}
         <Pagination page={result.page} totalPages={result.totalPages} loading={loading} onChange={number => { const next = new URLSearchParams(params); next.set('page', String(number)); setParams(next); }} />
       </>}
     </div>

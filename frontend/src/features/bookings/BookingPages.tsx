@@ -32,7 +32,7 @@ export function BookingListPage({ manifest = false }: { manifest?: boolean }) {
   }, [id, manifest, page]);
   return <section className="page"><h1>{manifest ? 'Ride bookings.' : 'My bookings.'}</h1>
     <Link to={manifest ? `/rides/${id}` : '/rides'}>{manifest ? '← Back to ride' : 'Find a ride'}</Link>
-    {manifest && <p>Confirmed and cancelled bookings for your ride. Passenger contact details remain private.</p>}
+    {manifest && <p>Booking requests and passenger bookings for your ride. Passenger contact details remain private.</p>}
     <div className="ride-results" aria-busy={loading}>{loading ? <p role="status">Loading bookings…</p> : error ? <p role="alert">{error}</p> : result && <>
       {!result.content.length && <p role="status">No bookings on this page.</p>}
       {result.content.map(booking => <BookingCard key={booking.id} booking={booking} />)}
@@ -70,6 +70,11 @@ export function BookingDetailsPage() {
     try { setBooking(await bookingsApi.cancel(id, reason)); setConfirm(false); setMessage('Cancellation recorded. Your seats have been released.'); }
     catch (failure) { setError(errorMessage(failure)); } finally { setBusy(false); }
   }
+  async function decide(decision: 'accept' | 'decline') {
+    setBusy(true); setError('');
+    try { setBooking(await bookingsApi.decide(id, decision)); setMessage(decision === 'accept' ? 'Request accepted.' : 'Request declined.'); }
+    catch (failure) { setError(errorMessage(failure)); } finally { setBusy(false); }
+  }
   async function rate(score: number, review?: string) {
     setBusy(true);
     setError('');
@@ -93,11 +98,19 @@ export function BookingDetailsPage() {
         {booking.cancellationReason && <p>Reason: {booking.cancellationReason}</p>}
         {booking.ride.status !== 'IN_PROGRESS' && <Link to={`/rides/${booking.ride.id}`}>View ride</Link>}
       </div>
+      {booking.status === 'PENDING' && <div className="panel">
+        <p>Awaiting driver approval. Seats are reserved only after acceptance.</p>
+        {booking.requestExpiresAt && <p>Request expires {new Date(booking.requestExpiresAt).toLocaleString()}.</p>}
+        {user?.id === booking.ride.driverId && <div className="ride-actions">
+          <button className="button" disabled={busy} onClick={() => void decide('accept')}>Accept request</button>
+          <button className="button button-secondary" disabled={busy} onClick={() => void decide('decline')}>Decline request</button>
+        </div>}
+      </div>}
       <BookingRating booking={booking} viewerId={user?.id} busy={busy} onRate={rate} />
       {booking.ride.route && <RoutePreview pins={booking.ride.route} />}
-      {user?.id === booking.passenger.id && <BookingPayment key={booking.id} booking={booking} />}
+      {user?.id === booking.passenger.id && booking.status !== 'PENDING' && <BookingPayment key={booking.id} booking={booking} />}
       {booking.canCancel && user?.id === booking.passenger.id && (!confirm ? <button className="button button-danger" onClick={() => setConfirm(true)}>Cancel booking</button> :
-        <form className="panel auth-form" onSubmit={cancel} aria-busy={busy}><h2>Cancel this booking?</h2><p>All {booking.seats} seats in this booking will be released.</p>
+        <form className="panel auth-form" onSubmit={cancel} aria-busy={busy}><h2>Cancel this booking?</h2><p>{booking.status === 'PENDING' ? 'Your request will be withdrawn.' : `All ${booking.seats} seats in this booking will be released.`}</p>
           <label>Reason (optional)<textarea name="reason" maxLength={500} disabled={busy} /></label>
           <div className="ride-actions"><button className="button button-danger" disabled={busy}>{busy ? 'Cancelling…' : 'Confirm cancellation'}</button>
             <button type="button" className="button button-secondary" disabled={busy} onClick={() => setConfirm(false)}>Keep booking</button></div>
