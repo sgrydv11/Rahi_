@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Keyboard, Platform, View } from 'react-native';
+import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Button, Copy, styles } from './ui';
 
-export function DateField({ label, mode, value, change, clear }: {
+export function DateField({ label, mode, value, change, clear, minimumDate }: {
   label: string;
   mode: 'date' | 'time';
   value?: Date;
   change: (value: Date) => void;
   clear?: () => void;
+  minimumDate?:Date;
 }) {
   const [pending, setPending] = useState<Date>();
   const display = value && (mode === 'date' ? value.toLocaleDateString() :
@@ -18,7 +20,7 @@ export function DateField({ label, mode, value, change, clear }: {
     const initial = value ?? new Date();
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
-        value: initial, mode, is24Hour: false,
+        value: initial, mode, is24Hour: false, minimumDate:mode==='date'?minimumDate:undefined,
         onChange: (event, selected) => { if (event.type === 'set' && selected) change(selected); },
       });
     } else {
@@ -28,11 +30,12 @@ export function DateField({ label, mode, value, change, clear }: {
   return <View style={styles.field}>
     <Copy>{label}</Copy>
     <View style={styles.row}>
-      <Button label={display ? `${label}: ${display}` : `Select ${label.toLowerCase()}`} onPress={open} />
+      {mode==='date'?<Pressable accessibilityRole="button" accessibilityLabel={display?`${label}: ${display}`:`Select ${label.toLowerCase()}`} onPress={open} style={{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:12,borderWidth:1,borderColor:'#c8d7ec',backgroundColor:'#fff'}}><Ionicons name="calendar-outline" size={23} color="#2359ac"/><Text style={{color:'#172b49',fontWeight:'600'}}>{display||'Select travel date'}</Text></Pressable>:<Button label={display ? `${label}: ${display}` : `Select ${label.toLowerCase()}`} onPress={open} />}
       {clear && value && <Button label="Clear date" onPress={() => { setPending(undefined); clear(); }} />}
     </View>
     {pending && <>
       <DateTimePicker value={pending} mode={mode} display={mode === 'date' ? 'inline' : 'spinner'}
+        minimumDate={mode==='date'?minimumDate:undefined}
         locale={mode === 'time' ? 'en_US' : undefined}
         onChange={(_, selected) => { if (selected) setPending(selected); }} />
       <View style={styles.row}>

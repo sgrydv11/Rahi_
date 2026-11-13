@@ -4,6 +4,24 @@ Last updated 13 November 2026, Asia/Kolkata.
 
 ## 13 November: community chat implementation
 
+### Follow-up: verified signup and reference layouts
+
+User supplied four UI references while release 0.2.0 was building. Hold the
+release email for a replacement 0.2.1 APK (version code 3). Implemented staged
+password signup with email OTP: V20 stores only a BCrypt password hash on the
+challenge and creates the account only after a valid code. The selected password
+remains usable for later login. Existing accounts cannot be overwritten through
+signup. Legacy unverified registration is blocked when EMAIL_OTP_ENABLED=true;
+existing password sign-in remains available. New web/native registration request
+endpoints use the existing rate limiter, CSRF/native-origin checks and OTP expiry.
+
+Reference UI changes: inline eye buttons, Today/Tomorrow chips, a calendar icon
+opening the date picker, women-only switch, compact ride cards, and a messenger
+layout with incoming/outgoing bubbles and a pinned composer. Do not add fake
+arrival times, read receipts, call buttons, discounts or other unavailable data.
+Browser signup layout checks simulate provider responses; EmailOtpIT tests real
+database account creation, password storage, rejected codes and replay separately.
+
 Implemented locally on app_v1: one authenticated shared driver/passenger chat,
 durable PostgreSQL messages (V19), ride attachments with current seat counts and
 departure details, links into the normal booking flow, and Chat in the web and

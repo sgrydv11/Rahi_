@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Linking, View } from 'react-native';
+import { Alert, Linking, Pressable, Switch, Text, View } from 'react-native';
 import { api, type Page, type Pins, type Ride, type RidePreferences, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
 import { demoMode, demoRide, demoRides } from './demo';
@@ -10,6 +10,10 @@ import { Button, Card, Choice, Copy, date, ErrorText, Field, labelStatus, QueryS
 const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const future = (ride: Ride) => ride.status === 'SCHEDULED' && Date.parse(ride.departureAt) > Date.now();
 const ridePath = (id: string) => '/rides/' + encodeURIComponent(id);
+function departureClock(ride:Ride) {
+  try{return new Date(ride.departureAt).toLocaleTimeString('en-IN',{timeZone:ride.timeZone,hour:'numeric',minute:'2-digit',hour12:true});}
+  catch{return new Date(ride.departureAt).toLocaleTimeString('en-IN',{timeZone:'UTC',hour:'numeric',minute:'2-digit',hour12:true})+' UTC';}
+}
 const message = (label: string, value?: string) => value ? <Copy>{label}: {value}</Copy> : null;
 function day(offset = 0) {
   const date = new Date(); date.setDate(date.getDate() + offset);
@@ -60,12 +64,14 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
   if (!mine && !query) return <Card>
     <Field label="From City" value={draft.origin || ''} change={value => update('origin', value)} />
     <Field label="To City" value={draft.destination || ''} change={value => update('destination', value)} />
-    <View style={styles.row}><Button label="Today" onPress={() => update('departureDate', day())} /><Button label="Tomorrow" onPress={() => update('departureDate', day(1))} /></View>
-    <DateField label="Calendar" mode="date" value={travelDate} change={value => update('departureDate', localDate(value.toISOString()).slice(0, 10))} />
+    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6}}>
+      <DateField label="Date of Journey" mode="date" minimumDate={new Date(day()+'T00:00')} value={travelDate} change={value => update('departureDate', localDate(value.toISOString()).slice(0, 10))} />
+      <View style={{flexDirection:'row',gap:5}}>{[{label:'Today',offset:0},{label:'Tomorrow',offset:1}].map(item=><Pressable key={item.label} accessibilityRole="button" onPress={()=>update('departureDate',day(item.offset))} style={{borderRadius:20,padding:8,backgroundColor:draft.departureDate===day(item.offset)?'#2359ac':'#e6edfc'}}><Text style={{fontSize:11,color:draft.departureDate===day(item.offset)?'#fff':'#172b49'}}>{item.label}</Text></Pressable>)}</View>
+    </View>
     <DateField label="Return date (optional)" mode="date" value={draft.returnDate ? new Date(draft.returnDate + 'T12:00') : undefined}
       change={value => update('returnDate', localDate(value.toISOString()).slice(0, 10))} clear={() => update('returnDate', '')} />
     <Choice label="Passengers" values={seatOptions} selected={draft.minimumSeats} change={value => update('minimumSeats', value)} />
-    <Choice label="Women-only rides" values={yesNo} selected={draft.womenOnly || ''} change={value => update('womenOnly', value)} />
+    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:12,borderWidth:1,borderColor:'#c8d7ec',borderRadius:12}}><View><Copy>Booking for women</Copy><Text style={{color:'#52657f',fontSize:12}}>Show women-only rides</Text></View><Switch accessibilityLabel="Women-only rides" value={draft.womenOnly==='true'} onValueChange={value=>update('womenOnly',value?'true':'')} trackColor={{true:'#2359ac'}}/></View>
     <ErrorText message={error} />
     <Button label="Search rides" onPress={() => apply()} />
   </Card>;
@@ -82,11 +88,10 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
         setDraft(next); apply(next);
       }} />}
       <Button label="Change search" onPress={() => { setQuery(''); setError(''); }} />
-      <Choice label="Sort rides" values={sortOptions} selected={draft.sort} change={value => {
+      <View style={styles.row}><Button label={filters ? 'Hide filters' : 'Filter & sort'} onPress={() => setFilters(value => !value)} /><Button label={draft.ac==='true'?'AC ✓':'AC'} onPress={()=>{const next={...draft,ac:draft.ac==='true'?'':'true'};setDraft(next);apply(next);}}/></View>
+      {filters && <Card><Choice label="Sort rides" values={sortOptions} selected={draft.sort} change={value => {
         const next = { ...draft, sort: value }; setDraft(next); apply(next);
       }} />
-      <Button label={filters ? 'Hide filters' : 'Filter rides'} onPress={() => setFilters(value => !value)} />
-      {filters && <Card>
         {timeField('departureTime', 'Direct departure time')}
         <Choice label="Time range" selected={(draft.timeFrom || '') + ',' + (draft.timeTo || '')}
           values={[{ value: ',', label: 'Any time' }, { value: '07:00,12:00', label: '7 AM – 12 PM' },
@@ -106,6 +111,7 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
     {!result.data ? <QueryState {...result} /> : <>
       {!result.data.content.length && <Copy>{mine ? 'You have not offered any rides yet.' : 'No rides match this route, date and filters.'}</Copy>}
       {result.data.content.map(ride => <Card key={ride.id}>
+        <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}><Text style={{fontSize:23,fontWeight:'700',color:'#19345e'}}>{departureClock(ride)}</Text><View><Text style={{fontSize:22,fontWeight:'700',color:'#19345e'}}>{ride.currency==='INR'?'₹':ride.currency+' '}{ride.pricePerSeat}</Text><Text style={{fontSize:11,color:'#52657f',textAlign:'right'}}>per seat</Text></View></View>
         <Copy>{ride.origin} → {ride.destination}</Copy><Copy>{date(ride.departureAt)}</Copy>
         {ride.preferences?.requiresApproval && <Copy>Driver approval required</Copy>}
         <Copy>{ride.currency} {ride.pricePerSeat} per seat · {ride.availableSeats} available</Copy>

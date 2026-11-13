@@ -184,7 +184,7 @@ function NativeApp() {
     </View>
     <KeyboardAvoidingView style={layout.flex} behavior="padding">
       <FieldFocus.Provider value={() => { if (Keyboard.isVisible()) requestAnimationFrame(revealField); }}>
-        <ScrollView ref={scroll} key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled"
+        {screen.kind==='chat' && user?<View style={{flex:1,padding:10}}>{content()}</View>:<ScrollView ref={scroll} key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled"
           onLayout={() => { if (Keyboard.isVisible()) revealField(); }}
           onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
           <Text accessibilityRole="header" style={styles.title}>{!user && !publicScreens.has(screen.kind) ? titles.login : titles[screen.kind]}</Text>
@@ -194,7 +194,7 @@ function NativeApp() {
             <Button label="Reconnect session" onPress={() => void retrySession()} />
           </Card>}
           {content()}
-        </ScrollView>
+        </ScrollView>}
       </FieldFocus.Provider>
       {!demoMode && !keyboardVisible && <View style={layout.footer}>
         {footer.map(({ kind, label, icon }) => <Pressable key={kind} accessibilityRole="tab"

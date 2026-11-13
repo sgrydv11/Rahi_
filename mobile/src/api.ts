@@ -126,6 +126,11 @@ export function requestEmailOtp(identifier: string, mobileNumber?: string, trave
     method: 'POST', body: { identifier, mobileNumber, travelPreference },
   });
 }
+export function requestRegistrationOtp(identifier:string,password:string,mobileNumber:string,travelPreference:Preference) {
+  return request<{challengeId:string;expiresIn:number;delivery:string}>('/mobile/auth/registration/request',{
+    method:'POST',body:{identifier,password,mobileNumber,travelPreference},
+  });
+}
 export async function verifyEmailOtp(challengeId: string, code: string) {
   return (await save(await request<Session>('/mobile/auth/otp/verify', { method: 'POST', body: { challengeId, code } }))).user;
 }

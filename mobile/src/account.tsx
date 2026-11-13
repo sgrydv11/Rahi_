@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { View } from 'react-native';
-import { api, login, register, type Preference, type User, type Vehicle } from './api';
+import { useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { api, login, requestRegistrationOtp, verifyEmailOtp, type Preference, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
 import { Button, Card, Copy, ErrorText, Field, QueryState, styles, useAction, useQuery } from './ui';
 
@@ -16,9 +17,15 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [challenge,setChallenge]=useState('');
+  const [code,setCode]=useState('');
+  const [resendAt,setResendAt]=useState(0);
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{if(!challenge)return;const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[challenge]);
   const [preference, setPreference] = useState<Preference>('PASSENGER');
   const action = useAction();
   async function submit() {
+    if(challenge){if(!/^\d{6}$/.test(code))throw new Error('Enter the six-digit email code.');onUser(await verifyEmailOtp(challenge,code));return;}
     const address = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) || address.length > 254)
       throw new Error('Enter a valid email address.');
@@ -27,19 +34,25 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
       throw new Error('Enter a valid mobile number with country code for numbers outside India.');
     if (!password.trim() || (create && password.length < 12))
       throw new Error(create ? 'Use a password of at least 12 characters.' : 'Enter your password.');
-    onUser(await (create ? register(address, password, 'FlexirRides member', preference, number) : login(address, password)));
+    if(create){const next=await requestRegistrationOtp(address,password,number,preference);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());}
+    else onUser(await login(address,password));
   }
   return <Card>
+    {challenge?<>
+      <Copy>Verify your email</Copy><Copy>Enter the code sent to {email}. Your account is created only after verification. The code expires in five minutes.</Copy>
+      <Field label="Email code" value={code} change={value=>setCode(value.replace(/\D/g,'').slice(0,6))} numeric />
+      <Button label={now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'} disabled={action.busy||now<resendAt} onPress={()=>void action.run(async()=>{const next=await requestRegistrationOtp(email.trim(),password,mobile,preference);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());})}/>
+      <Button label="Change details" disabled={action.busy} onPress={()=>{setChallenge('');setCode('');}} />
+    </>:<>
     <Field label="Email address" value={email} change={setEmail} />
     {create && <>
       <Field label="Mobile number" value={mobile} change={setMobile} />
       <Preferences value={preference} change={setPreference} />
       <Copy>Use a password of at least 12 characters, up to 72 UTF-8 bytes.</Copy>
     </>}
-    <Field label="Password" value={password} change={setPassword} secret={!showPassword} />
-    <Button label={showPassword ? 'Hide password' : 'Show password'} disabled={action.busy}
-      onPress={() => setShowPassword(value => !value)} />
-    <Button label={action.busy ? 'Please wait…' : create ? 'Create account' : 'Sign in'} disabled={action.busy}
+    <Field label="Password" value={password} change={setPassword} secret={!showPassword} trailing={<Pressable accessibilityRole="button" accessibilityLabel={showPassword?'Hide password':'Show password'} onPress={()=>setShowPassword(v=>!v)} disabled={action.busy} style={{padding:12}}><Ionicons name={showPassword?'eye-off-outline':'eye-outline'} size={22} color="#2359ac" /></Pressable>} />
+    </>}
+    <Button label={action.busy ? 'Please wait…' : challenge?'Verify and create account':create ? 'Create account' : 'Sign in'} disabled={action.busy}
       onPress={() => void action.run(submit)} />
     <ErrorText message={action.error} />
     <Button label={create ? 'Already have an account?' : 'Create an account'} disabled={action.busy}

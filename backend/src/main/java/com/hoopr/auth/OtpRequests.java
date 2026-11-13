@@ -17,4 +17,8 @@ public final class OtpRequests {
         @NotBlank @Pattern(regexp = "[0-9]{6}") public String code;
         @Override public String toString() { return "OtpVerify[redacted]"; }
     }
+    public static class Registration extends Request {
+        @NotBlank @Size(min=12,max=72) public String password;
+        @Override public String toString() { return "Registration[redacted]"; }
+    }
 }

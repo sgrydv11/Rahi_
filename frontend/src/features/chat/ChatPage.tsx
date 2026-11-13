@@ -68,10 +68,9 @@ export function ChatPage() {
     } catch(failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); }
   }
-  return <section className="page narrow">
-    <h1>Ride community</h1>
-    <p>Chat with drivers and passengers. Share your travel plans or a ride with seats to book.</p>
-    <p className="muted">Visible to all signed-in members. Showing the latest 50 messages; updates every 3 seconds. Keep personal contact and payment details private.</p>
+  return <section className="page narrow chat-page">
+    <header className="chat-header"><Link to="/rides" aria-label="Back to rides">←</Link><span className="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v2"/></svg></span><div><h1>Ride community</h1><small>Drivers & passengers · shared group</small></div></header>
+    <p className="chat-privacy">Visible to signed-in members. Keep contact and payment details private. Updates every 3 seconds.</p>
     {error && <p role="alert">{error} Your draft is kept; messages will retry automatically.</p>}
     <div className="chat-feed panel" ref={feed} role="log" aria-label="Community messages" aria-live="polite" aria-relevant="additions">
       {!loaded && !error && <p role="status">Loading chat…</p>}
@@ -90,16 +89,18 @@ export function ChatPage() {
         <small>{when(message.createdAt)}</small>
       </article>)}
     </div>
-    <form className="panel auth-form" onSubmit={send}>
-      <label>Message<textarea maxLength={1000} rows={3} value={body} disabled={busy} onChange={e=>setBody(e.target.value)} placeholder="I’m travelling to Ujjain tomorrow. Does anyone have a seat?" /></label>
+    <form className="chat-composer" onSubmit={send}>
+      <div className="chat-compose-row"><textarea aria-label="Message" maxLength={1000} rows={2} value={body} disabled={busy} onChange={e=>setBody(e.target.value)} placeholder="Message" />
+      <button className="chat-send" aria-label={busy?'Sending…':'Send message'} disabled={busy || !body.trim()}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"><path d="m3 3 19 9-19 9 4-9-4-9Zm4 9h15"/></svg></button></div>
+      <details className="chat-attachments"><summary>＋ Share a ride</summary>
       <button className="button button-small" type="button" onClick={()=>void loadOffers()}>Load my rides to share</button>
       {offerError && <p role="alert">{offerError}</p>}
       <label>Attach one of your upcoming rides<select value={rideId} onChange={e=>setRideId(e.target.value)} disabled={busy}>
         <option value="">Message only</option>
         {offers.map(ride=><option key={ride.id} value={ride.id}>{ride.origin} → {ride.destination} · {when(ride.departureAt,ride.timeZone)}</option>)}
       </select></label>
-      <button className="button" disabled={busy || !body.trim()}>{busy?'Sending…':'Send message'}</button>
       <Link to="/rides/new">Publish a new ride</Link>
+      </details>
     </form>
   </section>;
 }

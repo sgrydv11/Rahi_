@@ -26,6 +26,7 @@ class EmailOtpIT {
         registry.add("spring.datasource.password", () -> TestDatabase.required("TEST_DB_PASSWORD"));
     }
     @Autowired EmailOtpService otp;
+    @Autowired AuthService auth;
     @Autowired JdbcTemplate jdbc;
     @MockitoBean OtpMailer mailer;
     String email;
@@ -74,5 +75,29 @@ class EmailOtpIT {
         doThrow(new AuthFailure(503, "Unavailable")).when(mailer).deliver(eq(email), anyString());
         assertThrows(AuthFailure.class, () -> otp.request(email, mobile, TravelPreference.PASSENGER));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM email_otp_challenges WHERE email=?", Integer.class, email));
+    }
+    @Test void passwordSignupCreatesAccountOnlyAfterOtpAndKeepsChosenPassword() {
+        String password="Verified-signup-password-123";
+        var challenge=otp.requestRegistration(email,password,mobile,TravelPreference.PASSENGER);
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM users WHERE email=?",Integer.class,email));
+        String stored=jdbc.queryForObject("SELECT registration_password_hash FROM email_otp_challenges WHERE id=?",String.class,challenge.challengeId());
+        assertNotEquals(password,stored);
+        assertTrue(stored.startsWith("$2"));
+        String wrong=code.get().equals("000000")?"111111":"000000";
+        assertThrows(AuthFailure.class,()->otp.verify(challenge.challengeId(),wrong));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM users WHERE email=?",Integer.class,email));
+        var verified=otp.verify(challenge.challengeId(),code.get());
+        assertEquals(email,verified.access.user().email());
+        assertEquals(email,auth.login(email,password).access.user().email());
+        assertThrows(AuthFailure.class,()->otp.verify(challenge.challengeId(),code.get()));
+    }
+    @Test void registrationNeverReplacesAnExistingAccountsPassword() {
+        auth.register(email,"Original-password-123","Existing Rider");
+        assertEquals(409,assertThrows(AuthFailure.class,()->otp.requestRegistration(email,"Replacement-password-123",mobile,TravelPreference.PASSENGER)).status);
+        assertEquals(email,auth.login(email,"Original-password-123").access.user().email());
+    }
+    @Test void enabledEmailOtpBlocksLegacyUnverifiedSignup() {
+        when(mailer.enabled()).thenReturn(true);
+        assertEquals(409,assertThrows(AuthFailure.class,()->otp.requireLegacyRegistrationAllowed()).status);
     }
 }

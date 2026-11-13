@@ -39,6 +39,7 @@ async function login(page,email) {
     await login(driverPage,driver.email);await login(passengerPage,rider.email);
     const message='Two seats to Ujjain '+stamp;
     await driverPage.getByLabel('Message',{exact:true}).fill(message);
+    await driverPage.getByText('＋ Share a ride',{exact:true}).click();
     await driverPage.getByRole('button',{name:'Load my rides to share',exact:true}).click();
     await expect(driverPage.getByRole('combobox')).toContainText('Indore');
     await driverPage.getByRole('combobox').selectOption(ride.id);

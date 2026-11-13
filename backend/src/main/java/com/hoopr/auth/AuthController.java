@@ -58,6 +58,10 @@ public class AuthController {
         limiter.check(request.getRemoteAddr());
         return otp.request(body.identifier, body.mobileNumber, body.travelPreference);
     }
+    @PostMapping("/registration/request") public EmailOtpService.Challenge requestRegistration(@Valid @RequestBody OtpRequests.Registration body, HttpServletRequest request) {
+        limiter.check(request.getRemoteAddr());
+        return otp.requestRegistration(body.identifier,body.password,body.mobileNumber,body.travelPreference);
+    }
     @PostMapping("/otp/verify") public AuthService.Access verifyOtp(@Valid @RequestBody OtpRequests.Verify body,
             HttpServletRequest request, HttpServletResponse response) {
         limiter.check(request.getRemoteAddr());
@@ -67,6 +71,7 @@ public class AuthController {
     }
     @PostMapping("/register") @ResponseStatus(HttpStatus.CREATED)
     public AuthService.Profile register(@Valid @RequestBody RegisterRequest body) {
+        otp.requireLegacyRegistrationAllowed();
         if (body.password.length() < 12) throw new AuthFailure(400, "Password must contain at least 12 characters.");
         return registerAccount(auth, body);
     }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { errorMessage } from '../auth/auth';
 import { ridesApi, type RidePage } from './api';
@@ -14,6 +14,7 @@ export function RideSearchPage() {
   const [params, setParams] = useSearchParams();
   const [date, setDate] = useState(day());
   const [calendar, setCalendar] = useState(false);
+  const dateInput=useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<RidePage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -63,23 +64,25 @@ export function RideSearchPage() {
   }
   return <section className="page">
     <p className="eyebrow">Go further, together</p><h1>{selected ? 'Available rides' : 'Where are you headed?'}</h1>
-    {!selected ? <form className="panel ride-filter" onSubmit={search}>
-      <label>From City<input name="origin" required maxLength={200} placeholder="From City" /></label>
-      <label>To City<input name="destination" required maxLength={200} placeholder="To City" /></label>
-      <fieldset><legend>Date of Journey</legend><input type="hidden" name="departureDate" value={date} />
-        <div className="ride-actions"><button type="button" onClick={() => { setDate(day()); setCalendar(false); }}>Today</button><button type="button" onClick={() => { setDate(day(1)); setCalendar(false); }}>Tomorrow</button><button type="button" onClick={() => setCalendar(true)}>Calendar</button></div>
-        {calendar && <label>Custom date<input type="date" required min={day()} value={date} onChange={event => setDate(event.target.value)} /></label>}
-        <p>{date}</p>
-      </fieldset>
+    {!selected ? <form className="panel ride-search-compact" onSubmit={search}>
+      <div className="journey-fields"><label className="city-field"><span aria-hidden="true">↗</span><span>From City<input aria-label="From City" name="origin" required maxLength={200} placeholder="Leaving from" /></span></label>
+      <label className="city-field"><span aria-hidden="true">↘</span><span>To City<input aria-label="To City" name="destination" required maxLength={200} placeholder="Going to" /></span></label>
+      <div className="journey-date"><input type="hidden" name="departureDate" value={date} />
+        <button className="calendar-trigger" type="button" aria-label="Calendar" onClick={()=>{setCalendar(true);try{dateInput.current?.showPicker();}catch{dateInput.current?.focus();}}}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 2v6m10-6v6M3 11h18"/></svg><span><small>Date of Journey</small><strong>{new Date(date+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</strong></span></button>
+        <button className="date-chip" type="button" aria-pressed={date===day()} onClick={()=>{setDate(day());setCalendar(false);}}>Today</button><button className="date-chip" type="button" aria-pressed={date===day(1)} onClick={()=>{setDate(day(1));setCalendar(false);}}>Tomorrow</button>
+      </div></div>
+      <label className={calendar?'calendar-input':'calendar-input visually-hidden'}>Custom date<input ref={dateInput} type="date" required min={day()} value={date} onChange={event=>{if(event.target.value){setDate(event.target.value);setCalendar(false);}}} /></label>
+      <label className="women-toggle"><span>Booking for women<small>Show women-only rides</small></span><input name="womenOnly" type="checkbox" role="switch" aria-label="Women-only rides" value="true" /></label>
+      <div className="search-extras">
       <label>Return date (optional)<input type="date" name="returnDate" min={date} /></label>
-      <label><input name="womenOnly" type="checkbox" value="true" />Women-only rides</label>
       <label>Passengers<select name="minimumSeats" defaultValue={seats}>
         {seatOptions.map(value => <option key={value} value={value}>{value}</option>)}
       </select></label>
-      <button className="button" type="submit">Search rides</button>
+      </div><button className="button search-submit" type="submit" aria-label="Search rides">⌕ Search rides</button>
     </form> : <>
       <p>{params.get('origin')} → {params.get('destination')} · {params.get('departureDate') || day()} <Link to={`/rides?minimumSeats=${seats}`}>Change search</Link></p>
       {returnQuery && <p><Link to={`/rides?${returnQuery}`}>Find return rides on {returnDate}</Link></p>}
+      <div className="ride-results-toolbar"><details className="panel filter-sort-panel"><summary>Filter & sort</summary>
       <label>Passengers<select value={seats} onChange={event => change('minimumSeats', event.target.value)}>
         {seatOptions.map(value => <option key={value} value={value}>{value}</option>)}
       </select></label>
@@ -88,7 +91,7 @@ export function RideSearchPage() {
         <option value="PRICE_ASC">Price ascending</option><option value="PRICE_DESC">Price descending</option>
         <option value="RATING_ASC">Rating ascending</option><option value="RATING_DESC">Rating descending</option>
       </select></label>
-      <details className="panel"><summary>Filter rides</summary><form className="ride-filter" key={query} onSubmit={filters}>
+      <form className="ride-filter" key={query} onSubmit={filters}>
         <label>Direct departure time<input name="departureTime" type="time" defaultValue={params.get('departureTime') || ''} /></label>
         <label>Time range<select name="window" defaultValue=""><option value="">Custom range or any time</option>
           <option value="07:00,12:00">7 AM – 12 PM</option><option value="12:00,16:00">12 PM – 4 PM</option>
@@ -101,7 +104,7 @@ export function RideSearchPage() {
         <label><input type="checkbox" name="ac" value="true" defaultChecked={params.get('ac') === 'true'} />AC</label>
         <label><input type="checkbox" name="flexibleDropoff" value="true" defaultChecked={params.get('flexibleDropoff') === 'true'} />Flexible nearby drop-off</label>
         <button className="button">Apply filters</button>
-      </form></details>
+      </form></details><button className="date-chip" type="button" aria-pressed={params.get('ac')==='true'} onClick={()=>change('ac',params.get('ac')==='true'?'false':'true')}>AC</button><button className="date-chip" type="button" aria-pressed={params.get('flexibleDropoff')==='true'} onClick={()=>change('flexibleDropoff',params.get('flexibleDropoff')==='true'?'false':'true')}>Flexible drop-off</button></div>
     </>}
     {error && <p role="alert">{error}</p>}
     <div className="ride-results" aria-busy={loading}>

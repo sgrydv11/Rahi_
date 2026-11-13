@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppState, ScrollView, View } from 'react-native';
+import { AppState, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { randomUUID } from 'expo-crypto';
 import { api, type Ride } from './api';
 import type { Navigate } from './navigation';
-import { Button, Card, Copy, ErrorText, Field, date } from './ui';
+import { Button, Card, Copy, ErrorText, date } from './ui';
 
 interface Message {
   id:number; senderId:string; senderName:string; body:string; createdAt:string;
@@ -19,6 +20,7 @@ export function Chat({userId,go}:{userId:string;go:Navigate}) {
   const [offers,setOffers]=useState<Ride[]>([]);
   const [offerError,setOfferError]=useState('');
   const [busy,setBusy]=useState(false);
+  const [share,setShare]=useState(false);
   const feed=useRef<ScrollView>(null);
   const following=useRef(true);
   const pending=useRef<{clientId:string;body:string;rideId?:string} | undefined>(undefined);
@@ -66,16 +68,17 @@ export function Chat({userId,go}:{userId:string;go:Navigate}) {
     } catch(failure) {setError(failure instanceof Error?failure.message:'Unable to send. Your draft is kept.');}
     finally {setBusy(false);}
   }
-  return <>
-    <Card><Copy>Ride community</Copy><Copy>Visible to all signed-in drivers and passengers. Latest 50 messages, updated every 3 seconds. Keep personal contact and payment details private.</Copy></Card>
+  return <View style={{flex:1,borderRadius:16,overflow:'hidden',backgroundColor:'#eef1e8'}}>
+    <View style={{flexDirection:'row',gap:12,alignItems:'center',padding:14,backgroundColor:'#fff'}}><Ionicons name="people-circle" size={42} color="#2359ac"/><View><Text style={{fontSize:19,fontWeight:'700',color:'#172b49'}}>Ride community</Text><Text style={{fontSize:12,color:'#52657f'}}>Drivers & passengers · shared group</Text></View></View>
+    <Text style={{backgroundColor:'#fff5dc',padding:8,fontSize:11,color:'#52657f',textAlign:'center'}}>Visible to signed-in members. Keep contact and payment details private.</Text>
     <ErrorText message={error} />
     {!loaded && !error && <Copy>Loading chat…</Copy>}
     {loaded && !messages.length && <Copy>No messages yet. Start the conversation.</Copy>}
-    <ScrollView ref={feed} style={{maxHeight:360}} nestedScrollEnabled accessibilityLabel="Community messages"
+    <ScrollView ref={feed} style={{flex:1}} contentContainerStyle={{padding:12}} keyboardShouldPersistTaps="handled" accessibilityLabel="Community messages"
       scrollEventThrottle={100} onScroll={({nativeEvent:e})=>{following.current=e.contentSize.height-e.contentOffset.y-e.layoutMeasurement.height<100;}}
       onContentSizeChange={()=>{if(following.current)feed.current?.scrollToEnd({animated:true});}}>
-      <View style={{gap:10}}>{messages.map(message=><Card key={message.id}>
-        <Copy>{message.senderId===userId?'You':message.senderName} · {date(message.createdAt)}</Copy>
+      <View style={{gap:10}}>{messages.map(message=><View key={message.id} style={{maxWidth:'88%',alignSelf:message.senderId===userId?'flex-end':'flex-start',backgroundColor:message.senderId===userId?'#d9f3dc':'#fff',padding:12,borderRadius:13,gap:6}}>
+        <Text style={{fontWeight:'700',fontSize:12,color:'#2359ac'}}>{message.senderId===userId?'You':message.senderName}</Text>
         <Copy>{message.body}</Copy>
         {message.ride && <>
           <Copy>{message.ride.origin} → {message.ride.destination}</Copy>
@@ -85,18 +88,19 @@ export function Chat({userId,go}:{userId:string;go:Navigate}) {
             ? <Button label="View ride / book seats" onPress={()=>go({kind:'ride',id:message.ride!.id})} />
             : <Copy>This ride is no longer available to book.</Copy>}
         </>}
-      </Card>)}</View>
+        <Text style={{fontSize:10,color:'#52657f',textAlign:'right'}}>{date(message.createdAt)}</Text>
+      </View>)}</View>
     </ScrollView>
-    <Card>
-      <Field label="Message" value={draft} change={setDraft} multiline />
-      <Copy>{draft.length}/1000 characters</Copy>
+    <View style={{backgroundColor:'#f7f9fc',padding:10,gap:8}}>
+      <View style={{flexDirection:'row',gap:8,alignItems:'center'}}><Pressable accessibilityRole="button" accessibilityLabel="Share a ride" onPress={()=>setShare(v=>!v)} style={{padding:8}}><Ionicons name="attach" size={25} color="#2359ac"/></Pressable><TextInput accessibilityLabel="Message" placeholder="Message" value={draft} onChangeText={setDraft} multiline maxLength={1000} style={{flex:1,minHeight:44,maxHeight:100,padding:12,backgroundColor:'#fff',borderRadius:22,color:'#172b49'}}/><Pressable accessibilityRole="button" accessibilityLabel={busy?'Sending…':'Send message'} disabled={busy||!draft.trim()} onPress={()=>void send()} style={{backgroundColor:'#2359ac',borderRadius:24,padding:13,opacity:busy||!draft.trim()?0.5:1}}><Ionicons name="send" size={21} color="#fff"/></Pressable></View>
+      {share&&<ScrollView style={{maxHeight:160}} keyboardShouldPersistTaps="handled">
       <Button label="Load my rides to share" onPress={()=>void loadOffers()} disabled={busy} />
       <ErrorText message={offerError} />
       <Button label={'Message only'+(!rideId?' ✓':'')} onPress={()=>setRideId('')} disabled={busy} />
       {offers.map(ride=><Button key={ride.id} label={`${rideId===ride.id?'✓ ':''}${ride.origin} → ${ride.destination} · ${date(ride.departureAt)}`}
         onPress={()=>setRideId(ride.id)} disabled={busy} />)}
-      <Button label={busy?'Sending…':'Send message'} onPress={()=>void send()} disabled={busy||!draft.trim()||draft.length>1000} />
       <Button label="Publish a new ride" onPress={()=>go({kind:'rideForm'})} />
-    </Card>
-  </>;
+      </ScrollView>}
+    </View>
+  </View>;
 }

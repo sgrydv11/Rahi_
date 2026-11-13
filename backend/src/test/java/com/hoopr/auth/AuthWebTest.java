@@ -56,6 +56,15 @@ class AuthWebTest {
     @Test void communityChatRequiresAuthentication() throws Exception {
         mvc.perform(get("/api/v1/chat/messages")).andExpect(status().isUnauthorized());
     }
+    @Test void verifiedSignupRequestReturnsAChallengeWithoutRegisteringAnAccount() throws Exception {
+        var challenge=UUID.randomUUID();
+        when(emailOtp.requestRegistration(anyString(),anyString(),anyString(),org.mockito.ArgumentMatchers.any(com.hoopr.user.TravelPreference.class)))
+            .thenReturn(new EmailOtpService.Challenge(challenge,300,"EMAIL"));
+        mvc.perform(write("registration/request").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"identifier\":\"new@example.test\",\"password\":\"long-password-123\",\"mobileNumber\":\"+919876543210\",\"travelPreference\":\"PASSENGER\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.challengeId").value(challenge.toString()));
+        verifyNoInteractions(auth);
+    }
     @Test void csrfEndpointIsPublicAndCookieIsSecure() throws Exception {
         mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())

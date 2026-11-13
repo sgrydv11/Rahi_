@@ -49,6 +49,7 @@ public class OtpMailer {
                 .requestFactory(factory)
                 .defaultHeader(brevo ? "api-key" : "Authorization", brevo ? apiKey : "Bearer " + apiKey).build();
     }
+    public boolean enabled() { return enabled; }
     public void deliver(String email, String code) {
         if (!enabled) throw new AuthFailure(503, "Email OTP is paused. Sign in with your email and password.");
         if (apiKey.isBlank() || from.isBlank())

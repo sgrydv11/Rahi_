@@ -26,6 +26,7 @@ public class MobileAuthController {
     public ResponseEntity<AuthService.Profile> register(@Valid @RequestBody AuthController.RegisterRequest body,
                                                          HttpServletRequest request) {
         requireNativeRequest(request);
+        otp.requireLegacyRegistrationAllowed();
         if (body.password.length() < 12) throw new AuthFailure(400, "Password must contain at least 12 characters.");
         return ResponseEntity.status(HttpStatus.CREATED).header("Cache-Control", "no-store")
                 .body(AuthController.registerAccount(auth, body));
@@ -43,6 +44,11 @@ public class MobileAuthController {
     public EmailOtpService.Challenge requestOtp(@Valid @RequestBody OtpRequests.Request body, HttpServletRequest request) {
         requireNativeRequest(request); limiter.check(request.getRemoteAddr());
         return otp.request(body.identifier, body.mobileNumber, body.travelPreference);
+    }
+    @PostMapping("/registration/request")
+    public EmailOtpService.Challenge requestRegistration(@Valid @RequestBody OtpRequests.Registration body,HttpServletRequest request) {
+        requireNativeRequest(request); limiter.check(request.getRemoteAddr());
+        return otp.requestRegistration(body.identifier,body.password,body.mobileNumber,body.travelPreference);
     }
     @PostMapping("/otp/verify")
     public ResponseEntity<Session> verifyOtp(@Valid @RequestBody OtpRequests.Verify body, HttpServletRequest request) {

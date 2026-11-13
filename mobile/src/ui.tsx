@@ -23,14 +23,14 @@ export function Button({ label, onPress, disabled = false }: { label: string; on
     <Text style={styles.buttonText}>{label}</Text>
   </Pressable>;
 }
-export function Field({ label, value, change, secret, numeric, multiline }: {
-  label: string; value: string; change: (value: string) => void; secret?: boolean; numeric?: boolean; multiline?: boolean;
+export function Field({ label, value, change, secret, numeric, multiline, trailing }: {
+  label: string; value: string; change: (value: string) => void; secret?: boolean; numeric?: boolean; multiline?: boolean; trailing?:ReactNode;
 }) {
   const onFocus = useContext(FieldFocus);
-  return <View style={styles.field}><Copy>{label}</Copy><TextInput accessibilityLabel={label} value={value}
+  return <View style={styles.field}><Copy>{label}</Copy><View><TextInput accessibilityLabel={label} value={value}
     onFocus={onFocus}
     onChangeText={change} secureTextEntry={secret} keyboardType={numeric ? 'numbers-and-punctuation' : 'default'} multiline={multiline}
-    autoCapitalize="none" autoCorrect={false} style={styles.input} /></View>;
+    autoCapitalize="none" autoCorrect={false} style={[styles.input,trailing?{paddingRight:56}:{}]} />{trailing&&<View style={{position:'absolute',right:2,top:0,bottom:0,justifyContent:'center'}}>{trailing}</View>}</View></View>;
 }
 export function ErrorText({ message }: { message?: string }) {
   return message ? <Text accessibilityRole="alert" style={styles.error}>{message}</Text> : null;
