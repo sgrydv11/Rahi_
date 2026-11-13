@@ -1,6 +1,33 @@
 # FlexirRides carpool readiness tracker
 
-Last updated 7 November 2026, Asia/Kolkata.
+Last updated 13 November 2026, Asia/Kolkata.
+
+## 13 November: community chat implementation
+
+Implemented locally on app_v1: one authenticated shared driver/passenger chat,
+durable PostgreSQL messages (V19), ride attachments with current seat counts and
+departure details, links into the normal booking flow, and Chat in the web and
+Expo footer. Open screens refresh every three seconds; this is polling rather
+than WebSocket push. Message retries are idempotent; ownership, active-account,
+length and sending-rate checks are enforced server-side. See docs/community-chat.md.
+
+Verification: 136 backend tests have passing reports after fixing and rerunning
+the new chat and isolated auth tests; backend executable packaging passed.
+All 54 web and 22 mobile tests passed. Web production build, mobile TypeScript,
+and Android/iOS bundle exports passed. A two-context Playwright check passed
+message delivery, attaching a driver ride, passenger booking, live inventory
+refresh, reply, persistence after reload and phone-width footer navigation.
+Test schema and browser fixtures were isolated in local hoopr_test.
+
+Release authorized on 13 November: push app_v1, deploy the frontend/backend
+including V19, create Android APK 0.2.0 (version code 2), and notify the two
+previously supplied Gmail recipients only after live and build verification.
+At the time this release entry was written, deployment and EAS submission were
+pending. Verify final status in the Render and Expo dashboards. A physical
+device test is still required. Separate
+private groups/DMs, moderation/reporting, older-history browsing, unread/read
+receipts, attachments and background push notifications remain outside this
+first community-chat implementation.
 
 ## Purpose and working agreement
 

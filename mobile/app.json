@@ -4,17 +4,19 @@
     "icon": "./assets/flexirrides-icon.png",
     "slug": "sagar-yadav",
     "scheme": "hoopr",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "platforms": [
       "android",
       "ios"
     ],
     "newArchEnabled": false,
     "android": {
-      "package": "com.hoopr.app"
+      "package": "com.hoopr.app",
+      "versionCode": 2
     },
     "ios": {
-      "bundleIdentifier": "com.hoopr.app"
+      "bundleIdentifier": "com.hoopr.app",
+      "buildNumber": "2"
     },
     "plugins": [
       "expo-secure-store",

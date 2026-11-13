@@ -15,6 +15,7 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [preference, setPreference] = useState<Preference>('PASSENGER');
   const action = useAction();
   async function submit() {
@@ -35,7 +36,9 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
       <Preferences value={preference} change={setPreference} />
       <Copy>Use a password of at least 12 characters, up to 72 UTF-8 bytes.</Copy>
     </>}
-    <Field label="Password" value={password} change={setPassword} secret />
+    <Field label="Password" value={password} change={setPassword} secret={!showPassword} />
+    <Button label={showPassword ? 'Hide password' : 'Show password'} disabled={action.busy}
+      onPress={() => setShowPassword(value => !value)} />
     <Button label={action.busy ? 'Please wait…' : create ? 'Create account' : 'Sign in'} disabled={action.busy}
       onPress={() => void action.run(submit)} />
     <ErrorText message={action.error} />

@@ -12,6 +12,7 @@ import { MyRidesPage } from '../features/rides/MyRidesPage';
 import { BookingListPage, BookingDetailsPage } from '../features/bookings/BookingPages';
 import { NotificationsPage } from '../features/bookings/NotificationsPage';
 import { VehiclesPage } from '../features/vehicles/VehiclesPage';
+import { ChatPage } from '../features/chat/ChatPage';
 
 export const router = createBrowserRouter([
   { element: <AppLayout />, children: [
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
     { path: '/rides', element: <RideSearchPage /> },
     { path: '/rides/:id', element: <RideDetailsPage /> },
     { element: <ProtectedRoute />, children: [
+      { path: '/chat', element: <ChatPage /> },
       { path: '/profile', element: <ProfilePage /> },
       { path: '/vehicles', element: <VehiclesPage /> },
       { path: '/notifications', element: <NotificationsPage /> },

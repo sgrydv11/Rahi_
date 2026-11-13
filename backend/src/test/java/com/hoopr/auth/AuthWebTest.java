@@ -37,6 +37,7 @@ class AuthWebTest {
     @MockitoBean GoogleSignInService googleSignIn;
     @MockitoBean EmailOtpService emailOtp;
     @MockitoBean com.hoopr.ride.RideService rides;
+    @MockitoBean com.hoopr.ride.ChatController chat;
     @MockitoBean com.hoopr.ride.RideRepository rideRepository;
     @MockitoBean com.hoopr.booking.BookingService bookings;
     @MockitoBean org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate notificationJdbc;
@@ -51,6 +52,9 @@ class AuthWebTest {
     @Test void bothHealthEndpointsRemainPublic() throws Exception {
         mvc.perform(get("/api/v1/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
         mvc.perform(get("/actuator/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
+    }
+    @Test void communityChatRequiresAuthentication() throws Exception {
+        mvc.perform(get("/api/v1/chat/messages")).andExpect(status().isUnauthorized());
     }
     @Test void csrfEndpointIsPublicAndCookieIsSecure() throws Exception {
         mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk())

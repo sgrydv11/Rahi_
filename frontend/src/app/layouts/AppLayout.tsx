@@ -48,6 +48,7 @@ export function AppLayout() {
           <NavLink to="/rides/mine">My rides</NavLink>
           <NavLink to="/bookings/mine">My bookings</NavLink>
           <NavLink to="/notifications">Notifications</NavLink>
+          <NavLink to="/chat">Chat</NavLink>
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
         </> : demoMode ? <span className="demo-nav-note">Sample app</span> : <><NavLink to="/login">Log in</NavLink>
           <NavLink className="button button-small" to="/register">Join FlexirRides</NavLink></>}
@@ -61,15 +62,17 @@ export function AppLayout() {
       <MobileNavLink to="/" label="Home" icon="home" end />
       <MobileNavLink to="/bookings/mine" label="My Bookings" icon="bookings" />
       <MobileNavLink to="/rides/mine" label="Offers" icon="offer" />
+      <MobileNavLink to="/chat" label="Chat" icon="chat" />
       <MobileNavLink to="/profile" label="Account" icon="account" />
     </nav>
   </div>;
 }
 
-type MobileIconName = 'home' | 'account' | 'find' | 'offer' | 'rides' | 'bookings' | 'more';
+type MobileIconName = 'home' | 'account' | 'find' | 'offer' | 'rides' | 'bookings' | 'more' | 'chat';
 
 function MobileIcon({ name }: { name: MobileIconName }) {
   const paths: Record<MobileIconName, string> = {
+    chat: 'M21 11a8 8 0 0 1-8 8H7l-4 3V11a9 9 0 0 1 18 0ZM7 10h10M7 14h6',
     home: 'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',
     account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9a8 8 0 0 1 16 0',
     find: 'M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm5-2 5 5',

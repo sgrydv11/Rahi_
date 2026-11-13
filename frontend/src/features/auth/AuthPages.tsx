@@ -6,6 +6,7 @@ import { demoMode } from '../rides/api';
 
 function AuthForm({ registering = false }: { registering?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [preference, setPreference] = useState<TravelPreference>('PASSENGER');
   const navigate = useNavigate(); const location = useLocation();
@@ -50,7 +51,9 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
               <input type="radio" name="travelPreference" checked={preference === value} onChange={() => setPreference(value)} />{travelPreferenceLabels[value]}
             </label>)}</fieldset>
           </>}
-          <label>Password<input name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} required minLength={registering ? 12 : undefined} maxLength={72} disabled={busy} /></label>
+          <label>Password<input name="password" type={showPassword ? 'text' : 'password'} autoComplete={registering ? 'new-password' : 'current-password'} required minLength={registering ? 12 : undefined} maxLength={72} disabled={busy} /></label>
+          <button className="button button-small" type="button" aria-pressed={showPassword} disabled={busy}
+            onClick={() => setShowPassword(value => !value)}>{showPassword ? 'Hide password' : 'Show password'}</button>
           {registering && <p>Use at least 12 characters, up to 72 UTF-8 bytes.</p>}
           <button className="button" type="submit" disabled={busy}>{busy ? 'Please wait…' : registering ? 'Create account' : 'Log in'}</button>
         </form>

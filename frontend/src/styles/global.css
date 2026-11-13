@@ -78,6 +78,12 @@ dialog::backdrop { background: #163e3280; }
 
 select { font: inherit; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #aebcaf; border-radius: 7px; background: #f8f9f3; color: #163e32; }
 .mobile-nav { display: none; }
+.chat-feed { height: min(55vh, 520px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.chat-message { max-width: 90%; padding: 12px 16px; border-radius: 14px; background: #edf3ff; align-self: flex-start; overflow-wrap: anywhere; }
+.chat-own { align-self: flex-end; background: #dceaff; }
+.chat-body { white-space: pre-wrap; }
+.chat-offer { padding: 10px; border: 1px solid #b9cbed; border-radius: 10px; background: #fff; }
+.chat-message small { color: #465d7b; }
 .mobile-nav-icon { width: 22px; height: 22px; flex: 0 0 auto; }
 .mobile-nav-item { min-width: 0; color: #53645b; background: transparent; border: 0; border-radius: 10px; padding: 6px 4px; display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; font-size: 11px; font-weight: 600; line-height: 1.15; cursor: pointer; }
 .mobile-nav-item.active { color: #163e32; background: #e4ebd9; }

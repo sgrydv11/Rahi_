@@ -1,5 +1,6 @@
 import { Wallet } from './src/wallet';
 import { GroupOffers } from './src/group';
+import { Chat } from './src/chat';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Image, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ import { PinsForm, RideDetails, RideForm, Rides } from './src/rides';
 import { Button, Card, colors, Copy, ErrorText, FieldFocus, styles, useAction } from './src/ui';
 
 const titles: Record<Screen['kind'], string> = {
+  chat: 'Ride community',
   group: 'Open Ride Group', wallet: 'Wallet', home: 'Share the journey.', search: 'Find a ride', rides: 'My rides', bookings: 'My bookings',
   notifications: 'Notifications', profile: 'Your profile', vehicles: 'My vehicles',
   settings: 'Account', login: 'Welcome back', register: 'Join FlexirRides', ride: 'Ride details', booking: 'Booking details',
@@ -24,6 +26,7 @@ const footer = [
   { kind: 'home', label: 'Home', icon: 'home-outline' },
   { kind: 'bookings', label: 'My Bookings', icon: 'ticket-outline' },
   { kind: 'rides', label: 'Offers', icon: 'car-outline' },
+  { kind: 'chat', label: 'Chat', icon: 'chatbubbles-outline' },
   { kind: 'settings', label: 'Account', icon: 'person-outline' },
 ] as const;
 
@@ -112,6 +115,7 @@ function NativeApp() {
     if (restoring && screen.kind !== 'home' && screen.kind !== 'search') return <Copy>Restoring your session…</Copy>;
     if (!user && !publicScreens.has(screen.kind)) return <SignIn create={false} onUser={signedIn} go={go} />;
     switch (screen.kind) {
+      case 'chat': return user && <Chat userId={user.id} go={go} />;
       case 'login': case 'register': return <SignIn key={screen.kind} create={screen.kind === 'register'} onUser={signedIn} go={go} />;
       case 'search': case 'rides': return <Rides mine={screen.kind === 'rides'} go={go} />;
       case 'ride': return <RideDetails id={screen.id} requestedSeats={screen.requestedSeats} user={user} go={go} />;
