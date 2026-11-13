@@ -15,11 +15,13 @@ public class MobileAuthController {
     private final AuthService auth;
     private final LoginLimiter limiter;
     private final EmailOtpService otp;
+    private final GoogleSignInService google;
 
-    public MobileAuthController(AuthService auth, LoginLimiter limiter, EmailOtpService otp) {
+    public MobileAuthController(AuthService auth, LoginLimiter limiter, EmailOtpService otp, GoogleSignInService google) {
         this.auth = auth;
         this.limiter = limiter;
         this.otp = otp;
+        this.google = google;
     }
 
     @PostMapping("/register")
@@ -44,6 +46,13 @@ public class MobileAuthController {
     public EmailOtpService.Challenge requestOtp(@Valid @RequestBody OtpRequests.Request body, HttpServletRequest request) {
         requireNativeRequest(request); limiter.check(request.getRemoteAddr());
         return otp.request(body.identifier, body.mobileNumber, body.travelPreference);
+    }
+    @PostMapping("/google")
+    public ResponseEntity<Session> google(@Valid @RequestBody AuthController.GoogleRequest body,HttpServletRequest request) {
+        requireNativeRequest(request); limiter.check(request.getRemoteAddr());
+        var issued=google.signIn(body.credential,body.travelPreference);
+        limiter.succeeded(request.getRemoteAddr());
+        return session(issued);
     }
     @PostMapping("/registration/request")
     public EmailOtpService.Challenge requestRegistration(@Valid @RequestBody OtpRequests.Registration body,HttpServletRequest request) {

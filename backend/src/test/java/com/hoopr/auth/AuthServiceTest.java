@@ -30,6 +30,7 @@ class AuthServiceTest {
         user.passwordHash = passwords.encode("long-password-123"); user.status = "ACTIVE"; user.role = "USER";
         when(users.findByEmail(user.email)).thenReturn(Optional.of(user));
         when(users.findById(user.id)).thenReturn(Optional.of(user));
+        when(users.findForLoginByEmail(user.email)).thenReturn(Optional.of(user));
         when(encoder.encode(any())).thenReturn(Jwt.withTokenValue("test-access").header("alg", "HS256")
                 .subject(user.id.toString()).issuedAt(now).expiresAt(now.plusSeconds(900)).build());
     }
@@ -67,6 +68,15 @@ class AuthServiceTest {
         var claims = org.mockito.ArgumentCaptor.forClass(JwtEncoderParameters.class);
         verify(encoder).encode(claims.capture());
         assertEquals(now.plusSeconds(900), claims.getValue().getClaims().getExpiresAt());
+        assertEquals(saved.getValue().sessionId.toString(),claims.getValue().getClaims().getClaim("sid"));
+    }
+    @Test void mobileLoginNormalizesIndianAndInternationalNumbers() {
+        when(users.findForLoginByMobileNumber("+919876543210")).thenReturn(Optional.of(user));
+        assertEquals(user.id, service.login("9876543210", "long-password-123").access.user().id());
+        assertEquals(user.id, service.login("+91 98765-43210", "long-password-123").access.user().id());
+        assertEquals(401, assertThrows(AuthFailure.class, () -> service.login("9876543210", "wrong")).status);
+        assertEquals(401, assertThrows(AuthFailure.class, () -> service.login("not-a-number", "long-password-123")).status);
+        assertEquals(401, assertThrows(AuthFailure.class, () -> service.login("9876543211", "long-password-123")).status);
     }
     @Test void badAndUnknownCredentialsAndDisabledAccountsAreRejected() {
         assertEquals(401, assertThrows(AuthFailure.class, () -> service.login(user.email, "wrong")).status);
@@ -100,6 +110,16 @@ class AuthServiceTest {
     @Test void expiredFamilyIsRejectedAndRevoked() {
         String raw = "c".repeat(43); RefreshSession family = family(raw); family.expiresAt = now;
         assertThrows(AuthFailure.class, () -> service.refresh(raw)); assertTrue(family.revoked);
+    }
+    @Test void passwordFailuresLockAccountAcrossEmailAndPhoneAndUnlockAfterWindow() {
+        when(users.findForLoginByMobileNumber("+919876543210")).thenReturn(Optional.of(user));
+        for(int i=0;i<5;i++)assertEquals(401,assertThrows(AuthFailure.class,()->service.login(user.email,"wrong")).status);
+        assertEquals(5,user.failedLoginCount);
+        assertEquals(now.plusSeconds(900),user.loginLockedUntil);
+        assertEquals(401,assertThrows(AuthFailure.class,()->service.login("9876543210","long-password-123")).status);
+        var later=new AuthService(users,profiles,sessions,tokens,passwords,encoder,settings,Clock.fixed(now.plusSeconds(900),ZoneOffset.UTC));
+        later.login(user.email,"long-password-123");
+        assertEquals(0,user.failedLoginCount);assertNull(user.loginLockedUntil);
     }
     @Test void bcryptByteLimitIsEnforced() {
         assertThrows(AuthFailure.class, () -> service.register("new@example.test", "é".repeat(37), "Name"));

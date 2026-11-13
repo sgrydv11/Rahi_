@@ -39,7 +39,7 @@ export function ProfilePage() {
   }
   return <section className="page narrow"><h1>Your profile.</h1><div className="panel">
     {error && <p role="alert">{error}</p>}
-    {user ? <><h2>{user.fullName}</h2><p>{user.email}</p><p>Role: {user.role}</p>
+    {user ? <><h2>{user.fullName}</h2><p><a href={`mailto:${user.email}`}>{user.email}</a></p>
       <form className="auth-form" onSubmit={save}>
         <label>Full name<input name="fullName" required maxLength={120} defaultValue={user.fullName} disabled={busy} /></label>
         <label>I want to<select name="travelPreference" defaultValue={user.travelPreference} disabled={busy}>

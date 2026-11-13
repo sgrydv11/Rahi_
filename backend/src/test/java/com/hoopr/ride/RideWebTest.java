@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import(SecurityConfig.class)
 class RideWebTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean com.hoopr.auth.SessionRepository sessions;
     @Autowired MockMvc mvc;
     @MockitoBean RideService service;
     final UUID owner = UUID.randomUUID();

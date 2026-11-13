@@ -92,6 +92,36 @@ class AuthenticationIT {
             mvc.perform(post("/api/v1/mobile/auth/login").with(r -> { r.setRemoteAddr("192.0.2.201"); return r; })
                     .contentType(MediaType.APPLICATION_JSON).content(credentials)).andExpect(status().isOk());
     }
+    @Test void logoutImmediatelyInvalidatesAccessTokensAndRefreshTokens() throws Exception {
+        var login=auth.login(email,"test-password-long");
+        mvc.perform(get("/api/v1/rides/me").header("Authorization","Bearer "+login.access.accessToken())).andExpect(status().isOk());
+        auth.logout(login.refresh);
+        mvc.perform(get("/api/v1/rides/me").header("Authorization","Bearer "+login.access.accessToken())).andExpect(status().isUnauthorized());
+        assertEquals(401,assertThrows(AuthFailure.class,()->auth.refresh(login.refresh)).status);
+    }
+    @Test void concurrentPasswordFailuresAreCountedWithoutLostUpdates() throws Exception {
+        var start=new CountDownLatch(1);
+        try(var executor=Executors.newFixedThreadPool(3)) {
+            Callable<Integer> attempt=()->{start.await();try{auth.login(email,"incorrect");return 200;}catch(AuthFailure failure){return failure.status;}};
+            var a=executor.submit(attempt);var b=executor.submit(attempt);var c=executor.submit(attempt);start.countDown();
+            assertEquals(401,a.get(20,TimeUnit.SECONDS));assertEquals(401,b.get(20,TimeUnit.SECONDS));assertEquals(401,c.get(20,TimeUnit.SECONDS));
+        }
+        assertEquals(3,jdbc.queryForObject("SELECT failed_login_count FROM users WHERE id=?",Integer.class,userId));
+    }
+    @Test void changedServerRoleInvalidatesPreviouslyIssuedAuthority() throws Exception {
+        var login=auth.login(email,"test-password-long");
+        jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?",userId);
+        mvc.perform(get("/api/v1/rides/me").header("Authorization","Bearer "+login.access.accessToken())).andExpect(status().isUnauthorized());
+    }
+    @Test void passwordLockoutPersistsAcrossRequestsAndBothIdentifiers() {
+        jdbc.update("UPDATE users SET mobile_number='+919876543219' WHERE id=?",userId);
+        for(int i=0;i<5;i++)assertEquals(401,assertThrows(AuthFailure.class,()->auth.login(email,"incorrect")).status);
+        assertEquals(5,jdbc.queryForObject("SELECT failed_login_count FROM users WHERE id=?",Integer.class,userId));
+        assertEquals(401,assertThrows(AuthFailure.class,()->auth.login("9876543219","test-password-long")).status);
+        jdbc.update("UPDATE users SET login_locked_until=now()-interval '1 second',login_window_start=now()-interval '16 minutes' WHERE id=?",userId);
+        assertEquals(userId,auth.login("9876543219","test-password-long").access.user().id());
+        assertEquals(0,jdbc.queryForObject("SELECT failed_login_count FROM users WHERE id=?",Integer.class,userId));
+    }
     @Test void travelPreferencesPersistAcrossLoginRefreshAndProfile() {
         for (var preference : com.hoopr.user.TravelPreference.values()) {
             var account = auth.register("preference-" + UUID.randomUUID() + "@example.test", "test-password-long", "Preference User", preference);

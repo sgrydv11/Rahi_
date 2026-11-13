@@ -15,7 +15,12 @@ GET/POST /api/v1/chat/messages. POST requires a clientId UUID for idempotent
 retries; reusing that key with different content is rejected. Active-account
 checks apply to reads and writes. Sharing another driver's, cancelled, or past
 ride is rejected. Sending is limited to 20 messages per member per minute.
-Neither email addresses nor phone numbers are exposed by the chat response.
+Email addresses remain private. With V21, a sender may opt in to sharing their
+registered mobile number on an individual message. The default is off, including
+all existing messages. Only opted-in messages return the current registered
+number; unverified numbers are labelled. This shares the number with every
+signed-in community member, not only a ride's passengers. Idempotency checks
+include the sharing choice. Accounts without a mobile number cannot enable it.
 
 While the screen is open, clients fetch the latest 50 messages and current ride
 availability every three seconds, without overlapping requests. The Expo client
@@ -49,3 +54,25 @@ platform exports passed. The two-user browser booking-and-chat smoke passed.
 The user subsequently authorized live deployment and a signed Android build
 on 13 November. See PRODUCTION_READINESS_TRACKER.md and the Render/Expo release
 results for deployment status.
+
+## Quoted replies and member details
+
+V22 adds a nullable reply_to_id with a self-reference. A message can reply to
+any existing message in this single shared community room. The API returns one
+level of quoted sender/body context, including when the original has left the
+latest-50 window. Invalid targets are rejected, and retry validation includes
+the reply target. Older clients may omit the field. Reply text and selection
+survive failed sends; successful sends clear the selection.
+
+Web and Android/iOS source show Reply on each bubble, a cancellable composer
+preview, and the quote on received messages. Tapping an explicitly shared number
+opens basic details: name, travel preference, join month and the shared number's
+verification status. No email, age, account role, password or other private
+account fields are included. This is a member card, not private messaging.
+
+Local verification on 14 November: ChatIT (5) and AuthWebTest (19) passed before
+the subsequent Google endpoint change. Browser two-user smoke verified replies,
+cancel, quote persistence across reload, member-card contents and privacy, plus
+the existing booking/seat-update flow. Web 55 tests/build and mobile 22
+tests/typecheck/Android+iOS exports passed for the chat changes. V22 is applied
+only to isolated test schemas. Live deployment and a new APK remain pending.

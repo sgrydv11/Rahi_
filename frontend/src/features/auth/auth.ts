@@ -110,7 +110,9 @@ export function errorMessage(error: unknown): string {
   return 'Unable to connect. Please try again.';
 }
 export function validateCredentials(email: string, password: string, registering = false): string | null {
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 254) return 'Enter a valid email address.';
+  const validEmail=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && email.trim().length<=254;
+  const validMobile=/^(?:[6-9][0-9]{9}|\+[1-9][0-9]{7,14})$/.test(email.replace(/[ ()-]/g,''));
+  if(!validEmail && (registering || !validMobile))return registering?'Enter a valid email address.':'Enter a valid email address or mobile number.';
   if (!password.trim()) return 'Enter your password.';
   if (registering && password.length < 12) return 'Use at least 12 characters for your password.';
   if (new TextEncoder().encode(password).length > 72) return 'Password must be at most 72 UTF-8 bytes.';

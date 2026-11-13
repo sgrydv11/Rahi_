@@ -71,13 +71,31 @@ public class AuthService {
         profile.createdAt = profile.updatedAt = clock.instant(); profiles.save(profile);
         return new Profile(user.id, user.email, profile.fullName, user.role, profile.travelPreference);
     }
-    @Transactional
+    @Transactional(noRollbackFor = AuthFailure.class)
     public Issued login(String email, String password) {
         validatePassword(password);
-        UserAccount user = users.findByEmail(normalize(email)).orElse(null);
+        UserAccount user = null;
+        if (email.contains("@")) user = users.findForLoginByEmail(normalize(email)).orElse(null);
+        else {
+            try { String mobile=EmailOtpService.mobile(email); if(mobile!=null)user=users.findForLoginByMobileNumber(mobile).orElse(null); }
+            catch(AuthFailure invalidNumber) { /* Match the same generic credential failure below. */ }
+        }
         boolean matches = passwords.matches(password, user == null ? dummyHash : user.passwordHash);
-        if (!matches || user == null || !"ACTIVE".equals(user.status))
+        Instant now=clock.instant();
+        if(user!=null && user.loginLockedUntil!=null && user.loginLockedUntil.isAfter(now))
             throw new AuthFailure(401, "Invalid email or password.");
+        if(user!=null && (user.loginWindowStart==null || !user.loginWindowStart.plusSeconds(900).isAfter(now))) {
+            user.failedLoginCount=0;user.loginWindowStart=now;user.loginLockedUntil=null;
+        }
+        if (!matches || user == null || !"ACTIVE".equals(user.status)) {
+            if(user!=null && "ACTIVE".equals(user.status)) {
+                user.failedLoginCount++;
+                if(user.failedLoginCount>=5)user.loginLockedUntil=now.plusSeconds(900);
+                users.save(user);
+            }
+            throw new AuthFailure(401, "Invalid email or password.");
+        }
+        user.failedLoginCount=0;user.loginWindowStart=null;user.loginLockedUntil=null;users.save(user);
         return newSession(user);
     }
     Issued newSession(UserAccount user) {
@@ -142,7 +160,7 @@ public class AuthService {
         Instant now = clock.instant();
         var claims = JwtClaimsSet.builder().issuer(settings.issuer()).subject(user.id.toString())
                 .audience(List.of("hoopr-api")).issuedAt(now).expiresAt(now.plusSeconds(900))
-                .id(UUID.randomUUID().toString()).claim("role", user.role).build();
+                .id(UUID.randomUUID().toString()).claim("sid",session.id.toString()).claim("role", user.role).build();
         String access = jwt.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
         return new Issued(new Access(access, "Bearer", 900, profile(user.id)), raw, session.expiresAt);
     }

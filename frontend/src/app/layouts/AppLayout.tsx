@@ -1,5 +1,6 @@
-import { Link, NavLink, Outlet } from 'react-router';
-import { useEffect, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { pageMetadata } from '../pageMetadata';
 import { useNavigate } from 'react-router';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -12,6 +13,24 @@ export function AppLayout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location=useLocation();
+  const [menuOpen,setMenuOpen]=useState(false);
+  const menuButton=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{
+    setMenuOpen(false);
+    const metadata=pageMetadata(location.pathname);
+    document.title=metadata.title;
+    for(const [name,content] of [['description',metadata.description],['robots',metadata.robots]]) {
+      let tag=document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+      if(!tag){tag=document.createElement('meta');tag.name=name;document.head.append(tag);}
+      tag.content=content;
+    }
+  },[location.pathname]);
+  useEffect(()=>{
+    if(!menuOpen)return;
+    const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){setMenuOpen(false);menuButton.current?.focus();}};
+    document.addEventListener('keydown',close);return()=>document.removeEventListener('keydown',close);
+  },[menuOpen]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -32,7 +51,7 @@ export function AppLayout() {
 
   async function signOut() {
     setBusy(true); setError('');
-    try { await logout(); } catch (failure) { setError(errorMessage(failure)); }
+    try { await logout(); setMenuOpen(false); navigate('/login',{state:{message:'You have been logged out.'}}); } catch (failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); }
   }
 
@@ -41,7 +60,8 @@ export function AppLayout() {
     <a className="skip-link" href="#main">Skip to content</a>
     <header className="site-header">
       <Link className="brand" to="/" aria-label="FlexirRides home">FlexirRides<span aria-hidden="true">↗</span></Link>
-      <nav aria-label="Main navigation">
+      <button ref={menuButton} type="button" className="menu-toggle" aria-label={menuOpen?'Close menu':'Open menu'} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={()=>setMenuOpen(value=>!value)}><span aria-hidden="true">{menuOpen?'×':'☰'}</span></button>
+      <nav id="primary-navigation" className={`primary-navigation${menuOpen?' is-open':''}`} aria-label="Main navigation">
         <NavLink to="/rides" end>Find a ride</NavLink>
         {loading ? <span role="status">Loading…</span> : user ? <>
           <NavLink to="/rides/new">Offer a ride</NavLink>
@@ -52,12 +72,13 @@ export function AppLayout() {
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
         </> : demoMode ? <span className="demo-nav-note">Sample app</span> : <><NavLink to="/login">Log in</NavLink>
           <NavLink className="button button-small" to="/register">Join FlexirRides</NavLink></>}
+        <NavLink to="/help">Help</NavLink>
       </nav>
     </header>
     {error && <p role="alert">{error}</p>}
     {demoMode && <p className="demo-banner" role="status">Sample app · Browse demo rides. Accounts and bookings are disabled.</p>}
     <main id="main" tabIndex={-1}><Outlet /></main>
-    <footer><span className="footer-brand">FlexirRides</span><span>Good company. Shared journeys.</span><span>Shared journeys</span></footer>
+    <footer className="site-footer"><Link className="footer-brand" to="/">FlexirRides</Link><nav aria-label="Footer navigation"><Link to="/">Home</Link><Link to="/rides">Find a ride</Link><Link to="/help">Help</Link></nav><small>© {new Date().getFullYear()} FlexirRides</small></footer>
     <nav className="mobile-nav" aria-label="App navigation">
       <MobileNavLink to="/" label="Home" icon="home" end />
       <MobileNavLink to="/bookings/mine" label="My Bookings" icon="bookings" />

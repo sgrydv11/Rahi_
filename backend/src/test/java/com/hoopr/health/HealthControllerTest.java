@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import(SecurityConfig.class)
 class HealthControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean com.hoopr.auth.SessionRepository sessions;
     @Autowired private MockMvc mvc;
 
     @Test void healthIsPublic() throws Exception {

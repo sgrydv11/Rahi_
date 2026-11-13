@@ -2,11 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { errorMessage, login, requestRegistrationOtp, verifyEmailOtp, validateCredentials, loginWithGoogle, travelPreferenceLabels, type TravelPreference } from './auth';
 import { GoogleSignIn } from './GoogleSignIn';
+import { OtpSignIn } from './OtpSignIn';
 import { demoMode } from '../rides/api';
 
 function AuthForm({ registering = false }: { registering?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [emailCodeLogin,setEmailCodeLogin]=useState(false);
   const [challenge,setChallenge]=useState('');
   const [code,setCode]=useState('');
   const [signup,setSignup]=useState<{email:string;password:string;mobile:string;preference:TravelPreference}>();
@@ -57,10 +59,12 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
   return <section className="page narrow">
     <p className="eyebrow">Your journey starts here</p>
     <h1>{registering ? 'Join the journey.' : 'Welcome back.'}</h1>
+    {location.state?.message==='You have been logged out.' && <p role="status">You have been logged out.</p>}
     <div className="panel">
       {demoMode ? <p>Accounts are disabled in sample mode. <Link to="/rides">Browse rides</Link></p> : <>
         {!challenge && <GoogleSignIn registering={registering} busy={busy} onCredential={credential => void google(credential)} />}
-        <form key={String(registering)} className="auth-form" onSubmit={submit} aria-busy={busy}>
+        {!registering && <div className="ride-actions" aria-label="Sign-in method"><button type="button" aria-pressed={!emailCodeLogin} onClick={()=>{setEmailCodeLogin(false);setError('');}}>Password</button><button type="button" aria-pressed={emailCodeLogin} onClick={()=>{setEmailCodeLogin(true);setError('');}}>Email code</button></div>}
+        {emailCodeLogin && !registering ? <OtpSignIn registering={false} onAuthenticated={finish}/> : <form key={String(registering)} className="auth-form" onSubmit={submit} aria-busy={busy}>
           {challenge ? <div className="signup-verification">
             <h2>Verify your email</h2><p>We sent a six-digit code to {signup?.email}. Your account is created only after verification.</p>
             <label>Email code<input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} disabled={busy} /></label>
@@ -68,7 +72,7 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
             <button type="button" disabled={busy || now<resendAt} onClick={async()=>{if(!signup)return;setBusy(true);setError('');try{await sendSignup(signup);}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}}>{now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'}</button>
             <button type="button" disabled={busy} onClick={()=>{setChallenge('');setCode('');setSignup(undefined);setError('');}}>Change details</button>
           </div> : <>
-          <label>Email address<input name="email" type="email" autoComplete="email" required maxLength={254} disabled={busy} /></label>
+          <label>{registering?'Email address':'Email or mobile number'}<input name="email" type={registering?'email':'text'} autoComplete={registering?'email':'username'} required maxLength={254} disabled={busy} /></label>
           {registering && <>
             <label>Mobile number<input name="mobile" type="tel" autoComplete="tel" required maxLength={24} disabled={busy} /></label>
             <fieldset disabled={busy}><legend>I want to…</legend>{(Object.keys(travelPreferenceLabels) as TravelPreference[]).map(value => <label key={value}>
@@ -80,7 +84,7 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
           {registering && <p>Use at least 12 characters, up to 72 UTF-8 bytes.</p>}
           </>}
           <button className="button" type="submit" disabled={busy}>{busy ? 'Please wait…' : challenge?'Verify and create account':registering ? 'Create account' : 'Log in'}</button>
-        </form>
+        </form>}
         {error && <p role="alert">{error}</p>}
       </>}
       <p><Link state={location.state} to={registering ? '/login' : '/register'}>{registering ? 'Already have an account? Log in' : 'New to FlexirRides? Join us'}</Link></p>

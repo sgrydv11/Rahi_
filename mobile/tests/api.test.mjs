@@ -140,3 +140,19 @@ test('the timeout covers a response body that never finishes', async () => {
   await assert.rejects(request, /server is taking too long/);
   assert.equal(f.timers.size, 0);
 });
+
+test('Google ID token uses native endpoint and persists only the app refresh session', async () => {
+  const f=fixture(async url=>url.endsWith('/config')?Response.json({clientId:'public-client.apps.googleusercontent.com'}):Response.json(session));
+  assert.equal((await f.client.googleConfig()).clientId,'public-client.apps.googleusercontent.com');
+  const user=await f.client.loginWithGoogle('google-id-token','PASSENGER');
+  assert.equal(user.id,session.user.id);
+  assert.equal(f.calls[1].url,'https://example.test/api/v1/mobile/auth/google');
+  assert.deepEqual(JSON.parse(f.calls[1].options.body),{credential:'google-id-token',travelPreference:'PASSENGER'});
+  assert.equal(f.calls[1].options.headers.Authorization,undefined);
+  assert.equal(f.token(),'rotated');
+});
+test('rejected Google identity never establishes a session',async()=>{
+  const f=fixture(async()=>Response.json({detail:'Invalid Google identity.'},{status:401}));
+  await assert.rejects(f.client.loginWithGoogle('invalid'),/Invalid Google identity/);
+  assert.equal(f.token(),undefined);
+});

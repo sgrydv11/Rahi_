@@ -48,7 +48,7 @@ class EmailOtpIT {
         jdbc.update("DELETE FROM email_otp_challenges WHERE email=?", email);
     }
     @Test void verifiesOnceCreatesNoNameAccountAndRecordsUnverifiedMobile() {
-        var challenge = otp.request(email, mobile, TravelPreference.PASSENGER);
+        var challenge = otp.requestRegistration(email, "OTP-test-password-long", mobile, TravelPreference.PASSENGER);
         assertTrue(code.get().matches("[0-9]{6}"));
         assertNotEquals(code.get(), jdbc.queryForObject("SELECT code_hash FROM email_otp_challenges WHERE id=?", String.class, challenge.challengeId()));
         var issued = otp.verify(challenge.challengeId(), code.get());
@@ -59,14 +59,14 @@ class EmailOtpIT {
         assertThrows(AuthFailure.class, () -> otp.verify(challenge.challengeId(), code.get()));
     }
     @Test void persistsFailedAttemptsAndLocksAfterFive() {
-        var challenge = otp.request(email, mobile, TravelPreference.PASSENGER);
+        var challenge = otp.requestRegistration(email, "OTP-test-password-long", mobile, TravelPreference.PASSENGER);
         String wrong = code.get().equals("000000") ? "111111" : "000000";
         for (int i = 0; i < 5; i++) assertThrows(AuthFailure.class, () -> otp.verify(challenge.challengeId(), wrong));
         assertEquals(5, jdbc.queryForObject("SELECT attempts FROM email_otp_challenges WHERE id=?", Integer.class, challenge.challengeId()));
         assertThrows(AuthFailure.class, () -> otp.verify(challenge.challengeId(), code.get()));
     }
     @Test void rejectsExpiredAndThrottlesResend() {
-        var challenge = otp.request(email, mobile, TravelPreference.PASSENGER);
+        var challenge = otp.requestRegistration(email, "OTP-test-password-long", mobile, TravelPreference.PASSENGER);
         assertEquals(429, assertThrows(AuthFailure.class, () -> otp.request(email, mobile, TravelPreference.PASSENGER)).status);
         jdbc.update("UPDATE email_otp_challenges SET expires_at=now()-interval '1 second' WHERE id=?", challenge.challengeId());
         assertThrows(AuthFailure.class, () -> otp.verify(challenge.challengeId(), code.get()));
@@ -89,12 +89,28 @@ class EmailOtpIT {
         var verified=otp.verify(challenge.challengeId(),code.get());
         assertEquals(email,verified.access.user().email());
         assertEquals(email,auth.login(email,password).access.user().email());
+        assertEquals(email,auth.login(mobile,password).access.user().email());
+        assertEquals(email,auth.login(mobile.substring(3),password).access.user().email());
         assertThrows(AuthFailure.class,()->otp.verify(challenge.challengeId(),code.get()));
     }
     @Test void registrationNeverReplacesAnExistingAccountsPassword() {
         auth.register(email,"Original-password-123","Existing Rider");
-        assertEquals(409,assertThrows(AuthFailure.class,()->otp.requestRegistration(email,"Replacement-password-123",mobile,TravelPreference.PASSENGER)).status);
+        var decoy=otp.requestRegistration(email,"Replacement-password-123",mobile,TravelPreference.PASSENGER);
+        assertEquals(300,decoy.expiresIn());
+        assertEquals(401,assertThrows(AuthFailure.class,()->otp.verify(decoy.challengeId(),code.get())).status);
         assertEquals(email,auth.login(email,"Original-password-123").access.user().email());
+    }
+    @Test void unknownEmailLoginHasSameChallengeShapeAndNeverCreatesAnAccount() {
+        var challenge=otp.request(email,null,TravelPreference.PASSENGER);
+        assertEquals(300,challenge.expiresIn());assertEquals("EMAIL",challenge.delivery());
+        assertEquals(401,assertThrows(AuthFailure.class,()->otp.verify(challenge.challengeId(),code.get())).status);
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM users WHERE email=?",Integer.class,email));
+    }
+    @Test void existingEmailOtpStillSignsInAndCannotBeReused() {
+        auth.register(email,"Existing-test-password","Existing Member");
+        var challenge=otp.request(email,null,TravelPreference.PASSENGER);
+        assertEquals(email,otp.verify(challenge.challengeId(),code.get()).access.user().email());
+        assertEquals(401,assertThrows(AuthFailure.class,()->otp.verify(challenge.challengeId(),code.get())).status);
     }
     @Test void enabledEmailOtpBlocksLegacyUnverifiedSignup() {
         when(mailer.enabled()).thenReturn(true);

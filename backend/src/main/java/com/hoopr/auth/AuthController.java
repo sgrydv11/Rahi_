@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     // Classes rather than records avoid generated toString containing passwords.
     public static class LoginRequest {
-        @NotBlank @Email @Size(max = 254) public String email;
+        @NotBlank @Size(max = 254) public String email;
         @NotBlank @Size(max = 72) public String password;
     }
     public static class RegisterRequest extends LoginRequest {
+        @AssertTrue(message="Enter a valid email address.")
+        public boolean isValidEmail() { return email!=null && email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"); }
         @NotBlank @Size(max = 120) @Pattern(regexp = "\\p{L}[\\p{L}\\p{M} .'-]{0,119}") public String fullName;
         @Size(max = 24) public String mobileNumber;
         @NotNull public com.hoopr.user.TravelPreference travelPreference = com.hoopr.user.TravelPreference.BOTH;

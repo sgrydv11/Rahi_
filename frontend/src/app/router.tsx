@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import { AppLayout } from './layouts/AppLayout';
 import { HomePage } from '../features/home/HomePage';
+import { HelpPage } from '../features/home/HelpPage';
 import { LoginPage, RegisterPage } from '../features/auth/AuthPages';
 import { RideSearchPage } from '../features/rides/RideSearchPage';
 import { NotFoundPage } from '../components/NotFoundPage';
@@ -17,6 +18,7 @@ import { ChatPage } from '../features/chat/ChatPage';
 export const router = createBrowserRouter([
   { element: <AppLayout />, children: [
     { path: '/', element: <HomePage /> },
+    { path: '/help', element: <HelpPage /> },
     { path: '/login', element: <LoginPage /> },
     { path: '/register', element: <RegisterPage /> },
     { path: '/rides', element: <RideSearchPage /> },

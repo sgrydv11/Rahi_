@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { api, login, requestRegistrationOtp, verifyEmailOtp, type Preference, type User, type Vehicle } from './api';
+import { GoogleSignIn } from './GoogleSignIn';
+import { api, login, requestEmailOtp, requestRegistrationOtp, verifyEmailOtp, type Preference, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
 import { Button, Card, Copy, ErrorText, Field, QueryState, styles, useAction, useQuery } from './ui';
 
@@ -17,6 +18,7 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [emailCodeLogin,setEmailCodeLogin]=useState(false);
   const [challenge,setChallenge]=useState('');
   const [code,setCode]=useState('');
   const [resendAt,setResendAt]=useState(0);
@@ -27,8 +29,10 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
   async function submit() {
     if(challenge){if(!/^\d{6}$/.test(code))throw new Error('Enter the six-digit email code.');onUser(await verifyEmailOtp(challenge,code));return;}
     const address = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) || address.length > 254)
-      throw new Error('Enter a valid email address.');
+    const validEmail=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) && address.length<=254;
+    const validPhone=/^(?:[6-9][0-9]{9}|\+[1-9][0-9]{7,14})$/.test(address.replace(/[ ()-]/g,''));
+    if(!validEmail && (create || emailCodeLogin || !validPhone)) throw new Error(create || emailCodeLogin?'Enter a valid email address.':'Enter a valid email address or mobile number.');
+    if(!create && emailCodeLogin){const next=await requestEmailOtp(address);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());return;}
     const number = mobile.replace(/[ ()-]/g, '');
     if (create && !/^(?:[6-9][0-9]{9}|\+[1-9][0-9]{7,14})$/.test(number))
       throw new Error('Enter a valid mobile number with country code for numbers outside India.');
@@ -38,21 +42,23 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
     else onUser(await login(address,password));
   }
   return <Card>
+    {!challenge && <GoogleSignIn preference={preference} busy={action.busy} run={action.run} onUser={onUser}/>}
     {challenge?<>
-      <Copy>Verify your email</Copy><Copy>Enter the code sent to {email}. Your account is created only after verification. The code expires in five minutes.</Copy>
+      <Copy>Verify your email</Copy><Copy>Enter the code sent to {email}. {create?'Your account is created only after verification.':'Verify the code to sign in.'} The code expires in five minutes.</Copy>
       <Field label="Email code" value={code} change={value=>setCode(value.replace(/\D/g,'').slice(0,6))} numeric />
-      <Button label={now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'} disabled={action.busy||now<resendAt} onPress={()=>void action.run(async()=>{const next=await requestRegistrationOtp(email.trim(),password,mobile,preference);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());})}/>
+      <Button label={now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'} disabled={action.busy||now<resendAt} onPress={()=>void action.run(async()=>{const next=create?await requestRegistrationOtp(email.trim(),password,mobile,preference):await requestEmailOtp(email.trim());setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());})}/>
       <Button label="Change details" disabled={action.busy} onPress={()=>{setChallenge('');setCode('');}} />
     </>:<>
-    <Field label="Email address" value={email} change={setEmail} />
+    {!create && <View style={styles.row}><Button label={'Password'+(!emailCodeLogin?' ✓':'')} disabled={action.busy} onPress={()=>setEmailCodeLogin(false)}/><Button label={'Email code'+(emailCodeLogin?' ✓':'')} disabled={action.busy} onPress={()=>setEmailCodeLogin(true)}/></View>}
+    <Field label={create || emailCodeLogin?'Email address':'Email or mobile number'} value={email} change={setEmail} />
     {create && <>
       <Field label="Mobile number" value={mobile} change={setMobile} />
       <Preferences value={preference} change={setPreference} />
       <Copy>Use a password of at least 12 characters, up to 72 UTF-8 bytes.</Copy>
     </>}
-    <Field label="Password" value={password} change={setPassword} secret={!showPassword} trailing={<Pressable accessibilityRole="button" accessibilityLabel={showPassword?'Hide password':'Show password'} onPress={()=>setShowPassword(v=>!v)} disabled={action.busy} style={{padding:12}}><Ionicons name={showPassword?'eye-off-outline':'eye-outline'} size={22} color="#2359ac" /></Pressable>} />
+    {(create || !emailCodeLogin) && <Field label="Password" value={password} change={setPassword} secret={!showPassword} trailing={<Pressable accessibilityRole="button" accessibilityLabel={showPassword?'Hide password':'Show password'} onPress={()=>setShowPassword(v=>!v)} disabled={action.busy} style={{padding:12}}><Ionicons name={showPassword?'eye-off-outline':'eye-outline'} size={22} color="#2359ac" /></Pressable>} />}
     </>}
-    <Button label={action.busy ? 'Please wait…' : challenge?'Verify and create account':create ? 'Create account' : 'Sign in'} disabled={action.busy}
+    <Button label={action.busy ? 'Please wait…' : challenge?(create?'Verify and create account':'Verify and sign in'):create ? 'Create account' : emailCodeLogin?'Send email code':'Sign in'} disabled={action.busy}
       onPress={() => void action.run(submit)} />
     <ErrorText message={action.error} />
     <Button label={create ? 'Already have an account?' : 'Create an account'} disabled={action.busy}
@@ -66,7 +72,7 @@ export function Profile({ user, onUser, go }: { user: User; onUser: (user: User)
   const [saved, setSaved] = useState(false);
   const action = useAction();
   return <Card>
-    <Copy>{user.email}</Copy>
+    <Button label={user.email} onPress={()=>void action.run(async()=>{await Linking.openURL(`mailto:${user.email}`);})}/>
     <Field label="Full name" value={name} change={value => { setName(value); setSaved(false); }} />
     <Preferences value={preference} change={value => { setPreference(value); setSaved(false); }} />
     <ErrorText message={action.error} />

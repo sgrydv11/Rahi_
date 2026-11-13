@@ -27,6 +27,13 @@ describe('auth session client', () => {
     expect(validateCredentials('a@example.test', 'é'.repeat(37), true)).toContain('72');
     expect(validateCredentials('a@example.test', 'long-password', true)).toBeNull();
   });
+  it('accepts registered mobile identifiers only for password login', async () => {
+    const { validateCredentials } = await import('./auth');
+    expect(validateCredentials('9876543210', 'long-password', false)).toBeNull();
+    expect(validateCredentials('+91 98765-43210', 'long-password', false)).toBeNull();
+    expect(validateCredentials('1234', 'long-password', false)).toContain('mobile');
+    expect(validateCredentials('9876543210', 'long-password', true)).toContain('email');
+  });
   it('exchanges a Google credential using CSRF and establishes the normal session', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(session());
     vi.stubGlobal('fetch', fetcher);

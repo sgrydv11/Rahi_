@@ -33,9 +33,8 @@ public class EmailOtpService {
     public Challenge requestRegistration(String email, String password, String mobile, TravelPreference preference) {
         AuthService.validatePassword(password);
         if (password.isBlank() || password.length()<12) throw new AuthFailure(400,"Use a password of at least 12 characters.");
-        if (users.findByEmail(AuthService.normalize(email)).isPresent()) throw new AuthFailure(409,"Email is already registered. Sign in instead.");
         if (mobile==null || mobile.isBlank()) throw new AuthFailure(400,"Enter your mobile number.");
-        return challenge(email,mobile,preference,passwords.encode(password));
+        return challenge(email,mobile,preference,passwords.encode(password),true);
     }
     public static String mobile(String value) {
         if (value == null || value.isBlank()) return null;
@@ -46,16 +45,16 @@ public class EmailOtpService {
     }
     @Transactional
     public Challenge request(String identifier, String mobileNumber, TravelPreference preference) {
-        return challenge(identifier,mobileNumber,preference,null);
+        return challenge(identifier,mobileNumber,preference,null,false);
     }
-    private Challenge challenge(String identifier, String mobileNumber, TravelPreference preference, String passwordHash) {
+    private Challenge challenge(String identifier, String mobileNumber, TravelPreference preference, String passwordHash, boolean registering) {
         String email = AuthService.normalize(identifier);
         if (!email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+") || email.length() > 254)
             throw new AuthFailure(400, "Enter a valid email address. Mobile OTP will be available after SMS setup.");
         String mobile = mobile(mobileNumber);
-        if (users.findByEmail(email).isEmpty() && mobile == null)
-            throw new AuthFailure(400, "Enter your mobile number on the signup page to create an account.");
         jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtext(?))", "otp:" + email);
+        var account=users.findByEmail(email).orElse(null);
+        String purpose=registering ? (account==null?"REGISTER":"DECOY") : (account!=null && "ACTIVE".equals(account.status)?"LOGIN":"DECOY");
         var recent = jdbc.queryForObject("SELECT count(*) FROM email_otp_challenges WHERE email=? AND created_at>?", Integer.class,
                 email, clock.instant().minusSeconds(60).atOffset(ZoneOffset.UTC));
         if (recent != null && recent > 0) throw new AuthFailure(429, "Please wait 60 seconds before requesting another code.");
@@ -66,9 +65,9 @@ public class EmailOtpService {
         String code = String.format(Locale.ROOT, "%06d", random.nextInt(1000000));
         mailer.deliver(email, code);
         jdbc.update("UPDATE email_otp_challenges SET consumed=true WHERE email=? AND NOT consumed", email);
-        jdbc.update("INSERT INTO email_otp_challenges(id,email,mobile_number,code_hash,expires_at,created_at,travel_preference,registration_password_hash) VALUES(?,?,?,?,?,?,?,?)",
+        jdbc.update("INSERT INTO email_otp_challenges(id,email,mobile_number,code_hash,expires_at,created_at,travel_preference,registration_password_hash,purpose) VALUES(?,?,?,?,?,?,?,?,?)",
                 id, email, mobile, hash(id, code), clock.instant().plusSeconds(300).atOffset(ZoneOffset.UTC),
-                clock.instant().atOffset(ZoneOffset.UTC), preference.name(), passwordHash);
+                clock.instant().atOffset(ZoneOffset.UTC), preference.name(), passwordHash,purpose);
         return new Challenge(id, 300, "EMAIL");
     }
     @Transactional(noRollbackFor = AuthFailure.class)
@@ -81,17 +80,19 @@ public class EmailOtpService {
             throw invalid();
         jdbc.update("UPDATE email_otp_challenges SET attempts=attempts+1 WHERE id=?", id);
         if (!MessageDigest.isEqual(hash(id, code).getBytes(StandardCharsets.UTF_8), challenge.get("code_hash").toString().getBytes(StandardCharsets.UTF_8))) throw invalid();
+        if("DECOY".equals(challenge.get("purpose")))throw invalid();
         String email = challenge.get("email").toString();
         jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtext(?))", "email:" + email);
         var user = users.findByEmail(email).orElse(null);
         String signupHash = (String) challenge.get("registration_password_hash");
-        if (signupHash!=null && user!=null) throw new AuthFailure(409,"Email is already registered. Sign in instead.");
+        if ("REGISTER".equals(challenge.get("purpose")) && user!=null) throw invalid();
+        if ("LOGIN".equals(challenge.get("purpose")) && user==null) throw invalid();
         if (user == null) {
             var profile = auth.register(email, UUID.randomUUID().toString(), "FlexirRides member", TravelPreference.valueOf(challenge.get("travel_preference").toString()), (String)challenge.get("mobile_number"));
             user = users.findById(profile.id()).orElseThrow();
             if (signupHash!=null) { user.passwordHash=signupHash; users.saveAndFlush(user); }
         }
-        if (!"ACTIVE".equals(user.status)) throw new AuthFailure(401, "This account is unavailable.");
+        if (!"ACTIVE".equals(user.status)) throw invalid();
         String mobile = (String) challenge.get("mobile_number");
         if (mobile != null && user.mobileNumber == null) { user.mobileNumber = mobile; users.saveAndFlush(user); }
         jdbc.update("UPDATE email_otp_challenges SET consumed=true WHERE id=?", id);

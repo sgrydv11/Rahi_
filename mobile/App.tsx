@@ -177,10 +177,10 @@ function NativeApp() {
       {stack.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Back" style={layout.icon} onPress={back}>
         <Ionicons name="arrow-back" size={24} color={colors.accent} />
       </Pressable>}
-      <View style={layout.brandGroup}>
+      <Pressable accessibilityRole="link" accessibilityLabel="FlexirRides home" onPress={()=>{Keyboard.dismiss();setStack([home]);}} style={layout.brandGroup}>
         <Image source={require('./assets/flexirrides-icon.png')} style={layout.logo} />
         <Text accessibilityRole="header" style={layout.brand}>FlexirRides</Text>
-      </View>
+      </Pressable>
     </View>
     <KeyboardAvoidingView style={layout.flex} behavior="padding">
       <FieldFocus.Provider value={() => { if (Keyboard.isVisible()) requestAnimationFrame(revealField); }}>

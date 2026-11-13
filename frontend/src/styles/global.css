@@ -150,7 +150,9 @@ select { font: inherit; width: 100%; min-width: 0; min-height: 44px; padding: 10
 .ride-card-price small { display:block; font-size:11px; }
 .chat-page { display:flex; flex-direction:column; width:100%; max-width:760px; height:calc(100dvh - 190px); min-height:480px; padding:0!important; margin:20px auto; border:1px solid #d1dce8; border-radius:18px; overflow:hidden; background:#fff; }
 .chat-header { display:flex; align-items:center; gap:12px; padding:12px 16px; background:#fff; border-bottom:1px solid #dce3eb; }
-.chat-header h1 { font-size:19px; margin:0; line-height:1.2; }
+.chat-header h1 { font-size:19px; margin:0; line-height:1.2; letter-spacing:0; }
+.chat-phone-share { flex-direction:row; align-items:center; font-size:12px; font-weight:400; }
+.chat-phone-share input { width:18px; height:18px; padding:0; margin:0; flex-shrink:0; accent-color:#2359ac; }
 .chat-header small { color:#52657f; font-size:12px; }
 .chat-header>a { text-decoration:none; font-size:24px; }
 .chat-avatar { display:grid; place-items:center; width:42px; height:42px; border-radius:50%; background:#dfeafe; color:#2359ac; font-size:28px; }
@@ -196,3 +198,57 @@ select { font: inherit; width: 100%; min-width: 0; min-height: 44px; padding: 10
 .filter-sort-panel[open]>label { margin-top:12px; }
 .filter-sort-panel .ride-filter { margin-top:14px; }
 .ride-card-price strong { white-space:nowrap; }
+
+.chat-contact { border:0; padding:6px 0; background:transparent; color:#2359ac; text-decoration:underline; cursor:pointer; }
+.chat-quote,.chat-reply-draft { border-left:3px solid #2359ac; background:#e9eff8; border-radius:6px; padding:8px 10px; margin:4px 0; overflow-wrap:anywhere; }
+.chat-quote p,.chat-reply-draft p { margin:4px 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-wrap; }
+.chat-reply-draft { display:flex; gap:8px; align-items:center; }
+.chat-reply-draft>div { flex:1; min-width:0; }
+.chat-reply-draft button { padding:10px; }
+.chat-message-footer { display:flex; gap:12px; align-items:center; justify-content:space-between; }
+.chat-message-footer button { border:0; background:transparent; color:#2359ac; padding:8px 0; cursor:pointer; }
+.chat-member-dialog { width:min(90vw,400px); border:1px solid #dce3eb; border-radius:18px; padding:24px; color:#172b49; overflow-wrap:anywhere; }
+.chat-member-dialog::backdrop { background:#0008; }
+
+/* Let content wrap rather than clipping it or introducing horizontal scrolling. */
+main,.page,.panel,fieldset,.hero>*,.ride-card>*,.city-field>span,.chat-header>div { min-width:0; }
+.page,.panel,.site-footer,.chat-message { overflow-wrap:anywhere; }
+img,video,svg { max-width:100%; }
+img,video { height:auto; }
+fieldset { margin-inline:0; }
+input,textarea,select { max-width:100%; }
+button,.button { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+input[type=checkbox],input[type=radio] { width:auto; flex-shrink:0; }
+.site-header { flex-wrap:wrap; }
+.site-header .brand { max-width:calc(100% - 58px); }
+.primary-navigation { min-width:0; flex-wrap:wrap; }
+.menu-toggle { display:none; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#2359ac; min-width:44px; min-height:44px; font-size:24px; cursor:pointer; }
+.site-footer { flex-wrap:wrap; gap:18px; }
+.site-footer nav { flex-wrap:wrap; gap:18px; }
+.site-footer small { margin-left:auto; }
+.site-footer .footer-brand { color:#172b49; text-decoration:none; }
+.chat-send { flex-shrink:0; }
+[role=status] { overflow-wrap:anywhere; }
+@media(max-width:700px) {
+  .page>h1 { letter-spacing:-.6px; line-height:1.15; }
+  .site-header { justify-content:space-between; }
+  .menu-toggle { display:block; }
+  .site-header .primary-navigation.is-open { display:flex; flex-direction:column; align-items:stretch; width:100%; gap:4px; padding-top:12px; }
+  .primary-navigation a,.primary-navigation button { min-height:44px; padding:10px 12px; border-radius:9px; }
+  .site-footer { display:flex; padding-bottom:20px; }
+  .site-footer nav { width:auto; font-size:12px; }
+  .site-footer small { width:100%; margin-left:0; }
+  .chat-header { gap:8px; padding:10px; }
+  .chat-avatar { flex-shrink:0; }
+  .journey-date { flex-wrap:wrap; }
+  .calendar-trigger { flex:1 1 100%; margin:0; text-align:left; }
+  .ride-card { grid-template-columns:minmax(0,1fr) minmax(75px,95px); }
+  .ride-card-price { min-width:0; }
+  .ride-card-price strong { font-size:19px; }
+}
+@media(max-width:360px) {
+  .brand { font-size:26px; }
+  .panel { padding:14px; }
+  .ride-card { grid-template-columns:minmax(0,1fr); }
+  .ride-card-price { text-align:left; }
+}

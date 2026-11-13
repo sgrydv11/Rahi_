@@ -58,19 +58,21 @@ public class SecurityConfig {
     @Bean JwtEncoder jwtEncoder(AuthSettings settings) {
         return new NimbusJwtEncoder(new ImmutableSecret<>(Base64.getDecoder().decode(settings.jwtSecret())));
     }
-    @Bean JwtDecoder jwtDecoder(AuthSettings settings, Clock clock) {
+    @Bean JwtDecoder jwtDecoder(AuthSettings settings, Clock clock, com.hoopr.auth.SessionRepository sessions) {
         var decoder = NimbusJwtDecoder.withSecretKey(new SecretKeySpec(
                 Base64.getDecoder().decode(settings.jwtSecret()), "HmacSHA256")).macAlgorithm(MacAlgorithm.HS256).build();
         var timestamp = new JwtTimestampValidator(Duration.ZERO); timestamp.setClock(clock);
         OAuth2TokenValidator<Jwt> claims = token -> {
             try {
                 UUID.fromString(token.getSubject());
+                UUID sessionId=UUID.fromString(token.getClaimAsString("sid"));
                 if (token.getExpiresAt() != null && token.getIssuedAt() != null
                         && !token.getIssuedAt().isAfter(clock.instant())
                         && token.getExpiresAt().isAfter(token.getIssuedAt())
                         && Duration.between(token.getIssuedAt(), token.getExpiresAt()).compareTo(Duration.ofMinutes(15)) <= 0
                         && token.getAudience().contains("hoopr-api")
-                        && List.of("USER", "ADMIN").contains(token.getClaimAsString("role")))
+                        && List.of("USER", "ADMIN").contains(token.getClaimAsString("role"))
+                        && sessions.active(sessionId,UUID.fromString(token.getSubject()),clock.instant(),token.getClaimAsString("role")))
                     return OAuth2TokenValidatorResult.success();
             } catch (RuntimeException ignored) { }
             return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"));
@@ -95,7 +97,7 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(r -> "POST".equals(r.getMethod()) &&
                                 Set.of("/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
                                         "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout",
-                                        "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify", "/api/v1/mobile/auth/registration/request")
+                                        "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify", "/api/v1/mobile/auth/registration/request", "/api/v1/mobile/auth/google")
                                         .contains(r.getRequestURI().substring(r.getContextPath().length())))
                         // Only bearer-authenticated business requests bypass CSRF, never cookie auth routes.
                         .ignoringRequestMatchers(r -> !r.getRequestURI().startsWith(r.getContextPath() + "/api/v1/auth/")
@@ -115,9 +117,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.HEAD, com.hoopr.config.WebAppRoutes.PAGES).permitAll()
                         .requestMatchers(HttpMethod.GET, com.hoopr.config.WebAppRoutes.ASSETS).permitAll()
                         .requestMatchers(HttpMethod.HEAD, com.hoopr.config.WebAppRoutes.ASSETS).permitAll()
+                        .requestMatchers(com.hoopr.config.WebAppRoutes::browserPage).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
                                 "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout",
-                                "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify", "/api/v1/mobile/auth/registration/request").permitAll()
+                                "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify", "/api/v1/mobile/auth/registration/request", "/api/v1/mobile/auth/google").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/google/config").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
                                 "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/google",

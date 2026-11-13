@@ -121,6 +121,12 @@ export async function register(email: string, password: string, fullName: string
   await request<User>('/mobile/auth/register', { method: 'POST', body: { email, password, fullName, travelPreference, mobileNumber } });
   return login(email, password);
 }
+export function googleConfig() {
+  return request<{clientId:string}>('/auth/google/config');
+}
+export async function loginWithGoogle(credential:string, travelPreference:Preference='PASSENGER') {
+  return (await save(await request<Session>('/mobile/auth/google', {method:'POST',body:{credential,travelPreference}}))).user;
+}
 export function requestEmailOtp(identifier: string, mobileNumber?: string, travelPreference: Preference = 'PASSENGER') {
   return request<{ challengeId: string; expiresIn: number; delivery: string }>('/mobile/auth/otp/request', {
     method: 'POST', body: { identifier, mobileNumber, travelPreference },

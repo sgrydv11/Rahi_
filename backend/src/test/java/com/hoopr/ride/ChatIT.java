@@ -52,6 +52,39 @@ class ChatIT {
         assertThrows(jakarta.validation.ConstraintViolationException.class,
             ()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"   ",null)));
     }
+    @Test void phoneSharingRequiresExplicitConsentAndRegisteredNumber() {
+        var a=member();var b=member();var id=UUID.fromString(a.getSubject());
+        assertEquals(400,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"Contact me",null,true))).status);
+        jdbc.update("UPDATE users SET mobile_number='+919876543210',mobile_verified=false WHERE id=?",id);
+        var hidden=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Private contact",null));
+        assertNull(hidden.mobileNumber());assertFalse(hidden.phoneShared());
+        var key=UUID.randomUUID();
+        var shared=chat.send(a,new ChatController.Send(key,"Contact me",null,true));
+        assertEquals("+919876543210",shared.mobileNumber());assertFalse(shared.mobileVerified());
+        assertEquals(shared.id(),chat.send(a,new ChatController.Send(key,"Contact me",null,true)).id());
+        assertEquals(409,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(key,"Contact me",null,false))).status);
+        assertEquals("+919876543210",chat.list(b,0).content().stream().filter(m->m.id()==shared.id()).findFirst().orElseThrow().mobileNumber());
+    }
+    @Test void repliesPersistOriginalMessageAndRetryTargetCannotChange() {
+        var a=member();var b=member();
+        var original=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Leaving at seven",null));
+        var key=UUID.randomUUID();
+        var request=new ChatController.Send(key,"One seat please",null,false,original.id());
+        var reply=chat.send(b,request);
+        assertEquals(original.id(),reply.replyTo().id());
+        assertEquals(original.senderId(),reply.replyTo().senderId());
+        assertEquals(original.body(),reply.replyTo().body());
+        assertEquals(reply.id(),chat.send(b,request).id());
+        assertEquals(409,assertThrows(RideFailure.class,()->chat.send(b,new ChatController.Send(key,"One seat please",null,false,null))).status);
+        assertEquals(400,assertThrows(RideFailure.class,()->chat.send(b,new ChatController.Send(UUID.randomUUID(),"Missing",null,false,Long.MAX_VALUE))).status);
+        var persisted=chat.list(a,original.id()).content().stream().filter(m->m.id()==reply.id()).findFirst().orElseThrow();
+        assertEquals(original.body(),persisted.replyTo().body());
+        assertNull(persisted.mobileNumber());
+        assertEquals("Chat Member",persisted.member().fullName());
+        assertEquals("BOTH",persisted.member().travelPreference());
+        assertNotNull(persisted.member().memberSince());
+        assertThrows(jakarta.validation.ConstraintViolationException.class,()->chat.send(b,new ChatController.Send(UUID.randomUUID(),"Invalid",null,false,-1L)));
+    }
     @Test void onlyOwnersShareUpcomingRidesAndAvailabilityUpdatesLive() {
         var a=member();var b=member();
         var ride=rides.create(UUID.fromString(a.getSubject()),new RideDtos.Create("Indore","Ujjain",null,null,
