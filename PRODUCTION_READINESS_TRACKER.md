@@ -314,3 +314,17 @@ Implemented locally on app_v1:
 ## 0.2.2 release in progress — 14 November 2026
 
 User authorized complete testing, deployment and a new app build. Set Android 0.2.2/versionCode 4 (iOS source build number 4; no signed iOS release). Fresh full backend run passes all 157 tests and executable packaging; web 57 tests/build; mobile 24 tests/TypeScript/both platform exports. Repeated browser UI audit passes 72 route/viewport cases and 25 internal destinations. Two-user chat/reply/contact/book-from-chat, signup/calendar/email-code UI and packaged auth/booking/concurrency smoke pass. Render and Expo account access verified. See docs/release-0.2.2.md for release status and acceptance limits. Pushing app_v1 and building/deploying next; no live messages or release emails sent.
+
+### 0.2.2 live deployment and APK queue checkpoint
+
+Source d168d0b96a2e01c7b8f202e43d00c9e5087a3d68 pushed to origin/app_v1. Render dep-dbrmblh42hec73cc370g succeeded/Live; observed logs show public schema migrated V20 to V23 via V21/V22/V23. Live read-only checks passed: 17 API/assets, 24 responsive public UI cases, exact release asset match, health UP and city/date ride results. Hosted GitHub run 43493200825 passed all jobs. No live test chat messages/accounts/bookings or release email sent.
+
+Expo Android APK build abbcb267-192a-4770-96e2-bff8747936fc submitted from d168d0b, version0.2.2/code4 using existing signing credentials. Currently waiting in Expo queue. Continue monitoring this same build; do not submit duplicates. Once finished, download/verify APK with .local/verify-release-022-apk.py, update docs/release-0.2.2.md with artifact/result, and push documentation-only outcome with [skip render] [skip ci] to avoid an unnecessary redeploy. Physical Android test remains unavailable (no SDK/device).
+
+### 0.2.2 completed release outcome — 14 November 2026
+
+Expo abbcb267-192a-4770-96e2-bff8747936fc FINISHED, Android0.2.2/code4, source d168d0b96a2e01c7b8f202e43d00c9e5087a3d68. Downloaded APK successfully: https://expo.dev/artifacts/eas/gFhleznoBetWLxSb9xPa3pI9FNtKBq3aQMkgt9Jp0As.apk
+
+APK ZIP CRC passes; manifest package/version and Google native module verified; signing certificate matches the previous APK. SHA256 7de27a75238c0a9d0ba752e6c243a09fa83374cec8730bbb0a0c0e9647dd3fab. Render dep-dbrmblh42hec73cc370g is Live, V21–V23 applied, health UP; 17 live API/asset checks, 24 live responsive cases and 15 loaded selected-date ride cards/detail/Book Seat navigation passed. GitHub43493200825 passed all jobs. Full isolated backend157, web57, native24, exports, UI72/link25, signup/calendar/chat booking/reply/contact and security/concurrency tests passed. Additional ambiguous-delivery chat test passes same-key retry/draft retention and no duplication after reload.
+
+Release code pushed on app_v1. Verification documentation is committed with [skip render] [skip ci] so it does not redeploy unchanged code. No email or live community messages were sent. Physical Android acceptance, Google Cloud setup and the remaining combined-audit items are not claimed complete. See docs/release-0.2.2.md for links and limits.

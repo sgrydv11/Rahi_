@@ -1,9 +1,10 @@
 # Combined website, mobile and login-security audit
 
 Updated 14 November 2026. Branch: app_v1. Scope: the 20 website requests and
-the previous 20-point login/security screenshot. All implementation and tests
-below are local. These changes have not been pushed, deployed or included in a
-new APK. No production database or provider settings were modified.
+the previous 20-point login/security screenshot. The table records local implementation and testing. The subsequent 0.2.2
+rollout is recorded in release-0.2.2.md: source is pushed and the combined
+web/backend deployment is Live, including additive database migrations. The Android APK is also finished and download-verified. No production account data or provider settings were
+changed by the audit.
 
 **Implemented** means source code exists and the stated local checks passed.
 **Partial** means external setup, device verification or a scope limit remains.
@@ -76,7 +77,7 @@ new APK. No production database or provider settings were modified.
 - Screenshots/results are local under `.local/site-*-mobile.png` and
   `.local/site-audit-results.json`; they contain only generated local fixtures.
 
-Still pending: deployment/push and requested APK release; Google OAuth setup;
+Release 0.2.2 is pushed, deployed and its Android APK verified. Still pending: Google OAuth setup;
 real provider/device acceptance; production signing-key/default-admin checks;
 admin MFA; secure reset and email-change product flows if they are to be offered.
 No public support email/phone, legal policy or SLA was provided; none was made up.

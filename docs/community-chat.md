@@ -75,4 +75,5 @@ the subsequent Google endpoint change. Browser two-user smoke verified replies,
 cancel, quote persistence across reload, member-card contents and privacy, plus
 the existing booking/seat-update flow. Web 55 tests/build and mobile 22
 tests/typecheck/Android+iOS exports passed for the chat changes. V22 is applied
-only to isolated test schemas. Live deployment and a new APK remain pending.
+only to isolated test schemas. These were pending at the local audit. Release 0.2.2 subsequently deployed
+V21–V23 and produced a verified Android APK; see release-0.2.2.md.

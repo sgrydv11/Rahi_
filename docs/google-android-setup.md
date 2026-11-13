@@ -1,9 +1,9 @@
 # Google sign-in setup for FlexirRides Android
 
 The production `/api/v1/auth/google/config` returned an empty clientId on
-14 November 2026. Native sign-in code and a native session endpoint have been
-added locally. Configuration, deployment, a new signed APK and device acceptance
-are still required. No client secret is needed in the app or this repository.
+14 November 2026. Native sign-in code and a native session endpoint are now released in 0.2.2.
+Google Cloud configuration, the Render client-ID setting and device acceptance
+are still required; see release-0.2.2.md for the verified APK. No client secret is needed in the app or this repository.
 
 1. Open https://console.cloud.google.com/ and select or create a project for
    FlexirRides. Use the same project for both OAuth clients below.
@@ -38,8 +38,8 @@ are still required. No client secret is needed in the app or this repository.
    testing the new Android code. The endpoint verifies Google's signature,
    issuer, expiry, verified email and Web-client audience using the existing
    GoogleTokenVerifier. It issues the normal app access/refresh session.
-7. When an APK is explicitly requested, build it with the existing preview
-   profile and install it. The Google native dependency requires a rebuilt
+7. Install the 0.2.2 APK linked in release-0.2.2.md. For future native changes,
+   build a new APK only when requested. The Google native dependency requires a rebuilt
    binary; Expo Go and the old APK cannot provide this integration. Android
    uses native autolinking without Firebase; no google-services.json is needed.
 8. On an Android device with Google Play services, tap Continue with Google,
