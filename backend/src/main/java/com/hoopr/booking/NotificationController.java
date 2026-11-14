@@ -68,6 +68,12 @@ public class NotificationController {
                     WHERE driver_id = :user AND status IN ('SCHEDULED', 'PUBLISHED')
                       AND departure_at > :now AND departure_at <= :until
                     UNION ALL
+                    SELECT b.id,b.ride_id,b.driver_id,b.source_name,b.destination_name,'RIDE_STARTED',r.started_at
+                    FROM visible_bookings b JOIN rides r ON r.id=b.ride_id WHERE b.passenger_id=:user AND b.status='CONFIRMED' AND r.started_at IS NOT NULL
+                    UNION ALL
+                    SELECT b.id,b.ride_id,b.driver_id,b.source_name,b.destination_name,'RIDE_COMPLETED',r.completed_at
+                    FROM visible_bookings b JOIN rides r ON r.id=b.ride_id WHERE b.passenger_id=:user AND b.status='CONFIRMED' AND r.completed_at IS NOT NULL
+                    UNION ALL
                     SELECT r.id,r.id,r.driver_id,r.source_name,r.destination_name,'TRAVEL_RIDE',greatest(r.created_at,p.created_at)
                     FROM rides r JOIN user_travel_routes p ON p.user_id=:user AND lower(r.source_name)=lower(p.origin) AND lower(r.destination_name)=lower(p.destination)
                     WHERE r.driver_id<>:user AND r.status='SCHEDULED' AND r.departure_at>:now AND r.departure_at<:routeUntil
@@ -100,6 +106,6 @@ public class NotificationController {
                 });
     }
 
-    private static int routeGroup(String a,String b){var pair=Set.of(a,b);return pair.equals(Set.of("Indore","Ujjain"))?2:pair.equals(Set.of("Indore","Dewas"))?3:pair.equals(Set.of("Indore","Pithampur"))?4:1;}
+    public static int routeGroup(String a,String b){var pair=Set.of(a,b);return pair.equals(Set.of("Indore","Ujjain"))?2:pair.equals(Set.of("Indore","Dewas"))?3:pair.equals(Set.of("Indore","Pithampur"))?4:1;}
     public record Notice(String id, String kind, String origin, String destination, Instant time, String link) { }
 }

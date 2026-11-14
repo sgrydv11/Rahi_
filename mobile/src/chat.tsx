@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Modal, Switch, Pressable, ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { randomUUID } from 'expo-crypto';
-import { api, type Ride } from './api';
+import { api, type Ride,type Preference } from './api';
 import type { Navigate } from './navigation';
 import { Button, Card, Copy, ErrorText, date } from './ui';
 
@@ -17,14 +17,21 @@ interface Message {
   ride:null | {id:string;origin:string;destination:string;departureAt:string;availableSeats:number;
     pricePerSeat:number;currency:string;status:string};
 }
-export function Chat({userId,go,groupId,setGroup}:{userId:string;go:Navigate;groupId:number;setGroup:(id:number)=>void}) {
+type Draft={body:string;rideId:string;replyTo:Reply|null};
+type Pending={clientId:string;body:string;rideId?:string;groupId:number;replyToId?:number};
+export function Chat({userId,go,groupId,setGroup,preference}:{preference?:Preference;userId:string;go:Navigate;groupId?:number;setGroup:(id:number|undefined)=>void}) {
+ const community=useCommunity(),drafts=useRef<Record<number,Draft>>({}),pending=useRef<Record<number,Pending>>({});const[error,setError]=useState('');
+ if(groupId)return <Conversation userId={userId} go={go} groupId={groupId} canOffer={preference!=='PASSENGER'} canBook={preference!=='DRIVER'} onBack={()=>setGroup(undefined)} draftStore={drafts} pendingStore={pending}/>;
+ return <ScrollView contentContainerStyle={{gap:16,padding:12}}><Text accessibilityRole="header" style={{fontSize:32,fontWeight:'700'}}>Chats</Text><Copy>Choose a travel group.</Copy><ErrorText message={community.error||error}/>{community.groups.map(g=><Card key={g.id}><Button label={`${g.name}${g.unreadCount?' ('+g.unreadCount+')':''}`} onPress={()=>setGroup(g.id)}/><View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Copy>Notifications</Copy><Switch accessibilityLabel={`Notifications for ${g.name}`} value={!g.muted} disabled={community.muting.includes(g.id)} onValueChange={v=>void community.mute(g.id,!v).catch(e=>setError(e.message))}/></View></Card>)}</ScrollView>;
+}
+function Conversation({userId,go,groupId,onBack,draftStore,pendingStore,canOffer,canBook}:{canOffer:boolean;canBook:boolean;userId:string;go:Navigate;groupId:number;onBack:()=>void;draftStore:{current:Record<number,Draft>};pendingStore:{current:Record<number,Pending>}}) {
   const community=useCommunity();
   const [hasOlder,setHasOlder]=useState(false);
   const [feedError,setFeedError]=useState('');
   const [groupsOpen,setGroupsOpen]=useState(false);
   const selected=useRef(groupId);selected.current=groupId;
   const read=useRef(0);
-  const drafts=useRef<Record<number,{body:string;rideId:string;replyTo:Reply|null}>>({});
+  const drafts=draftStore;
   const [messages,setMessages]=useState<Message[]>([]);
   const [loaded,setLoaded]=useState(false);
   const [error,setError]=useState('');
@@ -42,7 +49,7 @@ export function Chat({userId,go,groupId,setGroup}:{userId:string;go:Navigate;gro
   const dimensions=useRef({height:0,offset:0});
   const preserve=useRef<{height:number;offset:number}|null>(null);
   const [newMessages,setNewMessages]=useState(false);
-  const pending=useRef<Record<number,{clientId:string;body:string;rideId?:string;groupId:number;replyToId?:number}>>({});
+  const pending=pendingStore;
   async function mark(id:number) {
     if(id<=read.current || AppState.currentState!=='active')return;
     const group=groupId;try{await api(`/chat/groups/${group}/read`,{method:'POST',body:{upToId:id}});if(selected.current===group){read.current=Math.max(read.current,id);community.refresh();}}catch{/* Poll retries read acknowledgement. */}
@@ -91,10 +98,8 @@ export function Chat({userId,go,groupId,setGroup}:{userId:string;go:Navigate;gro
     finally {setBusy(false);}
   }
   return <View style={{flex:1,borderRadius:16,overflow:'hidden',backgroundColor:'#F7F9FC'}}>
-    <Button label={groupsOpen?'Hide groups':'Groups · '+(community.groups.find(g=>g.id===groupId)?.name||'Ride community')} onPress={()=>setGroupsOpen(v=>!v)}/>
-    {groupsOpen && <ScrollView style={{maxHeight:190}}>{community.groups.map(g=><View key={g.id} style={{flexDirection:'row',alignItems:'center'}}><View style={{flex:1}}><Button label={`${g.id===groupId?'✓ ':''}${g.name} (${g.unreadCount})`} disabled={busy} onPress={()=>{setGroup(g.id);setGroupsOpen(false);}}/></View><Switch accessibilityLabel={`Notifications for ${g.name}`} value={!g.muted} disabled={community.muting.includes(g.id)} onValueChange={enabled=>void community.mute(g.id,!enabled).catch(e=>setError(e.message))}/></View>)}</ScrollView>}
     <ErrorText message={community.error}/>
-    <View style={{flexDirection:'row',gap:12,alignItems:'center',padding: 16,backgroundColor:'#fff'}}><Ionicons name="people-outline" size={42} color="#245EEA"/><View style={{flex:1}}><Text style={{fontSize:19,fontWeight:'700',color:'#142D4E'}}>{community.groups.find(g=>g.id===groupId)?.name||'Ride community'}</Text><Text style={{fontSize:12,color:'#4C5E75'}}>Swipe right to reply</Text></View></View>
+    <View style={{flexDirection:'row',gap:12,alignItems:'center',padding: 16,backgroundColor:'#fff'}}><Pressable accessibilityRole="button" accessibilityLabel="Back to groups" onPress={onBack} style={{padding:12}}><Ionicons accessible={false} name="arrow-back-outline" size={24} color="#245EEA"/></Pressable><Ionicons accessible={false} name="people-outline" size={32} color="#245EEA"/><View style={{flex:1}}><Text style={{fontSize:19,fontWeight:'700',color:'#142D4E'}}>{community.groups.find(g=>g.id===groupId)?.name||'Ride community'}</Text><Text style={{fontSize:12,color:'#4C5E75'}}>Swipe right to reply</Text></View></View>
     <Text style={{backgroundColor:'#F7F9FC',padding:8,fontSize:11,color:'#4C5E75',textAlign:'center'}}>Last 7 days · Mobile numbers visible to signed-in members.</Text>
     <ErrorText message={error} /><ErrorText message={feedError}/>
     {!loaded && !error && <Copy>Loading chat…</Copy>}
@@ -115,7 +120,7 @@ export function Chat({userId,go,groupId,setGroup}:{userId:string;go:Navigate;gro
           <Copy>{date(message.ride.departureAt)}</Copy>
           <Copy>{message.ride.availableSeats} seats available · {message.ride.currency} {message.ride.pricePerSeat} per seat</Copy>
           {message.ride.status==='SCHEDULED' && Date.parse(message.ride.departureAt)>Date.now() && message.ride.availableSeats>0
-            ? <Button label="View ride / book seats" onPress={()=>go({kind:'ride',id:message.ride!.id})} />
+            ? <Button label={canBook?"View ride / book seats":"View ride"} onPress={()=>go({kind:'ride',id:message.ride!.id})} />
             : <Copy>This ride is no longer available to book.</Copy>}
         </>}
         <Pressable accessibilityRole="button" accessibilityLabel={`Reply to ${message.senderName}`} disabled={busy} onPress={()=>{setReplyTo(message);composer.current?.focus();}} style={{paddingVertical:8}}><Text style={{color:"#245EEA"}}>↩ Reply</Text></Pressable>
@@ -125,7 +130,7 @@ export function Chat({userId,go,groupId,setGroup}:{userId:string;go:Navigate;gro
     {newMessages&&<Button label="New messages ↓" onPress={()=>{following.current=true;setNewMessages(false);feed.current?.scrollToEnd({animated:true});if(messages.length)void mark(messages[messages.length-1].id);}}/>}
     <View style={{backgroundColor:'#F7F9FC',padding: 12,gap:8}}>
       {replyTo && <View style={{flexDirection:"row",alignItems:"center",gap:8,padding:8,borderLeftWidth:3,borderLeftColor:"#245EEA",backgroundColor:"#EDF3FF"}}><View style={{flex:1}}><Text style={{fontWeight:"700"}}>Replying to {replyTo.senderName}</Text><Text numberOfLines={2}>{replyTo.body}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Cancel reply" disabled={busy} onPress={()=>setReplyTo(null)} style={{padding:12}}><Ionicons name="close" size={22}/></Pressable></View>}
-      <View style={{flexDirection:'row',gap:8,alignItems:'center'}}><Pressable accessibilityRole="button" accessibilityLabel="Share a ride" onPress={()=>setShare(v=>!v)} style={{padding:8}}><Ionicons name="attach-outline" size={25} color="#245EEA"/></Pressable><TextInput ref={composer} editable={!busy} accessibilityLabel="Message" placeholder="Message" value={draft} onChangeText={setDraft} multiline maxLength={1000} style={{flex:1,minHeight:44,maxHeight:100,padding:12,backgroundColor:'#fff',borderRadius:12,color:'#142D4E'}}/><Pressable accessibilityRole="button" accessibilityLabel={busy?'Sending…':'Send message'} disabled={busy||!draft.trim()} onPress={()=>void send()} style={{backgroundColor:'#245EEA',borderRadius:12,padding: 12,opacity:busy||!draft.trim()?0.5:1}}><Ionicons name="send" size={21} color="#fff"/></Pressable></View>
+      <View style={{flexDirection:'row',gap:8,alignItems:'center'}}>{canOffer&&<Pressable accessibilityRole="button" accessibilityLabel="Share a ride" onPress={()=>setShare(v=>!v)} style={{padding:8}}><Ionicons name="attach-outline" size={25} color="#245EEA"/></Pressable>}<TextInput ref={composer} editable={!busy} accessibilityLabel="Message" placeholder="Message" value={draft} onChangeText={setDraft} multiline maxLength={1000} style={{flex:1,minHeight:44,maxHeight:100,padding:12,backgroundColor:'#fff',borderRadius:12,color:'#142D4E'}}/><Pressable accessibilityRole="button" accessibilityLabel={busy?'Sending…':'Send message'} disabled={busy||!draft.trim()} onPress={()=>void send()} style={{backgroundColor:'#245EEA',borderRadius:12,padding: 12,opacity:busy||!draft.trim()?0.5:1}}><Ionicons name="send" size={21} color="#fff"/></Pressable></View>
 
       {share&&<ScrollView style={{maxHeight:160}} keyboardShouldPersistTaps="handled">
       <Button label="Load my rides to share" onPress={()=>void loadOffers()} disabled={busy} />

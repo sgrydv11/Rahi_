@@ -2,9 +2,9 @@ import { api as request, ApiError } from '../../lib/api/client';
 
 export type TravelPreference = 'DRIVER' | 'PASSENGER' | 'BOTH';
 export const travelPreferenceLabels: Record<TravelPreference, string> = {
-  DRIVER: 'Offer a seat (Driver)',
-  PASSENGER: 'Find a seat (Passenger)',
-  BOTH: 'Both — offer and find seats',
+  DRIVER: 'Driver',
+  PASSENGER: 'Passenger',
+  BOTH: 'Both',
 };
 export interface User { id: string; email: string; fullName: string; role: 'USER' | 'ADMIN'; travelPreference: TravelPreference }
 interface Session { accessToken: string; expiresIn: number; user: User }

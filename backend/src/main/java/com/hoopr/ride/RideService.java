@@ -28,6 +28,7 @@ public class RideService {
     @Transactional
     public View create(UUID driver, Create body) {
         active(driver);
+        if(profiles.findById(driver).map(p->p.travelPreference==com.hoopr.user.TravelPreference.PASSENGER).orElse(false))throw new RideFailure(403,"Select Driver or Both in Account before offering a ride.");
         validateDeparture(body.departureAt(), body.timeZone());
         validateLocations(body.origin(), body.destination());
         // PostgreSQL upsert also serializes simultaneous first offers by the same driver.

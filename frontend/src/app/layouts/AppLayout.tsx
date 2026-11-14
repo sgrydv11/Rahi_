@@ -1,3 +1,4 @@
+import {canOffer,canBook} from '../../features/auth/capabilities';
 import {Icon} from '../Icon';
 import { CommunityContext,useCommunityState } from '../../features/chat/Community';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
@@ -16,7 +17,7 @@ export function AppLayout() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location=useLocation();
-  const community=useCommunityState(user?.id,location.pathname==='/chat'?Number(new URLSearchParams(location.search).get('group')||1):undefined);
+  const community=useCommunityState(user?.id,location.pathname==='/chat'&&new URLSearchParams(location.search).has('group')?Number(new URLSearchParams(location.search).get('group')):undefined);
   const [menuOpen,setMenuOpen]=useState(false);
   const menuButton=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
@@ -65,10 +66,10 @@ export function AppLayout() {
       <Link className="brand" to="/" aria-label="FlexirRides home">FlexirRides<Icon name="arrow-forward-outline"/></Link>
       <button ref={menuButton} type="button" className="menu-toggle" aria-label={menuOpen?'Close menu':'Open menu'} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={()=>setMenuOpen(value=>!value)}><Icon name={menuOpen?'close-outline':'menu-outline'}/></button>
       <nav id="primary-navigation" className={`primary-navigation${menuOpen?' is-open':''}`} aria-label="Main navigation">
-        <NavLink to="/rides" end>Find a ride</NavLink>
+        {canBook(user)&&<NavLink to="/rides" end>Find a ride</NavLink>}
         {loading ? <span role="status">Loading…</span> : user ? <>
-          <NavLink to="/rides/new">Offer a ride</NavLink>
-          <NavLink to="/bookings/mine">My bookings</NavLink>
+          {canOffer(user)&&<NavLink to="/rides/new">Offer a ride</NavLink>}
+          {canBook(user)&&<NavLink to="/bookings/mine">My bookings</NavLink>}
           <NavLink to="/chat">Chat {community.unread>0&&<span className="unread-badge">{community.unread>99?'99+':community.unread}</span>}</NavLink>
           <NavLink to="/profile">Account</NavLink>
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
@@ -84,8 +85,8 @@ export function AppLayout() {
     <footer className="site-footer"><Link className="footer-brand" to="/">FlexirRides</Link><nav aria-label="Footer navigation"><Link to="/">Home</Link><Link to="/rides">Find a ride</Link><Link to="/help">Help</Link></nav><small>© {new Date().getFullYear()} FlexirRides</small></footer>
     <nav className="mobile-nav" aria-label="App navigation">
       <MobileNavLink to="/" label="Home" icon="home" end />
-      <MobileNavLink to="/bookings/mine" label="My Bookings" icon="bookings" />
-      <MobileNavLink to="/rides/mine" label="Offers" icon="offer" />
+      {canBook(user)&&<MobileNavLink to="/bookings/mine" label="My Bookings" icon="bookings" />}
+      {canOffer(user)&&<MobileNavLink to="/rides/mine" label="Offers" icon="offer" />}
       <MobileNavLink to="/chat" label="Chat" icon="chat" badge={community.unread} />
       <MobileNavLink to="/profile" label="Account" icon="account" />
     </nav>

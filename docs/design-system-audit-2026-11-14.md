@@ -48,3 +48,13 @@ Physical Android/iOS device checks for font rendering, gestures, keyboard and sc
 No APK was requested or created for this design pass; no live deployment or Git push was performed. Previous route-community backend and migration work remains in the working tree and should ship before its updated clients.
 
 Implementation references: frontend/src/styles/design-system.css, frontend/src/app/Icon.tsx, mobile/src/Typography.tsx and mobile/src/ui.tsx. Local web preview is http://127.0.0.1:5174.
+
+## Later release verification — 14 November 2026
+
+The earlier local-only release status above is superseded by APK 0.2.3/build 5,
+publication at c01bfab, deployed backend/web updates and the public-font correction
+at daca16b. Physical Samsung Android 13 tests now cover the principal signed-in
+flows, including native swipe reply, group drafts/mute, QR-demo booking/cancel and
+seat restoration. The user requested keeping the account signed in, so auth-screen
+flows remain outside this device run. See [current device audit](android-0.2.3-device-test-2026-11-14.md)
+for exact coverage, findings and remaining limits.

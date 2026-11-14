@@ -1,3 +1,4 @@
+import {usePhonePush,PhonePushSettings,disablePhonePush} from './src/push';
 import {useFonts} from 'expo-font';
 import {Text,TextInput} from './src/Typography';
 import {CommunityContext,useCommunityState} from './src/community';
@@ -67,10 +68,12 @@ function NativeApp() {
   }, []);
   const action = useAction();
   const screen = stack[stack.length - 1];
-  const [chatGroup,setChatGroup]=useState(1);
+  const [chatGroup,setChatGroup]=useState<number|undefined>();
+  const canOffer=!!user&&user.travelPreference!=='PASSENGER';
+  const canBook=!user||user.travelPreference!=='DRIVER';
   const community=useCommunityState(user?.id,screen.kind==='chat'?chatGroup:undefined);
   const go = (next: Screen) => {
-    if(next.kind==='chat' && next.groupId)setChatGroup(next.groupId);
+    if(next.kind==='chat')setChatGroup(next.groupId);
     Keyboard.dismiss();
     setStack(previous => {
       const current = previous[previous.length - 1].kind;
@@ -80,7 +83,8 @@ function NativeApp() {
       return [...previous, next];
     });
   };
-  const back = () => setStack(previous => previous.length > 1 ? previous.slice(0, -1) : previous);
+  const phonePush=usePhonePush(user?.id,go,community.unread);
+  const back = () => {if(screen.kind==='chat'&&chatGroup){setChatGroup(undefined);return;}setStack(previous => previous.length > 1 ? previous.slice(0, -1) : previous);};
   function signedIn(next: User) {
     setUser(next);
     setRestoreError('');
@@ -115,17 +119,18 @@ function NativeApp() {
       return true;
     });
     return () => listener.remove();
-  }, [stack.length]);
+  }, [stack.length,screen.kind,chatGroup]);
 
   function content() {
     if (restoring && screen.kind !== 'home' && screen.kind !== 'search') return <Copy>Restoring your session…</Copy>;
     if (!user && !publicScreens.has(screen.kind)) return <SignIn create={false} onUser={signedIn} go={go} />;
     switch (screen.kind) {
-      case 'chat': return user && <Chat userId={user.id} go={go} groupId={chatGroup} setGroup={setChatGroup} />;
+      case 'chat': return user && <Chat userId={user.id} preference={user.travelPreference} go={go} groupId={chatGroup} setGroup={setChatGroup} />;
       case 'login': case 'register': return <SignIn key={screen.kind} create={screen.kind === 'register'} onUser={signedIn} go={go} />;
-      case 'search': case 'rides': return <Rides mine={screen.kind === 'rides'} go={go} />;
+      case 'search': if(!canBook)return <Card><Copy>Select Passenger or Both in Account to book rides.</Copy></Card>;return <Rides user={user} go={go}/>;
+      case 'rides': return <Rides user={user} mine={screen.kind === 'rides'} go={go} />;
       case 'ride': return <RideDetails id={screen.id} requestedSeats={screen.requestedSeats} user={user} go={go} />;
-      case 'rideForm': return <RideForm id={screen.id} go={next => setStack(previous => [...previous.slice(0, -1), next])} />;
+      case 'rideForm': if(!canOffer)return <Card><Copy>Select Driver or Both in Account to offer rides.</Copy></Card>;return <RideForm id={screen.id} go={next => setStack(previous => [...previous.slice(0, -1), next])} />;
       case 'pins': return <PinsForm id={screen.id} back={back} />;
       case 'bookings': return <Bookings go={go} />;
       case 'manifest': return <Bookings ride={screen.id} go={go} />;
@@ -135,12 +140,12 @@ function NativeApp() {
       case 'notifications': return <Notifications go={go} />;
       case 'profile': return user && <Profile user={user} onUser={setUser} go={go} />;
       case 'settings': return user && <Card>
-        <Copy>{user.email}</Copy>
+        <Copy>{user.email}</Copy><PhonePushSettings state={phonePush}/><Button label="Booking history" onPress={()=>go({kind:'bookings'})}/><Button label="Ride history" onPress={()=>go({kind:'rides'})}/>
         <Button label="Edit profile" onPress={() => go({ kind: 'profile' })} />
-        <Button label="My vehicles" onPress={() => go({ kind: 'vehicles' })} />
+        {canOffer&&<Button label="My vehicles" onPress={() => go({ kind: 'vehicles' })} />}
         <Button label="Notifications" onPress={() => go({ kind: 'notifications' })} />
         <Button label="Sign out" disabled={action.busy} onPress={() => void action.run(async () => {
-          await logout(); setUser(null); setStack([home]);
+          await disablePhonePush().catch(()=>{});await logout(); setUser(null); setStack([home]);
         })} />
         <ErrorText message={action.error} />
       </Card>;
@@ -149,7 +154,9 @@ function NativeApp() {
       default: return <>
         <Card><Copy>{demoMode ? 'Browse sample rides in the FlexirRides demo.' : 'Find and offer shared rides with FlexirRides.'}</Copy>
           {user && <Copy>Welcome, {user.fullName}.</Copy>}
-          <Button label="Find a ride" onPress={() => go({ kind: 'search' })} />
+          {user&&phonePush.configured&&!phonePush.enabled&&<PhonePushSettings state={phonePush}/>}
+          {canBook&&<Button label="Find a ride" onPress={() => go({ kind: 'search' })} />}
+          {canOffer&&<Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />}
         </Card>
         <Card>
           <Text accessibilityRole="header" style={styles.body}>Rentals</Text>
@@ -157,16 +164,12 @@ function NativeApp() {
           <Copy>Self-drive car and bike rentals are coming to FlexirRides.</Copy>
         </Card>
         {demoMode ? null : user ? <View style={styles.row}>
-          <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
-          <Button label="My rides" onPress={() => go({ kind: 'rides' })} />
+
+          {canOffer&&<Button label="My rides" onPress={() => go({ kind: 'rides' })} />}
           <Button label="Wallet" onPress={() => go({ kind: 'wallet' })} />
-          <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
-          <Button label="Notifications" onPress={() => go({ kind: 'notifications' })} />
-          <Button label="Profile" onPress={() => go({ kind: 'profile' })} />
-          <Button label="My vehicles" onPress={() => go({ kind: 'vehicles' })} />
-          <Button label="Sign out" disabled={action.busy} onPress={() => void action.run(async () => {
-            await logout(); setUser(null); setStack([home]);
-          })} />
+          {canBook&&<Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />}
+
+
         </View> : <View style={styles.row}>
           <Button label="Sign in" onPress={() => go({ kind: 'login' })} />
           <Button label="Create account" onPress={() => go({ kind: 'register' })} />
@@ -204,12 +207,13 @@ function NativeApp() {
         </ScrollView>}
       </FieldFocus.Provider>
       {!demoMode && !keyboardVisible && <View style={layout.footer}>
-        {footer.map(({ kind, label, icon }) => <Pressable key={kind} accessibilityRole="tab"
-          accessibilityState={{ selected: screen.kind === kind }} onPress={() => {
+        {footer.filter(item=>(item.kind!=='rides'||canOffer)&&(item.kind!=='bookings'||canBook)).map(({ kind, label, icon }) => <Pressable key={kind} accessibilityRole="tab"
+          accessibilityLabel={label} accessibilityState={{ selected: screen.kind === kind }} onPress={() => {
             Keyboard.dismiss();
+            if(kind==='chat')setChatGroup(undefined);
             setStack(kind === 'home' ? [home] : [home, { kind }]);
           }} style={layout.tab}>
-          <Ionicons name={icon} size={23} color={screen.kind === kind ? colors.accent : colors.muted} />
+          <Ionicons accessible={false} name={icon} size={23} color={screen.kind === kind ? colors.accent : colors.muted} />
           <Text style={{ color: screen.kind === kind ? colors.accent : colors.muted }}>{label}{kind==='chat' && community.unread>0?` (${community.unread>99?'99+':community.unread})`:''}</Text>
         </Pressable>)}
       </View>}

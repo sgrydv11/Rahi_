@@ -26,7 +26,7 @@ async function login(page,email) {
   await page.getByRole('button',{name:'Log in',exact:true}).click();
   await page.getByRole('heading',{name:'Your profile.',exact:true}).waitFor();
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Chat',exact:true}).click();
-  await page.getByRole('heading',{name:'Ride community',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Chats',exact:true}).waitFor();await page.getByRole('button',{name:'Ride community',exact:true}).click();await page.getByRole('heading',{name:'Ride community',exact:true}).waitFor();
 }
 (async()=>{
   await api('/chat/messages',{status:401});
@@ -76,7 +76,7 @@ async function login(page,email) {
     assert.equal(saved.status,'CONFIRMED');
     assert.equal((await api('/rides/'+ride.id)).availableSeats,1);
     await expect(driverPage.getByRole('article').filter({hasText:message})).toContainText('1 seats available',{timeout:12000});
-    await passengerPage.goto(base+'/chat');
+    await passengerPage.goto(base+'/chat?group=1');
     const reply='Booked a seat, thank you '+stamp;
     const original=passengerPage.getByRole('article').filter({hasText:message});
     await original.getByRole('button',{name:'Reply to Chat Tester',exact:true}).click();

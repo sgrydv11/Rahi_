@@ -32,6 +32,11 @@ public class BookingService {
     }
     @Transactional
     public Created create(UUID rideId, UUID passenger, UUID requestKey, int seats, Long expectedVersion, JourneyDetails details) {
+        return createInternal(rideId,passenger,requestKey,seats,expectedVersion,details,false);
+    }
+    /** Complete a previously authorized hold after provider settlement, even if its owner changes user type. */
+    @Transactional public Created completeHoldBooking(UUID rideId,UUID passenger,UUID holdId,int seats){return createInternal(rideId,passenger,holdId,seats,null,null,true);}
+    private Created createInternal(UUID rideId,UUID passenger,UUID requestKey,int seats,Long expectedVersion,JourneyDetails details,boolean settledHold){
         active(passenger);
         Ride ride = lockRide(rideId);
         var replay = bookings.findByPassengerIdAndIdempotencyKey(passenger, requestKey);
@@ -41,6 +46,7 @@ public class BookingService {
                 throw new BookingFailure(409, "Idempotency key was already used for a different booking request.");
             return new Created(view(previous), true);
         }
+        if(!settledHold&&profiles.findById(passenger).map(p->p.travelPreference==TravelPreference.DRIVER).orElse(false))throw new BookingFailure(403,"Select Passenger or Both in Account before booking a ride.");
         if (expectedVersion != null && ride.version != expectedVersion)
             throw new BookingFailure(409, "Ride changed. Reload it and review the current price and availability before booking.");
         if (ride.driverId.equals(passenger)) throw new BookingFailure(400, "You cannot book your own ride.");

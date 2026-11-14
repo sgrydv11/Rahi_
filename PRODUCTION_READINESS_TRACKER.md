@@ -2,6 +2,34 @@
 
 Last updated 14 November 2026, Asia/Kolkata.
 
+## 14 November: user types, groups-first chat and phone push implementation
+
+Driver/Passenger/Both selection and backend authorization implemented. Chat now
+opens the group list, with Back and per-group draft retention. Native push and
+session-bound durable delivery implemented; Firebase/FCM setup and a new APK are
+still required before real background delivery can be verified. Backend 169,
+web 63 and native 27 tests passed; Android/iOS exports passed. No new APK submitted.
+
+Audit: [user types / chat / push](docs/user-types-chat-push-audit-2026-11-14.md).
+Setup: [Firebase and EAS instructions](docs/mobile-push-setup.md).
+
+## 14 November: APK 0.2.3 built, installed and physically tested
+
+Expo 3c80938c-3046-43d1-ba79-eb562e57eac5 finished. Signed 0.2.3 / build 5
+verified and installed in place on a Samsung Android 13 phone. Latest source
+published at c01bfab; hosted CI passed. Physical launch/session, journey/calendar,
+sort/stops/clear, dummy-QR booking/cancel/seat restoration, groups/mute/drafts,
+authorized single message/swipe reply, profile/editor, vehicles, offer validation,
+notifications and wallet read checks passed. No observed new-version crash/ANR.
+
+Session retained at the user's request; logout/OTP/signup/Google device flows
+not exercised. Google client configuration still absent. Minor accessibility/error
+copy/payment-panel follow-ups and other untested areas are listed in the report.
+The font URL 401 defect was reproduced/fixed with a regression test (26 auth web
+checks pass); correction pushed at daca16b; live font GET/hash verification and hosted CI passed.
+
+Report: [Android 0.2.3 physical tests](docs/android-0.2.3-device-test-2026-11-14.md).
+
 ## 14 November: requested fresh APK before physical testing
 
 APK 0.2.3 / Android version code 5 submitted to Expo from the current working tree.

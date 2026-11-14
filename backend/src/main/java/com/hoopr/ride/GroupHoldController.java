@@ -64,6 +64,7 @@ public class GroupHoldController {
         UUID passenger = auth.profile(user(jwt)).id();
         var existing = replay(passenger, key);
         if (existing.isPresent()) return match(existing.get(), request);
+        if(auth.profile(passenger).travelPreference()==com.hoopr.user.TravelPreference.DRIVER)throw new com.hoopr.booking.BookingFailure(403,"Select Passenger or Both before reserving a seat.");
         Ride ride = rides.lockById(request.rideId()).orElseThrow(GroupHoldController::missing);
         if (ride.preferences != null) throw new com.hoopr.booking.BookingFailure(409, "Use Book Seat to select stops and passenger details for this ride.");
         discounts.lockRider(passenger);
@@ -131,6 +132,7 @@ public class GroupHoldController {
         Ride ride = lock(passenger, id);
         Hold hold = owned(passenger, id);
         Payment payment = payment(id);
+        if(auth.profile(passenger).travelPreference()==com.hoopr.user.TravelPreference.DRIVER && !"CONFIRMED".equals(hold.status()) && payment.order()==null)throw new com.hoopr.booking.BookingFailure(403,"Select Passenger or Both before starting checkout.");
         if ("WALLET".equals(request.method())) {
             discounts.lockRider(passenger);
             hold = owned(passenger, id);
@@ -141,7 +143,7 @@ public class GroupHoldController {
             if (!active(hold)) throw new Failure(409, "HOLD_EXPIRED", "This hold is no longer payable.");
             jdbc.sql("UPDATE group_seat_holds SET status = 'CONFIRMED', checkout_key = :key WHERE id = :id")
                     .param("key", key).param("id", id).update();
-            UUID booking = bookings.create(ride.id, passenger, id, hold.seats()).booking().id();
+            UUID booking = bookings.completeHoldBooking(ride.id, passenger, id, hold.seats()).booking().id();
             if (!wallet.charge(booking, passenger, hold.quote().totalPaise()))
                 throw new Failure(409, "INSUFFICIENT_FUNDS", "Add wallet funds or use provider checkout.");
             attachBooking(hold, passenger, booking);
@@ -210,7 +212,7 @@ public class GroupHoldController {
         // Remove our hold from inventory inside the transaction before using the regular booking path.
         jdbc.sql("UPDATE group_seat_holds SET status = 'CONFIRMED', payment_id = :capture WHERE id = :id")
                 .param("id", id).param("capture", capture).update();
-        UUID booking = bookings.create(ride.id, passenger, id, hold.seats()).booking().id();
+        UUID booking = bookings.completeHoldBooking(ride.id, passenger, id, hold.seats()).booking().id();
         jdbc.sql("""
                 INSERT INTO booking_payments (booking_id, provider, order_id, amount, currency, payment_id, paid_at)
                 VALUES (:booking, :provider, :order, :amount, 'INR', :capture, :now)

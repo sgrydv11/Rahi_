@@ -1,3 +1,4 @@
+import {canBook} from '../auth/capabilities';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -36,7 +37,7 @@ export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedS
       if (input) input.value = String(person[key]);
     }
   }
-  if (user?.id === ride.driver.id || !canManage(ride)) return null;
+  if (!canBook(user) || user?.id === ride.driver.id || !canManage(ride)) return null;
   if (!ride.availableSeats) return <p className="notice">This ride is fully booked.</p>;
   if (demoMode) return <p className="notice">Seat booking is not available in this sample app.</p>;
   if (!started) return <>

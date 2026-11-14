@@ -43,13 +43,13 @@ export function ProfilePage() {
     {user ? <><h2>{user.fullName}</h2><p><a href={`mailto:${user.email}`}>{user.email}</a></p>
       <form className="auth-form" onSubmit={save}>
         <label>Full name<input name="fullName" required maxLength={120} defaultValue={user.fullName} disabled={busy} /></label>
-        <label>I want to<select name="travelPreference" defaultValue={user.travelPreference} disabled={busy}>
+        <label>User type<select name="travelPreference" defaultValue={user.travelPreference} disabled={busy}>
           {Object.entries(travelPreferenceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
         <button className="button" disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
       </form>
       {saved && <p role="status">Profile saved.</p>}
-      <div className="account-links"><Link to="/vehicles">Manage vehicles</Link><Link to="/rides/mine">My rides</Link><Link to="/notifications">Notifications</Link><Link to="/help">Help</Link></div><TravelPreferencesSettings/>
+      <div className="account-links">{user.travelPreference!=='PASSENGER'&&<Link to="/vehicles">Manage vehicles</Link>}<Link to="/rides/mine">Ride history</Link><Link to="/bookings/mine">Booking history</Link><Link to="/notifications">Notifications</Link><Link to="/help">Help</Link></div><TravelPreferencesSettings/>
     </> : !error && <p role="status">Loading your profile…</p>}
   </div></section>;
 }

@@ -61,3 +61,36 @@ References:
 - https://docs.expo.dev/guides/google-authentication/
 - https://react-native-google-signin.github.io/docs/original
 - https://react-native-google-signin.github.io/docs/setting-up/get-config-file
+
+## Firebase configuration applied — 14 November 2026
+
+- Firebase project: `flexiridetest` (FlexiRideTest).
+- Android app registered: `com.hoopr.app`, nickname FlexirRides Android.
+- Release SHA-1 saved and verified against the 0.2.3 APK:
+  `2E:E9:73:F7:5E:B9:68:C0:8E:F7:BD:0E:4E:81:81:00:E3:0E:82:F7`.
+- Google provider enabled with public name FlexirRides and explicitly approved
+  project-owner support email. Firebase created Android and Web OAuth clients.
+- Android OAuth client package and SHA-1 verified in Google Cloud.
+- Web client ID: `570503082437-gl451ikpnetb8p3m5gnfmhf4r9kvh3vi.apps.googleusercontent.com`.
+  This is a public identifier; no client secret is needed by our integration.
+- Authorized JavaScript origin added: `https://rahi-1-c3vn.onrender.com`.
+- Audience verified as External / In production. No extra sensitive API scopes added.
+- Render `GOOGLE_CLIENT_ID` saved using Save and deploy. Configuration deployment
+  `dep-dbs844m1egvs73d47rgg` succeeded and is Live, using existing source `daca16b`.
+- Live public config matches the Web client; health is UP; one intentionally invalid
+  token to `/api/v1/mobile/auth/google` correctly returned 401.
+- Live browser Google Identity Services button renders with that client ID.
+
+**Acceptance still required:** successful real-account login on Android, cancel,
+restart/session restoration and logout. The existing phone session was retained;
+no success claim is made for a completed Google account login. Google warns that
+OAuth changes can take five minutes to several hours to propagate.
+
+The existing 0.2.3 native Google module obtains its client ID from the backend, so
+this credential-only change does not require a fresh APK. No new APK was submitted.
+No application schema or account migration was necessary for this configuration.
+
+The user chose **Only configure Google sign-in**. No FCM private key was created
+or uploaded. Background mobile notifications remain awaiting that separate setup
+and a new notification-enabled APK. The previous locally tested user-type/chat/
+push source changes remain separate from this configuration-only deployment.

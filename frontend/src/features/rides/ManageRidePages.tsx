@@ -1,3 +1,4 @@
+import {canOffer} from '../auth/capabilities';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -5,7 +6,8 @@ import { errorMessage } from '../auth/auth';
 import { canManage, ridesApi, type Ride } from './api';
 import { RideForm } from './RideForm';
 export function OfferRidePage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate();const{user}=useAuth();
+  if(!canOffer(user))return <section className="page"><h1>Offer a ride</h1><p>Select Driver or Both in <Link to="/profile">Account</Link> to offer rides.</p></section>;
   return <section className="page"><p className="eyebrow">Make room for good company</p><h1>Offer a ride.</h1>
     <RideForm save={async body => { const ride = await ridesApi.create(body); navigate(`/rides/${ride.id}`, { replace: true, state: { message: 'Your ride is now available in search.' } }); }} />
   </section>;

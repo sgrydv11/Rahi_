@@ -1,13 +1,16 @@
+import {useAuth} from '../auth/AuthContext';
+import {canOffer,canBook} from '../auth/capabilities';
 import {Icon} from '../../app/Icon';
 import { Link } from 'react-router';
 
 export function HomePage() {
+  const{user}=useAuth();
   return <>
     <section className="hero">
       <div><p className="eyebrow">A better way to get there</p>
         <h1>Same direction.<br /><em>Better together.</em></h1>
         <p className="intro">Make room for a shared journey. FlexirRides connects drivers and passengers heading the same way.</p>
-        <Link className="button" to="/rides">Explore rides <Icon name="arrow-forward-outline"/></Link>
+        <div className="ride-actions">{canBook(user)&&<Link className="button" to="/rides">Explore rides <Icon name="arrow-forward-outline"/></Link>}{canOffer(user)&&<Link className="button" to="/rides/new">Offer a ride <Icon name="add-outline"/></Link>}</div>
       </div>
     </section>
     <section className="steps" aria-label="How FlexirRides works">

@@ -5,15 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { GoogleSignIn } from './GoogleSignIn';
 import { api, login, requestEmailOtp, requestRegistrationOtp, verifyEmailOtp, type Preference, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
-import { Button, Card, Copy, ErrorText, Field, QueryState, styles, useAction, useQuery } from './ui';
+import { Button, Card, Choice, Copy, ErrorText, Field, QueryState, styles, useAction, useQuery } from './ui';
 
-const preferences: Record<Preference, string> = { BOTH: 'Drive and ride', DRIVER: 'Drive', PASSENGER: 'Ride' };
+const preferences: Record<Preference, string> = { BOTH: 'Both', DRIVER: 'Driver', PASSENGER: 'Passenger' };
 function Preferences({ value, change }: { value: Preference; change: (value: Preference) => void }) {
-  return <><Copy>Travel preference</Copy><View style={styles.row}>
-    {(Object.keys(preferences) as Preference[]).map(option => <Button key={option}
-      label={preferences[option] + (value === option ? ' ✓' : '')} onPress={() => change(option)} />)}
-  </View></>;
+ return <Choice label="User type" values={(Object.keys(preferences) as Preference[]).map(value=>({value,label:preferences[value]}))} selected={value} change={v=>change(v as Preference)}/>;
 }
+
 export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user: User) => void; go: Navigate }) {
   const [regularRoutes,setRegularRoutes]=useState<RegularRoute[]>([]);
   const [email, setEmail] = useState('');
@@ -86,7 +84,7 @@ export function Profile({ user, onUser, go }: { user: User; onUser: (user: User)
       setSaved(true);
     })} />
     <TravelPreferencesSettings/>
-    <Button label="Manage vehicles" onPress={() => go({ kind: 'vehicles' })} />
+    {user.travelPreference!=='PASSENGER'&&<Button label="Manage vehicles" onPress={() => go({ kind: 'vehicles' })} />}
   </Card>;
 }
 

@@ -20,9 +20,9 @@ export const styles = StyleSheet.create({
 export function Copy({ children }: { children: ReactNode }) { return <Text style={styles.body}>{children}</Text>; }
 export function Card({ children }: { children: ReactNode }) { return <View style={styles.card}>{children}</View>; }
 export function Button({ label, onPress, disabled = false, selected, variant='primary' }: { label: string; onPress: () => void; disabled?: boolean; selected?:boolean; variant?:'primary'|'secondary' }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled,selected }} disabled={disabled} onPress={onPress}
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled,selected }} disabled={disabled} onPress={onPress}
     style={({ pressed }) => [styles.button, {borderWidth:1,borderColor:variant==='secondary'?colors.line:colors.accent,backgroundColor:variant==='secondary'?'#fff':colors.accent,flexDirection:'row',alignItems:'center',gap:8}, { opacity: disabled ? 0.45 : pressed ? 0.75 : 1 }]}>
-    <Text style={[styles.buttonText,variant==='secondary'?{color:colors.accent}:{}]}>{label}</Text>{selected&&<Ionicons name="checkmark-outline" size={18} color={variant==='secondary'?colors.accent:'#fff'}/>}
+    <Text style={[styles.buttonText,variant==='secondary'?{color:colors.accent}:{}]}>{label}</Text>{selected&&<Ionicons accessible={false} name="checkmark-outline" size={18} color={variant==='secondary'?colors.accent:'#fff'}/>}
   </Pressable>;
 }
 export function Field({ label, value, change, secret, numeric, multiline, trailing }: {

@@ -23,6 +23,7 @@ class ChatIT {
         r.add("spring.datasource.password",()->TestDatabase.required("TEST_DB_PASSWORD"));
     }
     @Autowired ChatController chat;
+    @Autowired com.hoopr.booking.BookingService bookingService;
     @Autowired ChatGroupsController groups;
     @Autowired com.hoopr.user.TravelRoutesController preferences;
     @Autowired com.hoopr.booking.NotificationController notifications;
@@ -146,6 +147,16 @@ class ChatIT {
         groups.settings(b,2,new ChatGroupsController.Settings(false));
         preferences.save(b,new com.hoopr.user.TravelRoutesController.Preferences(List.of(new com.hoopr.user.TravelRoutesController.Route("Indore","Ujjain",com.hoopr.user.TravelRoutesController.Period.EVENING))));
         assertFalse(notifications.inbox(b).stream().anyMatch(n->n.kind().equals("TRAVEL_RIDE")));
+    }
+    @Test void selectedUserTypeControlsNewOffersAndBookingsOnServer() {
+        var a=member();var b=member();var aid=UUID.fromString(a.getSubject());var bid=UUID.fromString(b.getSubject());
+        var body=new RideDtos.Create("Indore","Ujjain",null,null,Instant.now().plusSeconds(86400),"Asia/Kolkata",3,new BigDecimal("100"),"INR","Test car",null,null);
+        var ride=rides.create(aid,body);
+        jdbc.update("UPDATE user_profiles SET travel_preference='DRIVER' WHERE user_id=?",bid);
+        assertEquals(403,assertThrows(com.hoopr.booking.BookingFailure.class,()->bookingService.create(ride.id(),bid,UUID.randomUUID(),1)).status);
+        assertNotNull(rides.create(bid,body));
+        jdbc.update("UPDATE user_profiles SET travel_preference='PASSENGER' WHERE user_id=?",bid);
+        assertEquals(403,assertThrows(RideFailure.class,()->rides.create(bid,body)).status);
     }
     @Test void inactiveMembersCannotReadOrSendAndRateLimitIsEnforced() {
         var a=member();

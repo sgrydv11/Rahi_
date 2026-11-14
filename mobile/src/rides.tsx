@@ -37,7 +37,8 @@ export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (p
   </View>;
 }
 
-export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
+export function Rides({ mine = false, go,user }: { mine?: boolean; go: Navigate;user?:User|null }) {
+  const canOffer=!!user&&user.travelPreference!=='PASSENGER',canBook=!user||user.travelPreference!=='DRIVER';
   const points=useCityPoints();
   const [draft, setDraft] = useState<Record<string, string>>({ departureDate: day(), timeZone: tz(), sort: 'TIME_ASC', minimumSeats: '1' });
   const [query, setQuery] = useState('');
@@ -81,9 +82,9 @@ export function Rides({ mine = false, go }: { mine?: boolean; go: Navigate }) {
   </Card>;
   return <>
     {mine ? <View style={styles.row}>
-      <Button label="Find a ride" onPress={() => go({ kind: 'search' })} />
+      {canBook&&<Button label="Find a ride" onPress={() => go({ kind: 'search' })} />}
       <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
-      <Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />
+      {canOffer&&<Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />}
     </View> : <>
       <Copy>{draft.origin} → {draft.destination} · {draft.departureDate} · {requestedSeats} {requestedSeats === 1 ? 'passenger' : 'passengers'}</Copy>
       {draft.returnDate && <Button label={`Find return rides on ${draft.returnDate}`} onPress={() => {
@@ -187,7 +188,7 @@ export function RideDetails({ id, requestedSeats = 1, user, go }: { id: string; 
         ])} />
       </>}
     </Card>}
-    {!demoMode && !owner && future(ride) && ride.availableSeats > 0 && <SeatBooking ride={ride} requestedSeats={requestedSeats} user={user} go={go} />}
+    {!demoMode && user?.travelPreference!=='DRIVER' && !owner && future(ride) && ride.availableSeats > 0 && <SeatBooking ride={ride} requestedSeats={requestedSeats} user={user} go={go} />}
     <Button label="Refresh ride" onPress={result.reload} disabled={action.busy} />
   </>;
 }

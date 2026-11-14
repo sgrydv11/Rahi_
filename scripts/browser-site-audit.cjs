@@ -67,7 +67,7 @@ async function account(kind) {
   await page.route('**/api/v1/users/me',route=>route.request().method()==='PATCH'?route.fulfill({status:503,json:{detail:'Please try again later.'}}):route.continue());
   await page.getByRole('button',{name:'Save profile',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Please try again later.');
   await page.unroute('**/api/v1/users/me');
-  await page.goto(base+'/chat');const message=page.getByRole('article').filter({hasText:chatBody});
+  await page.goto(base+'/chat?group=1');const message=page.getByRole('article').filter({hasText:chatBody});
   await message.getByRole('button',{name:`View member details for ${driver.mobileNumber}`,exact:true}).click();
   await expect(page.getByRole('dialog').getByRole('link',{name:/Call /})).toHaveAttribute('href','tel:'+driver.mobileNumber);
   await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();

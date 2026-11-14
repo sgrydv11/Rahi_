@@ -78,7 +78,7 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
           <label>{registering?'Email address':'Email or mobile number'}<input name="email" type={registering?'email':'text'} autoComplete={registering?'email':'username'} required maxLength={254} disabled={busy} /></label>
           {registering && <>
             <RegularRoutesEditor value={regularRoutes} change={setRegularRoutes} disabled={busy}/><label>Mobile number<input name="mobile" type="tel" autoComplete="tel" required maxLength={24} disabled={busy} /></label>
-            <fieldset disabled={busy}><legend>I want to…</legend>{(Object.keys(travelPreferenceLabels) as TravelPreference[]).map(value => <label key={value}>
+            <fieldset disabled={busy}><legend>User type</legend>{(Object.keys(travelPreferenceLabels) as TravelPreference[]).map(value => <label key={value}>
               <input type="radio" name="travelPreference" checked={preference === value} onChange={() => setPreference(value)} />{travelPreferenceLabels[value]}
             </label>)}</fieldset>
           </>}

@@ -40,6 +40,9 @@ management:
       show-details: never
 
 hoopr:
+  push:
+    enabled: ${PUSH_NOTIFICATIONS_ENABLED:false}
+    expo-access-token: ${EXPO_PUSH_ACCESS_TOKEN:}
   auth:
     jwt-secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:hoopr}

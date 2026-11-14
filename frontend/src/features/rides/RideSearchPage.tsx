@@ -1,3 +1,5 @@
+import {useAuth} from '../auth/AuthContext';
+import {canBook} from '../auth/capabilities';
 import {Icon} from '../../app/Icon';
 import { useCityPoints } from './locations';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -13,6 +15,7 @@ function day(offset = 0) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 export function RideSearchPage() {
+  const{user}=useAuth();
   const cityPoints=useCityPoints();
   const [params, setParams] = useSearchParams();
   const [date, setDate] = useState(day());
@@ -65,6 +68,7 @@ export function RideSearchPage() {
     if (next.has('departureTime') && (next.has('timeFrom') || next.has('timeTo'))) { setError('Choose a direct time or a range, not both.'); return; }
     next.set('page', '0'); setParams(next);
   }
+  if(!canBook(user))return <section className="page"><h1>Book a ride</h1><p>Select Passenger or Both in <Link to="/profile">Account</Link> to find and book rides.</p></section>;
   return <section className="page">
     <p className="eyebrow">Go further, together</p><h1>{selected ? 'Available rides' : 'Where are you headed?'}</h1>
     {!selected ? <form className="panel ride-search-compact" onSubmit={search}>

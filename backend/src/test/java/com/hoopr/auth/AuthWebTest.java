@@ -40,6 +40,7 @@ class AuthWebTest {
     @MockitoBean EmailOtpService emailOtp;
     @MockitoBean com.hoopr.ride.RideService rides;
     @MockitoBean com.hoopr.ride.ChatController chat;
+    @MockitoBean com.hoopr.push.PushStore pushStore;
     @MockitoBean com.hoopr.ride.ChatGroupsController groups;
     @MockitoBean com.hoopr.user.TravelRoutesController routes;
     @MockitoBean com.hoopr.ride.RideRepository rideRepository;

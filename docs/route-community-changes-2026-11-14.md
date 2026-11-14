@@ -47,3 +47,13 @@ Deploy the backend with V24 before distributing updated clients. Then validate
 production chat/groups, preferences and locations, deploy the frontend, and create
 an APK only when requested. Background OS push requires provider/device-token setup;
 foreground notifications are the implemented scope.
+
+## Later release verification — 14 November 2026
+
+The earlier local-only release status above is superseded by APK 0.2.3/build 5,
+publication at c01bfab, deployed backend/web updates and the public-font correction
+at daca16b. Physical Samsung Android 13 tests now cover the principal signed-in
+flows, including native swipe reply, group drafts/mute, QR-demo booking/cancel and
+seat restoration. The user requested keeping the account signed in, so auth-screen
+flows remain outside this device run. See [current device audit](android-0.2.3-device-test-2026-11-14.md)
+for exact coverage, findings and remaining limits.

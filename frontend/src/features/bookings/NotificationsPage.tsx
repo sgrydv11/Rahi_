@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { authenticatedRequest, errorMessage } from '../auth/auth';
 
 const titles: Record<string, string> = {
-  TRAVEL_RIDE:'Ride on your regular route',
+  RIDE_STARTED:'Ride started', RIDE_COMPLETED:'Journey completed', TRAVEL_RIDE:'Ride on your regular route',
   TRAVEL_BUDDY:'Travel buddy on your regular route',
   BOOKING_CONFIRMED: 'Booking confirmed',
   BOOKING_REQUESTED: 'Booking requested',

@@ -129,6 +129,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me", "/api/v1/vehicles/{id}").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/vehicles").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/vehicles").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET,"/api/v1/push/config").hasAnyRole("USER","ADMIN")
+                        .requestMatchers(HttpMethod.POST,"/api/v1/push/devices","/api/v1/push/devices/{id}/disable").hasAnyRole("USER","ADMIN")
                         .requestMatchers(HttpMethod.GET,"/api/v1/chat/groups","/api/v1/travel-preferences").hasAnyRole("USER","ADMIN")
                         .requestMatchers(HttpMethod.POST,"/api/v1/chat/groups/{group}/settings","/api/v1/chat/groups/{group}/read","/api/v1/travel-preferences").hasAnyRole("USER","ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/notifications", "/api/v1/chat/messages").hasAnyRole("USER", "ADMIN")

@@ -22,14 +22,14 @@ describe('foundation pages', () => {
     expect(html).toContain('App navigation');
     expect(html).toContain('>Home</span>');
     expect(html).toContain('My Bookings');
-    expect(html).toContain('>Offers</span>');
+    expect(html).not.toContain('>Offers</span>');
     expect(html).toContain('>Account</span>');
     expect(html).toContain('Skip to content');
     if (path === '/login' || path === '/register') expect(html).toContain('Continue with Google');
     if (path === '/register') {
-      expect(html).toContain('Offer a seat (Driver)');
-      expect(html).toContain('Find a seat (Passenger)');
-      expect(html).toContain('Both — offer and find seats');
+      expect(html).toContain('>Driver<');
+      expect(html).toContain('>Passenger<');
+      expect(html).toContain('>Both<');
       expect(html).toContain('Mobile number');
       expect(html).not.toContain('Full name');
       expect(html).toContain('type="password"');
