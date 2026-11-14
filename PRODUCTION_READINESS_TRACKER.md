@@ -1,6 +1,45 @@
 # FlexirRides carpool readiness tracker
 
-Last updated 13 November 2026, Asia/Kolkata.
+Last updated 14 November 2026, Asia/Kolkata.
+
+## 14 November: requested fresh APK before physical testing
+
+APK 0.2.3 / Android version code 5 submitted to Expo from the current working tree.
+Build: 3c80938c-3046-43d1-ba79-eb562e57eac5.
+Fingerprint: 97ff065f094557da5044458d4330f0ef1aa439f5.
+The older installed 0.2.2 APK is not the target for validating the new changes.
+Physical Samsung Android 13 phone is authorized over USB. Upgrade installation
+and runtime testing of 0.2.3 are pending build completion. No release email requested.
+
+## 14 November: consistent web/native design system
+
+Applied Inter, navy/blue, a shared spacing/control system, larger headlines, clean
+surfaces and Ionicons. Removed homepage decorative artwork; added no invented
+photos or testimonials. Signed-in web navigation now has five destinations;
+account utility links remain accessible.
+
+Passed: 72 route/viewport checks, 23 internal links, 60 web tests, 25 native API
+tests, chat/community interaction scenarios, web build and Android/iOS bundle
+exports. Fonts/navigation assertions cover each web route case. Physical native
+UI checks remain pending. No new APK, deployment or push in this design pass.
+Details: [design system audit](docs/design-system-audit-2026-11-14.md).
+
+## 14 November: route communities and 16 requested changes
+
+Implemented locally across backend/web/native: three route groups, persisted mute/read
+state, foreground top alerts and unread badges, swipe replies, seven-day dated history,
+always-visible registered mobile numbers, regular-route registration/profile preferences
+and matching alerts, city stop catalog/dropdowns, arrow sorts/clear filters/no AC filter,
+and dummy-only booking payment choices. V24 contains additive schema/catalog changes.
+
+Verification: 160 backend tests, 60 web tests and 25 native API tests passed. Web
+production build, Android/iOS bundle exports and both mobile-browser chat/community
+scenarios passed. The updated test API is running locally on 8083; Vite on 5174.
+
+Detailed request-by-request status and verification: [route communities audit](docs/route-community-changes-2026-11-14.md).
+No new APK, live deployment, or push has been performed for this request. Physical native
+UI verification and background OS push remain separate work. Existing Google OAuth
+provider setup/release limitations recorded elsewhere still apply.
 
 ## 13 November: community chat implementation
 

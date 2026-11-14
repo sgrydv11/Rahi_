@@ -8,6 +8,7 @@ import { Button, Card, Choice, Copy, ErrorText, Field, styles, useAction } from 
 interface DraftPassenger { name: string; age: string; gender: string }
 export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride; requestedSeats?: number; user: User | null; go: Navigate }) {
   const [stage, setStage] = useState<'start' | 'stops' | 'passengers' | 'review'>('start');
+  const [payment,setPayment]=useState<'DIRECT'|'QR'|'OTHER'>('DIRECT');
   const [boarding, setBoarding] = useState('');
   const [dropping, setDropping] = useState('');
   const [passengers, setPassengers] = useState<DraftPassenger[]>(() => Array.from({ length: Math.min(requestedSeats, ride.availableSeats) }, () => ({ name: '', age: '', gender: '' })));
@@ -31,7 +32,7 @@ export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride
         || !Number.isInteger(Number(person.age)) || Number(person.age) < 0 || Number(person.age) > 120
         || !['FEMALE', 'MALE', 'OTHER'].includes(person.gender))) throw new Error('Enter a valid name, age and gender for each passenger.');
     if (ride.preferences?.womenOnly && passengers.some(person => person.gender !== 'FEMALE')) throw new Error('This ride is for women passengers only.');
-    return { boardingPoint: boarding, droppingPoint: dropping, passengers: passengers.map(person => ({
+    return { demoPaymentMethod:payment, boardingPoint: boarding, droppingPoint: dropping, passengers: passengers.map(person => ({
       name: person.name.trim(), age: Number(person.age), gender: person.gender as Passenger['gender'],
     })) };
   }
@@ -69,6 +70,9 @@ export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride
       <Button label="Review booking" onPress={() => void action.run(async () => { details(); setStage('review'); })} />
     </>}
     {stage === 'review' && <>
+      <Choice label="Demo payment method" values={[{value:'DIRECT',label:'Direct payment to driver'},{value:'QR',label:'QR code (demo)'},{value:'OTHER',label:'Other (demo)'}]} selected={payment} change={v=>{if(!action.busy&&!request.current)setPayment(v as typeof payment);}}/>
+      {payment==='QR'&&<View accessibilityLabel="Demo QR placeholder, not scannable" style={{padding:20,backgroundColor:'#EDF3FF'}}><Copy>▦ DEMO QR ▦</Copy><Copy>No payment QR code is generated.</Copy></View>}
+      <Copy>Demo selection only. No money is collected or marked paid.</Copy>
       <Copy>{boarding} → {dropping}</Copy>
       {passengers.map((person, index) => <Copy key={index}>{person.name} · {person.age} · {person.gender}</Copy>)}
       <Copy>Total: {ride.currency} {(passengers.length * ride.pricePerSeat).toFixed(2)}. No convenience fees or hidden charges.</Copy>

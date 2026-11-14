@@ -1,26 +1,28 @@
+import {Ionicons} from '@expo/vector-icons';
+import {Text,TextInput} from './Typography';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-export const colors = { background: '#f2f6fc', ink: '#172b49', accent: '#2359ac', muted: '#465d7b', line: '#c8d7ec' };
+export const colors = { background: '#F7F9FC', ink: '#142D4E', accent: '#245EEA', muted: '#4C5E75', line: '#D5DEEA' };
 export const FieldFocus = createContext(() => {});
 export const styles = StyleSheet.create({
-  body: { color: colors.ink, fontSize: 16, lineHeight: 23 },
-  title: { color: colors.ink, fontSize: 29, fontWeight: '700', marginBottom: 8 },
-  card: { padding: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: '#fff', gap: 10 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  field: { gap: 5 },
-  input: { borderWidth: 1, borderColor: colors.line, borderRadius: 9, backgroundColor: '#fff', padding: 12, color: colors.ink, fontSize: 16 },
-  button: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 14, minHeight: 44, justifyContent: 'center' },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  error: { color: '#9f251d', fontSize: 15 },
+  body: { color: colors.ink, fontSize: 16, lineHeight: 26 },
+  title: { color: colors.ink, fontSize: 34, fontWeight: '700', lineHeight: 40, letterSpacing: -1, marginBottom: 16 },
+  card: { padding: 24, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: '#fff', gap: 16 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  field: { gap: 8 },
+  input: { borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: '#fff', padding: 16, minHeight: 52, color: colors.ink, fontSize: 16 },
+  button: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, paddingHorizontal: 20, minHeight: 48, justifyContent: 'center' },
+  buttonText: { color: '#fff', fontSize: 14, fontWeight: '600', textAlign:'center' },
+  error: { color: '#B42336', fontSize: 15 },
 });
 
 export function Copy({ children }: { children: ReactNode }) { return <Text style={styles.body}>{children}</Text>; }
 export function Card({ children }: { children: ReactNode }) { return <View style={styles.card}>{children}</View>; }
-export function Button({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, { opacity: disabled ? 0.45 : pressed ? 0.75 : 1 }]}>
-    <Text style={styles.buttonText}>{label}</Text>
+export function Button({ label, onPress, disabled = false, selected, variant='primary' }: { label: string; onPress: () => void; disabled?: boolean; selected?:boolean; variant?:'primary'|'secondary' }) {
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled,selected }} disabled={disabled} onPress={onPress}
+    style={({ pressed }) => [styles.button, {borderWidth:1,borderColor:variant==='secondary'?colors.line:colors.accent,backgroundColor:variant==='secondary'?'#fff':colors.accent,flexDirection:'row',alignItems:'center',gap:8}, { opacity: disabled ? 0.45 : pressed ? 0.75 : 1 }]}>
+    <Text style={[styles.buttonText,variant==='secondary'?{color:colors.accent}:{}]}>{label}</Text>{selected&&<Ionicons name="checkmark-outline" size={18} color={variant==='secondary'?colors.accent:'#fff'}/>}
   </Pressable>;
 }
 export function Field({ label, value, change, secret, numeric, multiline, trailing }: {
@@ -39,7 +41,7 @@ export function Choice({ label, values, selected, change }: {
   label: string; values: { value: string; label: string }[]; selected: string; change: (value: string) => void;
 }) {
   return <View style={styles.field}><Copy>{label}</Copy><View style={styles.row}>{values.map(option =>
-    <Button key={option.value} label={option.label + (selected === option.value ? ' ✓' : '')} onPress={() => change(option.value)} />
+    <Button key={option.value} label={option.label} selected={selected===option.value} variant={selected===option.value?'primary':'secondary'} onPress={() => change(option.value)} />
   )}</View></View>;
 }
 export function useAction() {

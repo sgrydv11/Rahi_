@@ -1,3 +1,5 @@
+import {Icon} from '../../app/Icon';
+import { useCityPoints } from './locations';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { errorMessage } from '../auth/auth';
@@ -11,6 +13,7 @@ function day(offset = 0) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 export function RideSearchPage() {
+  const cityPoints=useCityPoints();
   const [params, setParams] = useSearchParams();
   const [date, setDate] = useState(day());
   const [calendar, setCalendar] = useState(false);
@@ -32,7 +35,7 @@ export function RideSearchPage() {
     const controller = new AbortController();
     setLoading(true); setError('');
     const searchParams = new URLSearchParams(query);
-    searchParams.delete('returnDate');
+    searchParams.delete('returnDate'); searchParams.delete('ac');
     ridesApi.search(searchParams, controller.signal).then(value => { if (!controller.signal.aborted) setResult(value); })
       .catch(failure => { if (!controller.signal.aborted) { setError(errorMessage(failure)); setResult(null); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -53,7 +56,7 @@ export function RideSearchPage() {
   }
   function filters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const data = new FormData(event.currentTarget); const next = new URLSearchParams(params);
-    for (const name of ['departureTime', 'timeFrom', 'timeTo', 'boardingPoint', 'droppingPoint', 'ac', 'flexibleDropoff']) {
+    for (const name of ['departureTime', 'timeFrom', 'timeTo', 'boardingPoint', 'droppingPoint', 'flexibleDropoff']) {
       const value = String(data.get(name) ?? '').trim(); if (value) next.set(name, value); else next.delete(name);
     }
     const preset = String(data.get('window') ?? '');
@@ -65,10 +68,10 @@ export function RideSearchPage() {
   return <section className="page">
     <p className="eyebrow">Go further, together</p><h1>{selected ? 'Available rides' : 'Where are you headed?'}</h1>
     {!selected ? <form className="panel ride-search-compact" onSubmit={search}>
-      <div className="journey-fields"><label className="city-field"><span aria-hidden="true">↗</span><span>From City<input aria-label="From City" name="origin" required maxLength={200} placeholder="Leaving from" /></span></label>
-      <label className="city-field"><span aria-hidden="true">↘</span><span>To City<input aria-label="To City" name="destination" required maxLength={200} placeholder="Going to" /></span></label>
+      <div className="journey-fields"><label className="city-field"><span aria-hidden="true"><Icon name="location-outline"/></span><span>From City<input aria-label="From City" name="origin" required maxLength={200} placeholder="Leaving from" /></span></label>
+      <label className="city-field"><span aria-hidden="true"><Icon name="location-outline"/></span><span>To City<input aria-label="To City" name="destination" required maxLength={200} placeholder="Going to" /></span></label>
       <div className="journey-date"><input type="hidden" name="departureDate" value={date} />
-        <button className="calendar-trigger" type="button" aria-label="Calendar" onClick={()=>{setCalendar(true);try{dateInput.current?.showPicker();}catch{dateInput.current?.focus();}}}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 2v6m10-6v6M3 11h18"/></svg><span><small>Date of Journey</small><strong>{new Date(date+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</strong></span></button>
+        <button className="calendar-trigger" type="button" aria-label="Calendar" onClick={()=>{setCalendar(true);try{dateInput.current?.showPicker();}catch{dateInput.current?.focus();}}}><Icon name="calendar-outline"/><span><small>Date of Journey</small><strong>{new Date(date+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</strong></span></button>
         <button className="date-chip" type="button" aria-pressed={date===day()} onClick={()=>{setDate(day());setCalendar(false);}}>Today</button><button className="date-chip" type="button" aria-pressed={date===day(1)} onClick={()=>{setDate(day(1));setCalendar(false);}}>Tomorrow</button>
       </div></div>
       <label className={calendar?'calendar-input':'calendar-input visually-hidden'}>Custom date<input ref={dateInput} type="date" required min={day()} value={date} onChange={event=>{if(event.target.value){setDate(event.target.value);setCalendar(false);}}} /></label>
@@ -82,14 +85,10 @@ export function RideSearchPage() {
     </form> : <>
       <p>{params.get('origin')} → {params.get('destination')} · {params.get('departureDate') || day()} <Link to={`/rides?minimumSeats=${seats}`}>Change search</Link></p>
       {returnQuery && <p><Link to={`/rides?${returnQuery}`}>Find return rides on {returnDate}</Link></p>}
-      <div className="ride-results-toolbar"><details className="panel filter-sort-panel"><summary>Filter & sort</summary>
+      <div className="sort-toggles" role="group" aria-label="Sort rides">{[['TIME','Time'],['PRICE','Price'],['RATING','Rating']].map(([key,label])=>{const current=params.get('sort')||'TIME_ASC',selected=current.startsWith(key),descending=selected&&current.endsWith('DESC');return <button type="button" key={key} aria-pressed={selected} aria-label={`Sort by ${label.toLowerCase()} ${descending?'descending':'ascending'}`} onClick={()=>change('sort',key+(selected&&!descending?'_DESC':'_ASC'))}>{label} {descending?'↓':'↑'}</button>;})}</div>
+      <div className="ride-results-toolbar"><details className="panel filter-sort-panel"><summary>Filters</summary>
       <label>Passengers<select value={seats} onChange={event => change('minimumSeats', event.target.value)}>
         {seatOptions.map(value => <option key={value} value={value}>{value}</option>)}
-      </select></label>
-      <label>Sort<select value={params.get('sort') || 'TIME_ASC'} onChange={event => change('sort', event.target.value)}>
-        <option value="TIME_ASC">Time ascending</option><option value="TIME_DESC">Time descending</option>
-        <option value="PRICE_ASC">Price ascending</option><option value="PRICE_DESC">Price descending</option>
-        <option value="RATING_ASC">Rating ascending</option><option value="RATING_DESC">Rating descending</option>
       </select></label>
       <form className="ride-filter" key={query} onSubmit={filters}>
         <label>Direct departure time<input name="departureTime" type="time" defaultValue={params.get('departureTime') || ''} /></label>
@@ -99,12 +98,11 @@ export function RideSearchPage() {
         </select></label>
         <label>From time<input name="timeFrom" type="time" defaultValue={params.get('timeFrom') || ''} /></label>
         <label>To time<input name="timeTo" type="time" defaultValue={params.get('timeTo') === '24:00' ? '00:00' : params.get('timeTo') || ''} /></label>
-        <label>Boarding point<input name="boardingPoint" maxLength={200} defaultValue={params.get('boardingPoint') || ''} /></label>
-        <label>Dropping point<input name="droppingPoint" maxLength={200} defaultValue={params.get('droppingPoint') || ''} /></label>
-        <label><input type="checkbox" name="ac" value="true" defaultChecked={params.get('ac') === 'true'} />AC</label>
+        <label>Boarding point<select name="boardingPoint" defaultValue={params.get('boardingPoint')||''}><option value="">Any boarding point</option>{[...new Set([...cityPoints(params.get('origin')||''),...(result?.content.flatMap(r=>r.preferences?.boardingPoints||[])||[]),params.get('boardingPoint')||''])].filter(Boolean).map(p=><option key={p}>{p}</option>)}</select></label>
+        <label>Dropping point<select name="droppingPoint" defaultValue={params.get('droppingPoint')||''}><option value="">Any dropping point</option>{[...new Set([...cityPoints(params.get('destination')||''),...(result?.content.flatMap(r=>r.preferences?.droppingPoints||[])||[]),params.get('droppingPoint')||''])].filter(Boolean).map(p=><option key={p}>{p}</option>)}</select></label>
         <label><input type="checkbox" name="flexibleDropoff" value="true" defaultChecked={params.get('flexibleDropoff') === 'true'} />Flexible nearby drop-off</label>
         <button className="button">Apply filters</button>
-      </form></details><button className="date-chip" type="button" aria-pressed={params.get('ac')==='true'} onClick={()=>change('ac',params.get('ac')==='true'?'false':'true')}>AC</button><button className="date-chip" type="button" aria-pressed={params.get('flexibleDropoff')==='true'} onClick={()=>change('flexibleDropoff',params.get('flexibleDropoff')==='true'?'false':'true')}>Flexible drop-off</button></div>
+      </form></details><button className="date-chip" type="button" onClick={()=>{const next=new URLSearchParams();for(const key of ['origin','destination','departureDate','returnDate','timeZone'])if(params.has(key))next.set(key,params.get(key)!);next.set('minimumSeats','1');next.set('sort','TIME_ASC');next.set('page','0');setError('');setParams(next);}}>Clear filters</button><button className="date-chip" type="button" aria-pressed={params.get('flexibleDropoff')==='true'} onClick={()=>change('flexibleDropoff',params.get('flexibleDropoff')==='true'?'false':'true')}>Flexible drop-off</button></div>
     </>}
     {error && <p role="alert">{error}</p>}
     <div className="ride-results" aria-busy={loading}>

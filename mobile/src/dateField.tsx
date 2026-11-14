@@ -1,5 +1,6 @@
+import {Text} from './Typography';
 import { useState } from 'react';
-import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
+import { Keyboard, Platform, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Button, Copy, styles } from './ui';
@@ -30,7 +31,7 @@ export function DateField({ label, mode, value, change, clear, minimumDate }: {
   return <View style={styles.field}>
     <Copy>{label}</Copy>
     <View style={styles.row}>
-      {mode==='date'?<Pressable accessibilityRole="button" accessibilityLabel={display?`${label}: ${display}`:`Select ${label.toLowerCase()}`} onPress={open} style={{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:12,borderWidth:1,borderColor:'#c8d7ec',backgroundColor:'#fff'}}><Ionicons name="calendar-outline" size={23} color="#2359ac"/><Text style={{color:'#172b49',fontWeight:'600'}}>{display||'Select travel date'}</Text></Pressable>:<Button label={display ? `${label}: ${display}` : `Select ${label.toLowerCase()}`} onPress={open} />}
+      {mode==='date'?<Pressable accessibilityRole="button" accessibilityLabel={display?`${label}: ${display}`:`Select ${label.toLowerCase()}`} onPress={open} style={{flexDirection:'row',alignItems:'center',gap: 12,padding:12,borderRadius:12,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'}}><Ionicons name="calendar-outline" size={23} color="#245EEA"/><Text style={{color:'#142D4E',fontWeight:'600'}}>{display||'Select travel date'}</Text></Pressable>:<Button label={display ? `${label}: ${display}` : `Select ${label.toLowerCase()}`} onPress={open} />}
       {clear && value && <Button label="Clear date" onPress={() => { setPending(undefined); clear(); }} />}
     </View>
     {pending && <>

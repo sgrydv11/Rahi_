@@ -47,9 +47,9 @@ async function account(kind) {
     await page.goto(base+path);await page.locator('main h1').waitFor();await page.locator('.primary-navigation [role="status"]').waitFor({state:'detached'});
     await page.waitForTimeout(200);
     const item=await page.evaluate(()=>({path:location.pathname,title:document.title,description:document.querySelector('meta[name=description]')?.content,
-     width:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+     width:innerWidth,scrollWidth:document.documentElement.scrollWidth,fonts:[...new Set([...document.querySelectorAll('main *,header *,footer *')].filter(e=>e.textContent.trim()).map(e=>getComputedStyle(e).fontFamily))],mainLinks:document.querySelectorAll('#primary-navigation>a').length,
      overflow:[...document.querySelectorAll('main *,header *,footer *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1 && e.getBoundingClientRect().width>0).slice(0,8).map(e=>`${e.tagName}.${e.className}`)}));
-    report.pages.push(item);
+    report.pages.push(item);assert.ok(item.fonts.every(f=>f.startsWith('Inter')),path+' typography');assert.ok(item.mainLinks<=5,path+' primary navigation limit');
     if(item.scrollWidth>width+1){report.failures.push(item);await page.screenshot({path:`.local/site-overflow-${width}-${paths.indexOf(path)}.png`,fullPage:true});}
     assert.ok(item.description?.length>30,path+' description');assert.ok(item.title.endsWith('| FlexirRides'),path+' title');
     for(const href of await page.locator('a[href]').evaluateAll(anchors=>anchors.map(a=>a.getAttribute('href'))))if(href.startsWith('/'))links.add(href);

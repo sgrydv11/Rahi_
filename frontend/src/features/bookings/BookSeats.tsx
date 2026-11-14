@@ -11,6 +11,7 @@ export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedS
   const { user } = useAuth(); const navigate = useNavigate();
   const [seats, setSeats] = useState(() => Math.max(1, Math.min(requestedSeats, ride.availableSeats))); const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [demoPaymentMethod,setDemoPaymentMethod]=useState<'DIRECT'|'QR'|'OTHER'>('DIRECT');
   const [started, setStarted] = useState(false);
   const [recent, setRecent] = useState<JourneyDetails['passengers']>([]);
   // Keep the same request after an uncertain network/server failure, until a definitive response.
@@ -61,7 +62,7 @@ export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedS
       setError('Select stops and enter a valid name, age and gender for each passenger.'); return;
     }
     if (!confirm) { review.current = details; setConfirm(true); return; }
-    const pending = request.current ?? { key: crypto.randomUUID(), seats, version: ride.version, details }; request.current = pending;
+    const pending = request.current ?? { key: crypto.randomUUID(), seats, version: ride.version, details:{...details,demoPaymentMethod} }; request.current = pending;
     setBusy(true); setError('');
     try { const booking = await bookingsApi.create(ride.id, pending.seats, pending.key, pending.version, pending.details); navigate(`/bookings/${booking.id}`, { state: { message: booking.status === 'CONFIRMED' ? 'Your seats are confirmed.' : booking.status === 'PENDING' ? 'Request sent. Your seats are not reserved until the driver accepts.' : 'This request was already recorded. Check its current booking status below.' } }); }
     catch (failure) {
@@ -85,6 +86,7 @@ export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedS
       <label>Gender<select name={`gender${index}`} required defaultValue=""><option value="">Select gender</option><option value="FEMALE">Female</option>{!ride.preferences?.womenOnly && <><option value="MALE">Male</option><option value="OTHER">Other</option></>}</select></label>
     </fieldset>)}
     <p>Total: <strong>{ride.currency} {(Number(ride.pricePerSeat) * seats).toFixed(2)}</strong>. No payment is collected here.</p>
+    {confirm && <fieldset disabled={busy || Boolean(request.current)}><legend>Payment choice · demo only</legend><label>Payment option<select aria-label="Demo payment option" value={demoPaymentMethod} onChange={e=>setDemoPaymentMethod(e.target.value as 'DIRECT'|'QR'|'OTHER')}><option value="DIRECT">Direct payment to driver (demo)</option><option value="QR">QR code (demo)</option><option value="OTHER">Other method (demo)</option></select></label>{demoPaymentMethod==='QR'&&<div className="demo-qr" role="img" aria-label="Demo QR placeholder, not a payment code">DEMO</div>}<p>No money is collected. This records a preference only; it does not mark the booking paid.</p></fieldset>}
     {confirm && <p role="status">{ride.preferences?.requiresApproval
       ? `Request ${seats} seat${seats > 1 ? 's' : ''}. The driver must accept before seats are reserved.`
       : `Confirm ${seats} seat${seats > 1 ? 's' : ''}. Availability is checked when you confirm.`}</p>}

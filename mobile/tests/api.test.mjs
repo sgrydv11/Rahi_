@@ -156,3 +156,13 @@ test('rejected Google identity never establishes a session',async()=>{
   await assert.rejects(f.client.loginWithGoogle('invalid'),/Invalid Google identity/);
   assert.equal(f.token(),undefined);
 });
+
+test('verified registration includes regular routes without establishing a session',async()=>{
+ const f=fixture(async()=>Response.json({challengeId:'challenge',expiresIn:300,delivery:'EMAIL'}));
+ const routes=[{origin:'Indore',destination:'Ujjain',period:'MORNING'},{origin:'Ujjain',destination:'Indore',period:'EVENING'}];
+ await f.client.requestRegistrationOtp('member@example.test','long-password-123','+919876543210','PASSENGER',routes);
+ assert.equal(f.calls[0].url,'https://example.test/api/v1/mobile/auth/registration/request');
+ assert.deepEqual(JSON.parse(f.calls[0].options.body).regularRoutes,routes);
+ assert.equal(f.calls[0].options.headers.Authorization,undefined);
+ assert.equal(f.token(),undefined);
+});

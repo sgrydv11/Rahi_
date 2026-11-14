@@ -57,7 +57,7 @@ public class MobileAuthController {
     @PostMapping("/registration/request")
     public EmailOtpService.Challenge requestRegistration(@Valid @RequestBody OtpRequests.Registration body,HttpServletRequest request) {
         requireNativeRequest(request); limiter.check(request.getRemoteAddr());
-        return otp.requestRegistration(body.identifier,body.password,body.mobileNumber,body.travelPreference);
+        return otp.requestRegistration(body.identifier,body.password,body.mobileNumber,body.travelPreference,body.regularRoutes);
     }
     @PostMapping("/otp/verify")
     public ResponseEntity<Session> verifyOtp(@Valid @RequestBody OtpRequests.Verify body, HttpServletRequest request) {

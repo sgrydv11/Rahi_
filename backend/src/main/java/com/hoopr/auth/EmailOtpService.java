@@ -19,6 +19,7 @@ public class EmailOtpService {
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     private final byte[] key;
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper=new com.fasterxml.jackson.databind.ObjectMapper();
     private final org.springframework.security.crypto.password.PasswordEncoder passwords;
     public EmailOtpService(JdbcTemplate jdbc, OtpMailer mailer, AuthService auth, UserRepository users, Clock clock, AuthSettings settings,
                            org.springframework.security.crypto.password.PasswordEncoder passwords) {
@@ -31,10 +32,17 @@ public class EmailOtpService {
     }
     @Transactional
     public Challenge requestRegistration(String email, String password, String mobile, TravelPreference preference) {
+        return requestRegistration(email,password,mobile,preference,List.of());
+    }
+    @Transactional
+    public Challenge requestRegistration(String email,String password,String mobile,TravelPreference preference,List<TravelRoutesController.Route> routes) {
+        routes=TravelRoutesController.normalize(routes);
         AuthService.validatePassword(password);
         if (password.isBlank() || password.length()<12) throw new AuthFailure(400,"Use a password of at least 12 characters.");
         if (mobile==null || mobile.isBlank()) throw new AuthFailure(400,"Enter your mobile number.");
-        return challenge(email,mobile,preference,passwords.encode(password),true);
+        var challenge=challenge(email,mobile,preference,passwords.encode(password),true);
+        jdbc.update("UPDATE email_otp_challenges SET regular_routes=?::jsonb WHERE id=?",routeJson(routes),challenge.challengeId());
+        return challenge;
     }
     public static String mobile(String value) {
         if (value == null || value.isBlank()) return null;
@@ -91,12 +99,20 @@ public class EmailOtpService {
             var profile = auth.register(email, UUID.randomUUID().toString(), "FlexirRides member", TravelPreference.valueOf(challenge.get("travel_preference").toString()), (String)challenge.get("mobile_number"));
             user = users.findById(profile.id()).orElseThrow();
             if (signupHash!=null) { user.passwordHash=signupHash; users.saveAndFlush(user); }
+            for(var route:readRoutes(challenge.get("regular_routes").toString()))
+                jdbc.update("INSERT INTO user_travel_routes(user_id,origin,destination,time_period) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",user.id,route.origin(),route.destination(),route.period().name());
         }
         if (!"ACTIVE".equals(user.status)) throw invalid();
         String mobile = (String) challenge.get("mobile_number");
         if (mobile != null && user.mobileNumber == null) { user.mobileNumber = mobile; users.saveAndFlush(user); }
         jdbc.update("UPDATE email_otp_challenges SET consumed=true WHERE id=?", id);
         return auth.newSession(user);
+    }
+    private String routeJson(List<TravelRoutesController.Route> routes) {
+        try{return mapper.writeValueAsString(routes);}catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new AuthFailure(400,"Invalid regular routes.");}
+    }
+    private List<TravelRoutesController.Route> readRoutes(String json) {
+        try{return List.of(mapper.readValue(json,TravelRoutesController.Route[].class));}catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new AuthFailure(400,"Invalid regular routes.");}
     }
     private String hash(UUID id, String code) {
         try {

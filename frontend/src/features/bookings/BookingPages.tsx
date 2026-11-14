@@ -92,7 +92,7 @@ export function BookingDetailsPage() {
     {loading ? <p role="status">Loading booking…</p> : booking ? <>
       {message && <p role="status">{message}</p>}<BookingCard booking={booking} />
       <div className="panel"><p>Booking reference: {booking.id}</p><p>Price agreed: {booking.currency} {Number(booking.pricePerSeat).toFixed(2)} per seat.</p>
-        {booking.details && <><p>Boarding: {booking.details.boardingPoint} · Dropping: {booking.details.droppingPoint}</p>
+        {booking.details && <><p>Demo payment choice: {booking.details.demoPaymentMethod || 'DIRECT'} · No payment collected by this choice.</p><p>Boarding: {booking.details.boardingPoint} · Dropping: {booking.details.droppingPoint}</p>
           {booking.details.passengers.map((person, index) => <p key={index}>{person.name} · {person.age} · {person.gender}</p>)}</>}
         {booking.cancelledAt && <p>Cancelled: {new Date(booking.cancelledAt).toLocaleString()}</p>}
         {booking.cancellationReason && <p>Reason: {booking.cancellationReason}</p>}

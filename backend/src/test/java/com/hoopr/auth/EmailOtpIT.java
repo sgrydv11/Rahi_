@@ -48,11 +48,12 @@ class EmailOtpIT {
         jdbc.update("DELETE FROM email_otp_challenges WHERE email=?", email);
     }
     @Test void verifiesOnceCreatesNoNameAccountAndRecordsUnverifiedMobile() {
-        var challenge = otp.requestRegistration(email, "OTP-test-password-long", mobile, TravelPreference.PASSENGER);
+        var challenge = otp.requestRegistration(email, "OTP-test-password-long", mobile, TravelPreference.PASSENGER, List.of(new com.hoopr.user.TravelRoutesController.Route("Indore","Ujjain",com.hoopr.user.TravelRoutesController.Period.MORNING)));
         assertTrue(code.get().matches("[0-9]{6}"));
         assertNotEquals(code.get(), jdbc.queryForObject("SELECT code_hash FROM email_otp_challenges WHERE id=?", String.class, challenge.challengeId()));
         var issued = otp.verify(challenge.challengeId(), code.get());
         assertEquals(email, issued.access.user().email());
+        assertEquals("MORNING",jdbc.queryForObject("SELECT time_period FROM user_travel_routes WHERE user_id=?",String.class,issued.access.user().id()));
         assertEquals("FlexirRides member", issued.access.user().fullName());
         assertEquals(mobile, jdbc.queryForObject("SELECT mobile_number FROM users WHERE id=?", String.class, issued.access.user().id()));
         assertEquals(false, jdbc.queryForObject("SELECT mobile_verified FROM users WHERE id=?", Boolean.class, issued.access.user().id()));

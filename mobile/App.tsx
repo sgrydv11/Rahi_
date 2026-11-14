@@ -1,8 +1,11 @@
+import {useFonts} from 'expo-font';
+import {Text,TextInput} from './src/Typography';
+import {CommunityContext,useCommunityState} from './src/community';
 import { Wallet } from './src/wallet';
 import { GroupOffers } from './src/group';
 import { Chat } from './src/chat';
 import { useEffect, useRef, useState } from 'react';
-import { BackHandler, Image, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Image, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { logout, onSessionInvalidated, restore, type User } from './src/api';
@@ -64,7 +67,10 @@ function NativeApp() {
   }, []);
   const action = useAction();
   const screen = stack[stack.length - 1];
+  const [chatGroup,setChatGroup]=useState(1);
+  const community=useCommunityState(user?.id,screen.kind==='chat'?chatGroup:undefined);
   const go = (next: Screen) => {
+    if(next.kind==='chat' && next.groupId)setChatGroup(next.groupId);
     Keyboard.dismiss();
     setStack(previous => {
       const current = previous[previous.length - 1].kind;
@@ -115,7 +121,7 @@ function NativeApp() {
     if (restoring && screen.kind !== 'home' && screen.kind !== 'search') return <Copy>Restoring your session…</Copy>;
     if (!user && !publicScreens.has(screen.kind)) return <SignIn create={false} onUser={signedIn} go={go} />;
     switch (screen.kind) {
-      case 'chat': return user && <Chat userId={user.id} go={go} />;
+      case 'chat': return user && <Chat userId={user.id} go={go} groupId={chatGroup} setGroup={setChatGroup} />;
       case 'login': case 'register': return <SignIn key={screen.kind} create={screen.kind === 'register'} onUser={signedIn} go={go} />;
       case 'search': case 'rides': return <Rides mine={screen.kind === 'rides'} go={go} />;
       case 'ride': return <RideDetails id={screen.id} requestedSeats={screen.requestedSeats} user={user} go={go} />;
@@ -171,7 +177,7 @@ function NativeApp() {
   }
   const key = `${stack.length}-${screen.kind}-${'id' in screen ? screen.id ?? '' : ''}`;
   useEffect(() => { scrollOffset.current = 0; }, [key]);
-  return <SafeAreaView style={layout.surface}>
+  return <CommunityContext.Provider value={community}><SafeAreaView style={layout.surface}>
     <StatusBar barStyle="dark-content" />
     <View style={layout.header}>
       {stack.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Back" style={layout.icon} onPress={back}>
@@ -182,9 +188,10 @@ function NativeApp() {
         <Text accessibilityRole="header" style={layout.brand}>FlexirRides</Text>
       </Pressable>
     </View>
+    {community.toast && <View style={{backgroundColor:'#EDF3FF',padding: 12,flexDirection:'row',alignItems:'center'}}><Pressable accessibilityRole="button" style={{flex:1}} onPress={()=>{const t=community.toast!;community.dismiss();if(t.link.startsWith('/chat')){setChatGroup(Number(t.link.split('group=')[1])||1);setStack([home,{kind:'chat'}]);}else if(t.link.startsWith('/rides/'))go({kind:'ride',id:t.link.split('/')[2]});}}><Text style={{fontWeight:'700'}}>{community.toast.title}</Text><Text numberOfLines={2}>{community.toast.body}</Text></Pressable><Button label="Dismiss" onPress={community.dismiss}/></View>}
     <KeyboardAvoidingView style={layout.flex} behavior="padding">
       <FieldFocus.Provider value={() => { if (Keyboard.isVisible()) requestAnimationFrame(revealField); }}>
-        {screen.kind==='chat' && user?<View style={{flex:1,padding:10}}>{content()}</View>:<ScrollView ref={scroll} key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled"
+        {screen.kind==='chat' && user?<View style={{flex:1,padding: 12}}>{content()}</View>:<ScrollView ref={scroll} key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled"
           onLayout={() => { if (Keyboard.isVisible()) revealField(); }}
           onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
           <Text accessibilityRole="header" style={styles.title}>{!user && !publicScreens.has(screen.kind) ? titles.login : titles[screen.kind]}</Text>
@@ -203,13 +210,16 @@ function NativeApp() {
             setStack(kind === 'home' ? [home] : [home, { kind }]);
           }} style={layout.tab}>
           <Ionicons name={icon} size={23} color={screen.kind === kind ? colors.accent : colors.muted} />
-          <Text style={{ color: screen.kind === kind ? colors.accent : colors.muted }}>{label}</Text>
+          <Text style={{ color: screen.kind === kind ? colors.accent : colors.muted }}>{label}{kind==='chat' && community.unread>0?` (${community.unread>99?'99+':community.unread})`:''}</Text>
         </Pressable>)}
       </View>}
     </KeyboardAvoidingView>
-  </SafeAreaView>;
+  </SafeAreaView></CommunityContext.Provider>;
 }
-export default function App() { return <SafeAreaProvider><NativeApp /></SafeAreaProvider>; }
+export default function App() {
+ const[loaded,error]=useFonts({Inter:require('./assets/fonts/Inter-Regular.ttf'),InterSemiBold:require('./assets/fonts/Inter-SemiBold.ttf'),InterBold:require('./assets/fonts/Inter-Bold.ttf')});
+ return <SafeAreaProvider>{loaded?<NativeApp/>:<SafeAreaView style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'#F7F9FC'}}>{error?<Text accessibilityRole="alert">Unable to load app fonts. Please reopen the app.</Text>:<ActivityIndicator accessibilityLabel="Loading FlexirRides" color="#245EEA"/>}</SafeAreaView>}</SafeAreaProvider>;
+}
 
 const layout = StyleSheet.create({
   flex: { flex: 1 },
@@ -217,10 +227,10 @@ const layout = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, gap: 8, backgroundColor: '#fff' },
   brandGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   logo: { width: 32, height: 32, borderRadius: 8 },
-  brand: { color: colors.accent, fontSize: 24, fontWeight: '800', flexShrink: 1 },
+  brand: { color: colors.accent, fontSize: 24, fontWeight: '700', flexShrink: 1 },
   icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   menu: { alignSelf: 'flex-end', padding: 12, gap: 8, backgroundColor: '#fff' },
   footer: { flexDirection: 'row', borderTopWidth: 1, borderColor: colors.line, backgroundColor: '#fff' },
-  tab: { flex: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  content: { padding: 16, gap: 14, maxWidth: 720, width: '100%', alignSelf: 'center' },
+  tab: { flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  content: { padding: 24, gap: 24, maxWidth: 720, width: '100%', alignSelf: 'center' },
 });

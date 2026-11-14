@@ -61,9 +61,10 @@ class RideChangesIT {
         var ride = offer(driver, 9, "120", new RidePreferences(List.of("Station"), List.of("Tower"), true, true,
                 false, false, RidePreferences.RouteType.OTHER, true));
         var passenger = new BookingDtos.Passenger("Test Rider", 25, BookingDtos.Gender.FEMALE);
-        var details = new BookingDtos.JourneyDetails("Station", "Tower", List.of(passenger, passenger));
+        var details = new BookingDtos.JourneyDetails("Station", "Tower", List.of(passenger, passenger),"QR");
         var first = bookings.create(ride.id(), users.get(1), UUID.randomUUID(), 2, ride.version(), details).booking();
         var second = bookings.create(ride.id(), users.get(2), UUID.randomUUID(), 2, ride.version(), details).booking();
+        assertEquals("QR",first.details().demoPaymentMethod());
         assertEquals("PENDING", first.status());
         assertNotNull(first.requestExpiresAt());
         assertEquals(2, rides.details(ride.id(), null).availableSeats());

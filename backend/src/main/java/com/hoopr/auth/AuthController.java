@@ -62,7 +62,7 @@ public class AuthController {
     }
     @PostMapping("/registration/request") public EmailOtpService.Challenge requestRegistration(@Valid @RequestBody OtpRequests.Registration body, HttpServletRequest request) {
         limiter.check(request.getRemoteAddr());
-        return otp.requestRegistration(body.identifier,body.password,body.mobileNumber,body.travelPreference);
+        return otp.requestRegistration(body.identifier,body.password,body.mobileNumber,body.travelPreference,body.regularRoutes);
     }
     @PostMapping("/otp/verify") public AuthService.Access verifyOtp(@Valid @RequestBody OtpRequests.Verify body,
             HttpServletRequest request, HttpServletResponse response) {

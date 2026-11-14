@@ -1,3 +1,5 @@
+import {Icon} from '../Icon';
+import { CommunityContext,useCommunityState } from '../../features/chat/Community';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { useEffect, useRef, useState } from 'react';
 import { pageMetadata } from '../pageMetadata';
@@ -14,6 +16,7 @@ export function AppLayout() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location=useLocation();
+  const community=useCommunityState(user?.id,location.pathname==='/chat'?Number(new URLSearchParams(location.search).get('group')||1):undefined);
   const [menuOpen,setMenuOpen]=useState(false);
   const menuButton=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
@@ -56,25 +59,25 @@ export function AppLayout() {
   }
 
 
-  return <div className="app-shell">
+  return <CommunityContext.Provider value={community}><div className="app-shell">
     <a className="skip-link" href="#main">Skip to content</a>
     <header className="site-header">
-      <Link className="brand" to="/" aria-label="FlexirRides home">FlexirRides<span aria-hidden="true">↗</span></Link>
-      <button ref={menuButton} type="button" className="menu-toggle" aria-label={menuOpen?'Close menu':'Open menu'} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={()=>setMenuOpen(value=>!value)}><span aria-hidden="true">{menuOpen?'×':'☰'}</span></button>
+      <Link className="brand" to="/" aria-label="FlexirRides home">FlexirRides<Icon name="arrow-forward-outline"/></Link>
+      <button ref={menuButton} type="button" className="menu-toggle" aria-label={menuOpen?'Close menu':'Open menu'} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={()=>setMenuOpen(value=>!value)}><Icon name={menuOpen?'close-outline':'menu-outline'}/></button>
       <nav id="primary-navigation" className={`primary-navigation${menuOpen?' is-open':''}`} aria-label="Main navigation">
         <NavLink to="/rides" end>Find a ride</NavLink>
         {loading ? <span role="status">Loading…</span> : user ? <>
           <NavLink to="/rides/new">Offer a ride</NavLink>
-          <NavLink to="/rides/mine">My rides</NavLink>
           <NavLink to="/bookings/mine">My bookings</NavLink>
-          <NavLink to="/notifications">Notifications</NavLink>
-          <NavLink to="/chat">Chat</NavLink>
+          <NavLink to="/chat">Chat {community.unread>0&&<span className="unread-badge">{community.unread>99?'99+':community.unread}</span>}</NavLink>
+          <NavLink to="/profile">Account</NavLink>
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
         </> : demoMode ? <span className="demo-nav-note">Sample app</span> : <><NavLink to="/login">Log in</NavLink>
           <NavLink className="button button-small" to="/register">Join FlexirRides</NavLink></>}
-        <NavLink to="/help">Help</NavLink>
+        {!user&&<NavLink to="/help">Help</NavLink>}
       </nav>
     </header>
+    {community.toast && <div className="community-toast" role="status"><button type="button" onClick={()=>{navigate(community.toast!.link);community.dismiss();}}><strong>{community.toast.title}</strong><span>{community.toast.body}</span></button><button type="button" aria-label="Dismiss notification" onClick={community.dismiss}><Icon name="close-outline"/></button></div>}
     {error && <p role="alert">{error}</p>}
     {demoMode && <p className="demo-banner" role="status">Sample app · Browse demo rides. Accounts and bookings are disabled.</p>}
     <main id="main" tabIndex={-1}><Outlet /></main>
@@ -83,36 +86,24 @@ export function AppLayout() {
       <MobileNavLink to="/" label="Home" icon="home" end />
       <MobileNavLink to="/bookings/mine" label="My Bookings" icon="bookings" />
       <MobileNavLink to="/rides/mine" label="Offers" icon="offer" />
-      <MobileNavLink to="/chat" label="Chat" icon="chat" />
+      <MobileNavLink to="/chat" label="Chat" icon="chat" badge={community.unread} />
       <MobileNavLink to="/profile" label="Account" icon="account" />
     </nav>
-  </div>;
+  </div></CommunityContext.Provider>;
 }
 
 type MobileIconName = 'home' | 'account' | 'find' | 'offer' | 'rides' | 'bookings' | 'more' | 'chat';
 
-function MobileIcon({ name }: { name: MobileIconName }) {
-  const paths: Record<MobileIconName, string> = {
-    chat: 'M21 11a8 8 0 0 1-8 8H7l-4 3V11a9 9 0 0 1 18 0ZM7 10h10M7 14h6',
-    home: 'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',
-    account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9a8 8 0 0 1 16 0',
-    find: 'M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm5-2 5 5',
-    offer: 'M12 5v14M5 12h14',
-    rides: 'M5 17h14l1-5-2-5H6l-2 5 1 5Zm0 0v2m14-2v2M5 13h14M7 17h.01M17 17h.01',
-    bookings: 'M6 3h12v18l-6-4-6 4V3Z',
-    more: 'M5 12h.01M12 12h.01M19 12h.01',
-  };
-  return <svg className="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d={paths[name]} />
-  </svg>;
+function MobileIcon({name}:{name:MobileIconName}) {
+ const names={home:'home-outline',account:'person-outline',find:'search-outline',offer:'add-outline',rides:'car-outline',bookings:'ticket-outline',more:'menu-outline',chat:'chatbubbles-outline'} as const;
+ return <Icon name={names[name]} className="mobile-nav-icon"/>;
 }
 
-function MobileNavLink({ to, label, icon, end = false }: {
-  to: string; label: string; icon: MobileIconName; end?: boolean;
+function MobileNavLink({ to, label, icon, end = false,badge=0 }: {
+  to: string; label: string; icon: MobileIconName; end?: boolean;badge?:number;
 }) {
   return <NavLink className={({ isActive }) => `mobile-nav-item${isActive ? ' active' : ''}`}
     to={to} end={end}>
-    <MobileIcon name={icon} /><span className="mobile-nav-label">{label}</span>
+    <MobileIcon name={icon} />{badge>0&&<span className="unread-badge" aria-label={`${badge} unread messages`}>{badge>99?'99+':badge}</span>}<span className="mobile-nav-label">{label}</span>
   </NavLink>;
 }

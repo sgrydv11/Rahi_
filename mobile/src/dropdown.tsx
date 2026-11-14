@@ -1,0 +1,5 @@
+import {Text} from './Typography';
+import {useState} from 'react';
+import {Modal,Pressable,ScrollView,View} from 'react-native';
+import {Button,Copy} from './ui';
+export function Dropdown({label,values,selected,change}:{label:string;values:string[];selected:string;change:(v:string)=>void}){const[open,setOpen]=useState(false);return <View><Copy>{label}</Copy><Button label={(selected||'Any')+' ▾'} onPress={()=>setOpen(true)}/><Modal transparent visible={open} animationType="fade" onRequestClose={()=>setOpen(false)}><View style={{flex:1,backgroundColor:'#0008',justifyContent:'center',padding:24}}><View accessibilityViewIsModal style={{backgroundColor:'white',borderRadius:16,padding:16,maxHeight:'80%'}}><Copy>{label}</Copy><ScrollView>{['',...new Set(values)].map(v=><Pressable key={v} accessibilityRole="button" style={{padding:16}} onPress={()=>{change(v);setOpen(false);}}><Text>{v||'Any'}{v===selected?' ✓':''}</Text></Pressable>)}</ScrollView><Button label="Close" onPress={()=>setOpen(false)}/></View></View></Modal></View>;}

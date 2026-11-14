@@ -1,8 +1,12 @@
+import { useCityPoints } from './locations';
 import { useEffect, useState, type FormEvent } from 'react';
 import { listVehicles, type Vehicle } from '../vehicles/VehiclesPage';
 import { localDateTime, validateRide, type Ride, type RideInput } from './api';
 import { errorMessage } from '../auth/auth';
 export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) => Promise<void> }) {
+  const cityPoints=useCityPoints();
+  const [origin,setOrigin]=useState(ride?.origin||''),[destination,setDestination]=useState(ride?.destination||'');
+  const [boarding,setBoarding]=useState(ride?.preferences?.boardingPoints.join('\n')||ride?.origin||''),[dropping,setDropping]=useState(ride?.preferences?.droppingPoints.join('\n')||ride?.destination||'');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -44,13 +48,15 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
   return <form className="panel" onSubmit={submit} aria-busy={busy}>
     <fieldset className="ride-form" disabled={busy}>
       <legend>{ride ? 'Edit your offer' : 'Your journey details'}</legend>
-      <label>Leaving from<input name="origin" required maxLength={200} defaultValue={ride?.origin} /></label>
-      <label>Going to<input name="destination" required maxLength={200} defaultValue={ride?.destination} /></label>
+      <label>Leaving from<input name="origin" required maxLength={200} value={origin} onChange={e=>setOrigin(e.target.value)} /></label>
+      <label>Going to<input name="destination" required maxLength={200} value={destination} onChange={e=>setDestination(e.target.value)} /></label>
       <label>Departure<input name="departure" type="datetime-local" required defaultValue={ride ? localDateTime(ride.departureAt) : ''} /></label>
       <label>Do you have a car?<select name="hasCar" required defaultValue={ride?.preferences?.hasCar ? 'yes' : ''}><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
       <label>Route type<select name="routeType" defaultValue={ride?.preferences?.routeType || 'OTHER'}><option value="HOME_TO_OFFICE">Home to Office</option><option value="OFFICE_TO_HOME">Office to Home</option><option value="OTHER">Other</option></select></label>
-      <label>Boarding points, one per line<textarea name="boardingPoints" required defaultValue={ride?.preferences?.boardingPoints.join('\n') || ride?.origin || ''} /></label>
-      <label>Dropping points, one per line<textarea name="droppingPoints" required defaultValue={ride?.preferences?.droppingPoints.join('\n') || ride?.destination || ''} /></label>
+      <label>Boarding points, one per line<textarea name="boardingPoints" required value={boarding} onChange={e=>setBoarding(e.target.value)} /></label>
+      <label>Dropping points, one per line<textarea name="droppingPoints" required value={dropping} onChange={e=>setDropping(e.target.value)} /></label>
+      {cityPoints(origin).length>0&&<button type="button" onClick={()=>setBoarding(cityPoints(origin).join('\n'))}>Use city boarding points</button>}
+      {cityPoints(destination).length>0&&<button type="button" onClick={()=>setDropping(cityPoints(destination).join('\n'))}>Use city dropping points</button>}
       <label><input name="ac" type="checkbox" defaultChecked={ride?.preferences?.ac === true} />Car has AC</label>
       <label><input name="flexibleDropoff" type="checkbox" defaultChecked={ride?.preferences?.flexibleDropoff} />Agree to nearby requested drop-off, by arrangement</label>
       <label><input name="womenOnly" type="checkbox" defaultChecked={ride?.preferences?.womenOnly} />Women-only ride</label>

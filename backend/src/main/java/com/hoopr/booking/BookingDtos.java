@@ -12,7 +12,11 @@ public final class BookingDtos {
     public enum Gender { FEMALE, MALE, OTHER }
     public record JourneyDetails(@NotBlank @Size(max = 200) String boardingPoint,
                                  @NotBlank @Size(max = 200) String droppingPoint,
-                                 @NotNull @Size(min = 1, max = 6) List<@NotNull @jakarta.validation.Valid Passenger> passengers) { }
+                                 @NotNull @Size(min = 1, max = 6) List<@NotNull @jakarta.validation.Valid Passenger> passengers,
+                                 @Pattern(regexp="DIRECT|QR|OTHER") String demoPaymentMethod) {
+        public JourneyDetails(String boardingPoint,String droppingPoint,List<Passenger> passengers){this(boardingPoint,droppingPoint,passengers,"DIRECT");}
+        public JourneyDetails { if(demoPaymentMethod==null)demoPaymentMethod="DIRECT"; }
+    }
     public record Create(@NotNull @Min(1) @Max(6) Integer seats, @PositiveOrZero Long rideVersion,
                          @jakarta.validation.Valid JourneyDetails details) {
         public Create(Integer seats, Long rideVersion) { this(seats, rideVersion, null); }

@@ -1,3 +1,4 @@
+import {RegularRoutesEditor,TravelPreferencesSettings,type RegularRoute} from './regularRoutes';
 import { useEffect, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ function Preferences({ value, change }: { value: Preference; change: (value: Pre
   </View></>;
 }
 export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user: User) => void; go: Navigate }) {
+  const [regularRoutes,setRegularRoutes]=useState<RegularRoute[]>([]);
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +40,7 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
       throw new Error('Enter a valid mobile number with country code for numbers outside India.');
     if (!password.trim() || (create && password.length < 12))
       throw new Error(create ? 'Use a password of at least 12 characters.' : 'Enter your password.');
-    if(create){const next=await requestRegistrationOtp(address,password,number,preference);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());}
+    if(create){const next=await requestRegistrationOtp(address,password,number,preference,regularRoutes);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());}
     else onUser(await login(address,password));
   }
   return <Card>
@@ -46,7 +48,7 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
     {challenge?<>
       <Copy>Verify your email</Copy><Copy>Enter the code sent to {email}. {create?'Your account is created only after verification.':'Verify the code to sign in.'} The code expires in five minutes.</Copy>
       <Field label="Email code" value={code} change={value=>setCode(value.replace(/\D/g,'').slice(0,6))} numeric />
-      <Button label={now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'} disabled={action.busy||now<resendAt} onPress={()=>void action.run(async()=>{const next=create?await requestRegistrationOtp(email.trim(),password,mobile,preference):await requestEmailOtp(email.trim());setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());})}/>
+      <Button label={now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'} disabled={action.busy||now<resendAt} onPress={()=>void action.run(async()=>{const next=create?await requestRegistrationOtp(email.trim(),password,mobile,preference,regularRoutes):await requestEmailOtp(email.trim());setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());})}/>
       <Button label="Change details" disabled={action.busy} onPress={()=>{setChallenge('');setCode('');}} />
     </>:<>
     {!create && <View style={styles.row}><Button label={'Password'+(!emailCodeLogin?' ✓':'')} disabled={action.busy} onPress={()=>setEmailCodeLogin(false)}/><Button label={'Email code'+(emailCodeLogin?' ✓':'')} disabled={action.busy} onPress={()=>setEmailCodeLogin(true)}/></View>}
@@ -54,9 +56,10 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
     {create && <>
       <Field label="Mobile number" value={mobile} change={setMobile} />
       <Preferences value={preference} change={setPreference} />
+      <RegularRoutesEditor value={regularRoutes} change={setRegularRoutes} disabled={action.busy}/>
       <Copy>Use a password of at least 12 characters, up to 72 UTF-8 bytes.</Copy>
     </>}
-    {(create || !emailCodeLogin) && <Field label="Password" value={password} change={setPassword} secret={!showPassword} trailing={<Pressable accessibilityRole="button" accessibilityLabel={showPassword?'Hide password':'Show password'} onPress={()=>setShowPassword(v=>!v)} disabled={action.busy} style={{padding:12}}><Ionicons name={showPassword?'eye-off-outline':'eye-outline'} size={22} color="#2359ac" /></Pressable>} />}
+    {(create || !emailCodeLogin) && <Field label="Password" value={password} change={setPassword} secret={!showPassword} trailing={<Pressable accessibilityRole="button" accessibilityLabel={showPassword?'Hide password':'Show password'} onPress={()=>setShowPassword(v=>!v)} disabled={action.busy} style={{padding:12}}><Ionicons name={showPassword?'eye-off-outline':'eye-outline'} size={22} color="#245EEA" /></Pressable>} />}
     </>}
     <Button label={action.busy ? 'Please wait…' : challenge?(create?'Verify and create account':'Verify and sign in'):create ? 'Create account' : emailCodeLogin?'Send email code':'Sign in'} disabled={action.busy}
       onPress={() => void action.run(submit)} />
@@ -82,6 +85,7 @@ export function Profile({ user, onUser, go }: { user: User; onUser: (user: User)
       onUser(await api<User>('/users/me', { method: 'PATCH', body: { fullName: name.trim(), travelPreference: preference } }));
       setSaved(true);
     })} />
+    <TravelPreferencesSettings/>
     <Button label="Manage vehicles" onPress={() => go({ kind: 'vehicles' })} />
   </Card>;
 }

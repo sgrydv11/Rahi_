@@ -121,7 +121,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/mobile/auth/register", "/api/v1/mobile/auth/login",
                                 "/api/v1/mobile/auth/refresh", "/api/v1/mobile/auth/logout",
                                 "/api/v1/mobile/auth/otp/request", "/api/v1/mobile/auth/otp/verify", "/api/v1/mobile/auth/registration/request", "/api/v1/mobile/auth/google").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/health", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/google/config").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/health", "/actuator/health", "/api/v1/auth/csrf", "/api/v1/auth/google/config", "/api/v1/locations").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
                                 "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/google",
                                 "/api/v1/auth/otp/request", "/api/v1/auth/otp/verify", "/api/v1/auth/registration/request").permitAll()
@@ -129,6 +129,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me", "/api/v1/vehicles/{id}").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/vehicles").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/vehicles").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET,"/api/v1/chat/groups","/api/v1/travel-preferences").hasAnyRole("USER","ADMIN")
+                        .requestMatchers(HttpMethod.POST,"/api/v1/chat/groups/{group}/settings","/api/v1/chat/groups/{group}/read","/api/v1/travel-preferences").hasAnyRole("USER","ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/notifications", "/api/v1/chat/messages").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/chat/messages").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/group/holds", "/api/v1/group/holds/{id}/cancel", "/api/v1/group/holds/{id}/checkout", "/api/v1/group/holds/{id}/sync").hasAnyRole("USER", "ADMIN")

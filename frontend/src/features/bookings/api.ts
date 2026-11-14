@@ -11,6 +11,7 @@ export interface Booking {
   requestExpiresAt?: string | null;
 }
 export interface JourneyDetails {
+  demoPaymentMethod?: 'DIRECT'|'QR'|'OTHER';
   boardingPoint: string; droppingPoint: string;
   passengers: { name: string; age: number; gender: 'FEMALE' | 'MALE' | 'OTHER' }[];
 }

@@ -40,6 +40,8 @@ class AuthWebTest {
     @MockitoBean EmailOtpService emailOtp;
     @MockitoBean com.hoopr.ride.RideService rides;
     @MockitoBean com.hoopr.ride.ChatController chat;
+    @MockitoBean com.hoopr.ride.ChatGroupsController groups;
+    @MockitoBean com.hoopr.user.TravelRoutesController routes;
     @MockitoBean com.hoopr.ride.RideRepository rideRepository;
     @MockitoBean com.hoopr.booking.BookingService bookings;
     @MockitoBean org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate notificationJdbc;
@@ -68,7 +70,7 @@ class AuthWebTest {
     }
     @Test void verifiedSignupRequestReturnsAChallengeWithoutRegisteringAnAccount() throws Exception {
         var challenge=UUID.randomUUID();
-        when(emailOtp.requestRegistration(anyString(),anyString(),anyString(),org.mockito.ArgumentMatchers.any(com.hoopr.user.TravelPreference.class)))
+        when(emailOtp.requestRegistration(anyString(),anyString(),anyString(),org.mockito.ArgumentMatchers.any(com.hoopr.user.TravelPreference.class),anyList()))
             .thenReturn(new EmailOtpService.Challenge(challenge,300,"EMAIL"));
         mvc.perform(write("registration/request").contentType(MediaType.APPLICATION_JSON)
             .content("{\"identifier\":\"new@example.test\",\"password\":\"long-password-123\",\"mobileNumber\":\"+919876543210\",\"travelPreference\":\"PASSENGER\"}"))

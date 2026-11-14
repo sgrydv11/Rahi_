@@ -1,6 +1,7 @@
 package com.hoopr.auth;
 
 import com.hoopr.user.TravelPreference;
+import com.hoopr.user.TravelRoutesController.Route;
 import jakarta.validation.constraints.*;
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ public final class OtpRequests {
         @Override public String toString() { return "OtpVerify[redacted]"; }
     }
     public static class Registration extends Request {
+        @Size(max=6) public java.util.List<@NotNull @jakarta.validation.Valid Route> regularRoutes=java.util.List.of();
         @NotBlank @Size(min=12,max=72) public String password;
         @Override public String toString() { return "Registration[redacted]"; }
     }

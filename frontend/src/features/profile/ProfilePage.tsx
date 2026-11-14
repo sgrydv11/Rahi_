@@ -1,3 +1,4 @@
+import { TravelPreferencesSettings } from './RegularRoutes';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { authenticatedRequest, authStore, errorMessage, travelPreferenceLabels, type User } from '../auth/auth';
@@ -48,7 +49,7 @@ export function ProfilePage() {
         <button className="button" disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
       </form>
       {saved && <p role="status">Profile saved.</p>}
-      <p><Link to="/vehicles">Manage vehicles</Link></p>
+      <div className="account-links"><Link to="/vehicles">Manage vehicles</Link><Link to="/rides/mine">My rides</Link><Link to="/notifications">Notifications</Link><Link to="/help">Help</Link></div><TravelPreferencesSettings/>
     </> : !error && <p role="status">Loading your profile…</p>}
   </div></section>;
 }

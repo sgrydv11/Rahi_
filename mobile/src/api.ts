@@ -1,3 +1,4 @@
+import type {RegularRoute} from './regularRoutes';
 import * as SecureStore from 'expo-secure-store';
 import { createGroupWalletClient } from './groupWallet';
 
@@ -12,7 +13,7 @@ export interface RidePreferences {
   flexibleDropoff: boolean; womenOnly: boolean; routeType: 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER';
 }
 export interface Passenger { name: string; age: number; gender: 'FEMALE' | 'MALE' | 'OTHER' }
-export interface JourneyDetails { boardingPoint: string; droppingPoint: string; passengers: Passenger[] }
+export interface JourneyDetails { boardingPoint: string; droppingPoint: string; passengers: Passenger[]; demoPaymentMethod?: 'DIRECT'|'QR'|'OTHER' }
 export interface Ride {
   id: string; origin: string; destination: string; driver: { id: string; displayName: string };
   departureAt: string; timeZone: string; status: string; totalSeats: number; availableSeats: number;
@@ -132,9 +133,9 @@ export function requestEmailOtp(identifier: string, mobileNumber?: string, trave
     method: 'POST', body: { identifier, mobileNumber, travelPreference },
   });
 }
-export function requestRegistrationOtp(identifier:string,password:string,mobileNumber:string,travelPreference:Preference) {
+export function requestRegistrationOtp(identifier:string,password:string,mobileNumber:string,travelPreference:Preference,regularRoutes:RegularRoute[]=[]) {
   return request<{challengeId:string;expiresIn:number;delivery:string}>('/mobile/auth/registration/request',{
-    method:'POST',body:{identifier,password,mobileNumber,travelPreference},
+    method:'POST',body:{identifier,password,mobileNumber,travelPreference,regularRoutes},
   });
 }
 export async function verifyEmailOtp(challengeId: string, code: string) {

@@ -41,11 +41,10 @@ async function login(page,email) {
     await login(driverPage,driverMobile);await login(passengerPage,rider.email);
     const message='Two seats to Ujjain '+stamp;
     await driverPage.getByLabel('Message',{exact:true}).fill(message);
-    await driverPage.getByLabel('Share my mobile number with this message').check();
     await driverPage.getByText('＋ Share a ride',{exact:true}).click();
     await driverPage.getByRole('button',{name:'Load my rides to share',exact:true}).click();
-    await expect(driverPage.getByRole('combobox')).toContainText('Indore');
-    await driverPage.getByRole('combobox').selectOption(ride.id);
+    await expect(driverPage.getByRole('combobox',{name:'Attach one of your upcoming rides'})).toContainText('Indore');
+    await driverPage.getByRole('combobox',{name:'Attach one of your upcoming rides'}).selectOption(ride.id);
     await driverPage.getByRole('button',{name:'Send message',exact:true}).click();
     await expect(passengerPage.getByText(message,{exact:true})).toBeVisible({timeout:12000});
     const card=passengerPage.getByRole('article').filter({hasText:message});
@@ -68,8 +67,13 @@ async function login(page,email) {
     await person.getByLabel('Age',{exact:true}).fill('28');
     await person.getByRole('combobox',{name:'Gender',exact:true}).selectOption('FEMALE');
     await passengerPage.getByRole('button',{name:'Review booking',exact:true}).click();
+    await passengerPage.getByLabel('Demo payment option').selectOption('QR');
+    await expect(passengerPage.getByRole('img',{name:'Demo QR placeholder, not a payment code'})).toBeVisible();
     await passengerPage.getByRole('button',{name:'Confirm booking',exact:true}).click();
     await expect(passengerPage).toHaveURL(/\/bookings\//);
+    const saved=await api('/bookings/'+passengerPage.url().split('/').at(-1),{token:rider.accessToken});
+    assert.equal(saved.details.demoPaymentMethod,'QR');
+    assert.equal(saved.status,'CONFIRMED');
     assert.equal((await api('/rides/'+ride.id)).availableSeats,1);
     await expect(driverPage.getByRole('article').filter({hasText:message})).toContainText('1 seats available',{timeout:12000});
     await passengerPage.goto(base+'/chat');

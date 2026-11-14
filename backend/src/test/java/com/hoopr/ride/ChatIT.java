@@ -23,6 +23,9 @@ class ChatIT {
         r.add("spring.datasource.password",()->TestDatabase.required("TEST_DB_PASSWORD"));
     }
     @Autowired ChatController chat;
+    @Autowired ChatGroupsController groups;
+    @Autowired com.hoopr.user.TravelRoutesController preferences;
+    @Autowired com.hoopr.booking.NotificationController notifications;
     @Autowired AuthService auth;
     @Autowired RideService rides;
     @Autowired JdbcTemplate jdbc;
@@ -52,18 +55,14 @@ class ChatIT {
         assertThrows(jakarta.validation.ConstraintViolationException.class,
             ()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"   ",null)));
     }
-    @Test void phoneSharingRequiresExplicitConsentAndRegisteredNumber() {
+    @Test void registeredMobileIsAlwaysVisibleWithoutSharingFlag() {
         var a=member();var b=member();var id=UUID.fromString(a.getSubject());
-        assertEquals(400,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"Contact me",null,true))).status);
+        assertNull(chat.send(a,new ChatController.Send(UUID.randomUUID(),"No number",null)).mobileNumber());
         jdbc.update("UPDATE users SET mobile_number='+919876543210',mobile_verified=false WHERE id=?",id);
-        var hidden=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Private contact",null));
-        assertNull(hidden.mobileNumber());assertFalse(hidden.phoneShared());
-        var key=UUID.randomUUID();
-        var shared=chat.send(a,new ChatController.Send(key,"Contact me",null,true));
-        assertEquals("+919876543210",shared.mobileNumber());assertFalse(shared.mobileVerified());
-        assertEquals(shared.id(),chat.send(a,new ChatController.Send(key,"Contact me",null,true)).id());
-        assertEquals(409,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(key,"Contact me",null,false))).status);
-        assertEquals("+919876543210",chat.list(b,0).content().stream().filter(m->m.id()==shared.id()).findFirst().orElseThrow().mobileNumber());
+        var key=UUID.randomUUID();var sent=chat.send(a,new ChatController.Send(key,"Contact me",null,false));
+        assertEquals("+919876543210",sent.mobileNumber());assertFalse(sent.mobileVerified());assertTrue(sent.phoneShared());
+        assertEquals(sent.id(),chat.send(a,new ChatController.Send(key,"Contact me",null,true)).id());
+        assertEquals("+919876543210",chat.list(b,0).content().stream().filter(m->m.id()==sent.id()).findFirst().orElseThrow().mobileNumber());
     }
     @Test void repliesPersistOriginalMessageAndRetryTargetCannotChange() {
         var a=member();var b=member();
@@ -92,11 +91,61 @@ class ChatIT {
         assertEquals(400,assertThrows(RideFailure.class,()->chat.send(b,new ChatController.Send(UUID.randomUUID(),"Fake offer",ride.id()))).status);
         var sent=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Three seats tomorrow",ride.id()));
         assertEquals(3,sent.ride().availableSeats());
+        assertEquals(2,chat.send(a,new ChatController.Send(UUID.randomUUID(),"Ujjain route",ride.id(),false,null,2L)).groupId());
+        assertEquals(400,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"Wrong route",ride.id(),false,null,3L))).status);
         jdbc.update("UPDATE rides SET available_seats=1 WHERE id=?",ride.id());
         var updated=chat.list(b,0).content().stream().filter(m->m.id()==sent.id()).findFirst().orElseThrow();
         assertEquals(1,updated.ride().availableSeats());
         jdbc.update("UPDATE rides SET departure_at=now()-interval '1 hour' WHERE id=?",ride.id());
         assertEquals(400,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"Old ride",ride.id()))).status);
+    }
+    @Test void routeGroupsIsolateRepliesUnreadCursorsAndMutePerUser() {
+        var a=member();var b=member();groups.groups(a);groups.groups(b);
+        var sent=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Ujjain tomorrow",null,false,null,2L));
+        assertFalse(chat.list(b,0,3,0).content().stream().anyMatch(m->m.id()==sent.id()));
+        assertEquals(1,groups.groups(b).stream().filter(g->g.id()==2).findFirst().orElseThrow().unreadCount());
+        assertEquals(0,groups.groups(a).stream().filter(g->g.id()==2).findFirst().orElseThrow().unreadCount());
+        assertEquals(400,assertThrows(RideFailure.class,()->chat.send(b,new ChatController.Send(UUID.randomUUID(),"Wrong group",null,false,sent.id(),3L))).status);
+        groups.settings(b,2,new ChatGroupsController.Settings(true));
+        assertTrue(groups.groups(b).stream().filter(g->g.id()==2).findFirst().orElseThrow().muted());
+        assertFalse(groups.groups(a).stream().filter(g->g.id()==2).findFirst().orElseThrow().muted());
+        groups.read(b,2,new ChatGroupsController.Read(sent.id()));groups.read(b,2,new ChatGroupsController.Read(0));
+        assertEquals(0,groups.groups(b).stream().filter(g->g.id()==2).findFirst().orElseThrow().unreadCount());
+        assertEquals(404,assertThrows(RideFailure.class,()->chat.list(b,0,999,0)).status);
+    }
+    @Test void historyAndQuotesExcludeMessagesOlderThanSevenDaysAndPagesDoNotOverlap() {
+        var a=member();var old=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Old",null));
+        var reply=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Reply",null,false,old.id()));
+        jdbc.update("UPDATE chat_messages SET created_at=now()-interval '8 days' WHERE id=?",old.id());
+        var current=chat.list(a,0);
+        assertFalse(current.content().stream().anyMatch(m->m.id()==old.id()));
+        assertNull(current.content().stream().filter(m->m.id()==reply.id()).findFirst().orElseThrow().replyTo());
+        assertEquals(400,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"Old quote",null,false,old.id()))).status);
+        for(int i=0;i<65;i++)jdbc.update("INSERT INTO chat_messages(sender_id,client_id,body,group_id) VALUES(?,?,?,4)",UUID.fromString(a.getSubject()),UUID.randomUUID(),"History "+i);
+        var first=chat.list(a,0,4,0);var older=chat.list(a,0,4,first.olderCursor());
+        assertEquals(50,first.content().size());assertTrue(first.hasOlder());assertEquals(15,older.content().size());assertFalse(older.hasOlder());
+        assertTrue(older.nextCursor()<first.olderCursor());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM chat_messages WHERE id=?",Integer.class,old.id()));
+    }
+    @Test void regularRoutesValidateMatchIndianTimeAndRespectGroupMute() {
+        var a=member();var b=member();var morning=com.hoopr.user.TravelRoutesController.Period.MORNING;
+        var route=new com.hoopr.user.TravelRoutesController.Route("indore","Ujjain",morning);
+        var saved=preferences.save(b,new com.hoopr.user.TravelRoutesController.Preferences(List.of(route,route)));
+        assertEquals(1,saved.size());assertEquals("Indore",saved.getFirst().origin());
+        preferences.save(a,new com.hoopr.user.TravelRoutesController.Preferences(List.of(route)));
+        var tomorrow=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).plusDays(1);
+        var ride=rides.create(UUID.fromString(a.getSubject()),new RideDtos.Create("Indore","Ujjain",null,null,tomorrow.atTime(8,0).atZone(java.time.ZoneId.of("Asia/Kolkata")).toInstant(),"Asia/Kolkata",3,new BigDecimal("100"),"INR","Test car",null,null));
+        var notices=notifications.inbox(b);
+        assertTrue(notices.stream().anyMatch(n->n.kind().equals("TRAVEL_RIDE")&&n.link().equals("/rides/"+ride.id())));
+        assertTrue(notices.stream().anyMatch(n->n.kind().equals("TRAVEL_BUDDY")&&n.link().equals("/chat?group=2")));
+        groups.settings(b,2,new ChatGroupsController.Settings(true));
+        assertFalse(notifications.inbox(b).stream().anyMatch(n->n.kind().startsWith("TRAVEL_")));
+        assertTrue(preferences.locations().get("Ujjain").containsAll(List.of("Nanakheda","D-Mart","Lal Gate")));
+        assertTrue(preferences.locations().get("Indore").containsAll(List.of("Aurobindo","Luv Kush","Vijay Nagar")));
+        assertThrows(com.hoopr.auth.AuthFailure.class,()->preferences.save(a,new com.hoopr.user.TravelRoutesController.Preferences(List.of(new com.hoopr.user.TravelRoutesController.Route("Indore","Indore",morning)))));
+        groups.settings(b,2,new ChatGroupsController.Settings(false));
+        preferences.save(b,new com.hoopr.user.TravelRoutesController.Preferences(List.of(new com.hoopr.user.TravelRoutesController.Route("Indore","Ujjain",com.hoopr.user.TravelRoutesController.Period.EVENING))));
+        assertFalse(notifications.inbox(b).stream().anyMatch(n->n.kind().equals("TRAVEL_RIDE")));
     }
     @Test void inactiveMembersCannotReadOrSendAndRateLimitIsEnforced() {
         var a=member();

@@ -124,6 +124,7 @@ export function BookingDetails({ id, user, go }: { id: string; user: User; go: N
       <Copy>Fare: {booking.currency} {booking.totalPrice}</Copy>
       {booking.cancellationReason && <Copy>Cancellation: {booking.cancellationReason}</Copy>}
       {booking.rating && <Copy>Driver rating: {booking.rating.score} / 5</Copy>}
+      {booking.details?.demoPaymentMethod && <Copy>Demo payment: {booking.details.demoPaymentMethod} · No payment collected.</Copy>}
       {booking.details && <><Copy>Boarding: {booking.details.boardingPoint} · Dropping: {booking.details.droppingPoint}</Copy>
         {booking.details.passengers.map((person, index) => <Copy key={index}>{person.name} · {person.age} · {person.gender}</Copy>)}</>}
       <Button label="View ride" onPress={() => go({ kind: 'ride', id: booking.ride.id })} />
@@ -168,7 +169,8 @@ export function Notifications({ go }: { go: Navigate }) {
     {!result.data ? <QueryState {...result} /> : !result.data.length ? <Copy>No notifications yet.</Copy> :
       result.data.map(notice => {
         const match = /^\/(bookings|rides)\/([a-f0-9-]+)$/i.exec(notice.link);
-        return <Card key={notice.id}><Copy>{labelStatus(notice.kind)}</Copy>
+        return <Card key={notice.id}><Copy>{notice.kind==='TRAVEL_RIDE'?'Ride on your regular route':notice.kind==='TRAVEL_BUDDY'?'Travel buddy available':labelStatus(notice.kind)}</Copy>
+          {notice.link.startsWith('/chat?group=')&&<Button label="Open travel group" onPress={()=>go({kind:'chat',groupId:Number(notice.link.split('group=')[1])||1})}/>}
           <Copy>{notice.origin} → {notice.destination}</Copy><Copy>{date(notice.time)}</Copy>
           {match && <Button label="View details" onPress={() => go({
             kind: match[1] === 'bookings' ? 'booking' : 'ride', id: match[2],
