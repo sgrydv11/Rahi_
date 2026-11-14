@@ -65,6 +65,11 @@ class AuthWebTest {
         mvc.perform(get("/api/v1/unknown").accept(MediaType.TEXT_HTML)).andExpect(status().isUnauthorized());
         mvc.perform(get("/actuator/env").accept(MediaType.TEXT_HTML)).andExpect(status().isUnauthorized());
     }
+    @Test void bundledFontsArePublicForGetAndHead() throws Exception {
+        mvc.perform(get("/fonts/public-asset.txt")).andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Public font resource fixture.")));
+        mvc.perform(head("/fonts/public-asset.txt")).andExpect(status().isOk());
+    }
     @Test void communityChatRequiresAuthentication() throws Exception {
         mvc.perform(get("/api/v1/chat/messages")).andExpect(status().isUnauthorized());
     }

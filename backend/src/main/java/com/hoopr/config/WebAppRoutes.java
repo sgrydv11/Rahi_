@@ -9,7 +9,7 @@ public class WebAppRoutes implements WebMvcConfigurer {
     public static final String[] PAGES = {"/", "/help", "/chat", "/login", "/register", "/profile", "/vehicles", "/notifications",
             "/rides", "/rides/mine", "/rides/new", "/rides/{id}", "/rides/{id}/edit", "/rides/{id}/bookings",
             "/bookings/mine", "/bookings/{id}"};
-    public static final String[] ASSETS = {"/index.html", "/assets/**", "/flexirrides-icon.png", "/favicon.png"};
+    public static final String[] ASSETS = {"/index.html", "/assets/**", "/fonts/**", "/icons/**", "/flexirrides-icon.png", "/favicon.png"};
 
     public static boolean browserPage(jakarta.servlet.http.HttpServletRequest request) {
         String path=request.getRequestURI().substring(request.getContextPath().length());

@@ -1,0 +1,1 @@
+Public font resource fixture.
