@@ -37,17 +37,18 @@ async page => {
   const card = id => page.locator('a.button[href^="/rides/' + id + '"]');
   await card(rides[1].id).waitFor();
   if (await card(rides[0].id).count()) throw new Error('One-seat ride leaked into a two-passenger search');
-  await page.getByRole('combobox', { name: 'Sort', exact: true }).selectOption('PRICE_DESC');
-  await page.getByText('Filter rides', { exact: true }).click();
-  await page.getByLabel('AC', { exact: true }).check();
+  await page.getByRole('button', { name: 'Sort by price ascending', exact: true }).click();
+  await page.getByRole('button', { name: 'Sort by price ascending', exact: true }).click();
+  await page.getByText('Filters', { exact: true }).click();
+  await page.getByLabel('Boarding point', { exact: true }).selectOption('Station');
   await page.getByRole('button', { name: 'Apply filters' }).click();
   const search = new URL(page.url()).searchParams;
-  if (search.get('minimumSeats') !== '2' || search.get('ac') !== 'true' || search.get('sort') !== 'PRICE_DESC')
+  if (search.get('minimumSeats') !== '2' || search.get('boardingPoint') !== 'Station' || search.get('sort') !== 'PRICE_DESC')
     throw new Error('Sorting or filters lost search criteria');
   await card(rides[1].id).click();
   await page.getByRole('button', { name: 'Book Seat', exact: true }).click();
   await page.getByRole('link', { name: 'Log in', exact: true }).last().click();
-  await page.getByLabel('Email address', { exact: true }).fill(rider);
+  await page.getByLabel('Email or mobile number', { exact: true }).fill(rider);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await page.getByRole('button', { name: 'Book Seat', exact: true }).click();

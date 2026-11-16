@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {AppState,Linking,Platform} from 'react-native';
+import {AppState,Linking,Platform,Modal,View} from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -9,6 +9,14 @@ import {api} from './api';
 import {notificationScreen} from './notificationLinks';
 import type {Navigate} from './navigation';
 import {Button,Card,Copy,ErrorText} from './ui';
+import {notificationPromptKey,shouldOfferNotifications,decideNotifications,canRegisterNotifications} from './notificationOnboarding';
+export function NotificationWelcome({onEnabled}:{onEnabled:()=>void}){
+ const[visible,setVisible]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const active=useRef(false),callback=useRef(onEnabled);callback.current=onEnabled;
+ useEffect(()=>{let cancelled=false;if(Platform.OS==='web')return;Promise.all([Notifications.getPermissionsAsync(),SecureStore.getItemAsync(notificationPromptKey)]).then(([permission,decision])=>{if(!cancelled)setVisible(shouldOfferNotifications(permission,decision));}).catch(()=>{/* Settings remain available if permission inspection fails. */});return()=>{cancelled=true;};},[]);
+ async function decide(enable:boolean){if(active.current)return;active.current=true;setBusy(true);setError('');try{const permission=await decideNotifications(enable,{save:value=>SecureStore.setItemAsync(notificationPromptKey,value),channel:async()=>{if(Platform.OS==='android')await Notifications.setNotificationChannelAsync('travel-updates',{name:'Messages and ride updates',importance:Notifications.AndroidImportance.HIGH});},request:async()=>{const permission=await Notifications.getPermissionsAsync();return permission.granted?permission:Notifications.requestPermissionsAsync();}});setVisible(false);if(permission?.granted)callback.current();}catch{setError('Unable to request notifications. Try again or choose Not now. You can enable them later in Account.');}finally{active.current=false;setBusy(false);}}
+ return <Modal visible={visible} transparent animationType="fade" onRequestClose={()=>{if(!busy)void decide(false);}}><View style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'rgba(20,45,78,0.45)'}}><Card><Copy>Stay updated on your journey</Copy><Copy>Allow FlexirRides to notify you about new chat messages, booking requests and ride updates. You can change this later in Account or your phone settings.</Copy><ErrorText message={error}/><Button label="Enable notifications" disabled={busy} onPress={()=>void decide(true)}/><Button label="Not now" variant="secondary" disabled={busy} onPress={()=>void decide(false)}/></Card></View></Modal>;
+}
 // The foreground community banner handles open-app alerts. OS displays background alerts.
 Notifications.setNotificationHandler({handleNotification:async()=>({shouldShowBanner:false,shouldShowList:false,shouldPlaySound:false,shouldSetBadge:true})});
 const installKey='flexir.push.installation.v1';
@@ -23,6 +31,9 @@ export function usePhonePush(userId:string|undefined,go:Navigate,unread=0){
   try{
    const config=await api<{enabled:boolean}>('/push/config');if(user.current!==userId||generation.current!==version)return;setConfigured(config.enabled&&nativeReady);
    if(!config.enabled||!nativeReady){setStatus('Phone notifications are not available yet. In-app alerts remain available.');return;}
+   const decision=await SecureStore.getItemAsync(notificationPromptKey);
+   if(!canRegisterNotifications(ask,decision)){const id=await SecureStore.getItemAsync(installKey);if(id)await api(`/push/devices/${id}/disable`,{method:'POST'});setEnabled(false);setStatus('Phone notifications are optional. Enable them in Account when ready.');return;}
+   if(ask)await SecureStore.setItemAsync(notificationPromptKey,'requested');
    if(!Device.isDevice)throw new Error('Phone push requires a physical device.');
    if(Platform.OS==='android')await Notifications.setNotificationChannelAsync('travel-updates',{name:'Messages and ride updates',importance:Notifications.AndroidImportance.HIGH});
    let permission=await Notifications.getPermissionsAsync();if(!permission.granted&&ask&&permission.canAskAgain)permission=await Notifications.requestPermissionsAsync();

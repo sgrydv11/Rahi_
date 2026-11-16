@@ -34,7 +34,7 @@ async page => {
     },
   });
   await page.goto(`${base}/login`);
-  await page.getByLabel('Email address', { exact: true }).fill(riderEmail);
+  await page.getByLabel('Email or mobile number', { exact: true }).fill(riderEmail);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await page.getByRole('heading', { name: 'Your profile.', exact: true }).waitFor();

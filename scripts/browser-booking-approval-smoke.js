@@ -20,7 +20,7 @@ async page => {
   }
   async function webLogin(target, email) {
     await target.goto(base + '/login');
-    await target.getByLabel('Email address', { exact: true }).fill(email);
+    await target.getByLabel('Email or mobile number', { exact: true }).fill(email);
     await target.getByLabel('Password', { exact: true }).fill(password);
     await target.getByRole('button', { name: 'Log in', exact: true }).click();
     await target.getByRole('heading', { name: 'Your profile.', exact: true }).waitFor();

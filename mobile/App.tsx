@@ -1,4 +1,4 @@
-import {usePhonePush,PhonePushSettings,disablePhonePush} from './src/push';
+import {usePhonePush,PhonePushSettings,disablePhonePush,NotificationWelcome} from './src/push';
 import {useFonts} from 'expo-font';
 import {Text,TextInput} from './src/Typography';
 import {CommunityContext,useCommunityState} from './src/community';
@@ -218,6 +218,7 @@ function NativeApp() {
         </Pressable>)}
       </View>}
     </KeyboardAvoidingView>
+    {!demoMode&&<NotificationWelcome onEnabled={()=>{void phonePush.enable(false);}}/>}
   </SafeAreaView></CommunityContext.Provider>;
 }
 export default function App() {
