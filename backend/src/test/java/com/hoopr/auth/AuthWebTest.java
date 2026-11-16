@@ -34,6 +34,7 @@ class AuthWebTest {
     @Autowired JwtEncoder encoder;
     @Autowired JwtDecoder decoder;
     @MockitoBean AuthService auth;
+    @MockitoBean com.hoopr.admin.AdminService adminService;
     @MockitoBean SessionRepository sessionRepository;
     @org.junit.jupiter.api.BeforeEach void activeSessionFixture() {when(sessionRepository.active(any(),any(),any(),anyString())).thenReturn(true);}
     @MockitoBean GoogleSignInService googleSignIn;

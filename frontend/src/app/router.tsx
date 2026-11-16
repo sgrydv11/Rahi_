@@ -14,8 +14,10 @@ import { BookingListPage, BookingDetailsPage } from '../features/bookings/Bookin
 import { NotificationsPage } from '../features/bookings/NotificationsPage';
 import { VehiclesPage } from '../features/vehicles/VehiclesPage';
 import { ChatPage } from '../features/chat/ChatPage';
+import { AdminPage } from '../features/admin/AdminPage';
 
 export const router = createBrowserRouter([
+  {path:'/admin',element:<AdminPage/>},
   { element: <AppLayout />, children: [
     { path: '/', element: <HomePage /> },
     { path: '/help', element: <HelpPage /> },

@@ -1,6 +1,7 @@
 import { TravelPreferencesSettings } from './RegularRoutes';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
+import { Capacitor } from '@capacitor/core';
 import { authenticatedRequest, authStore, errorMessage, travelPreferenceLabels, type User } from '../auth/auth';
 export function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -40,7 +41,7 @@ export function ProfilePage() {
   }
   return <section className="page narrow"><h1>Your profile.</h1><div className="panel">
     {error && <p role="alert">{error}</p>}
-    {user ? <><h2>{user.fullName}</h2><p><a href={`mailto:${user.email}`}>{user.email}</a></p>
+    {user ? <><h2>{user.fullName}</h2><p><a href={`mailto:${user.email}`}>{user.email}</a></p>{user.role==='ADMIN'&&!Capacitor.isNativePlatform()&&<p><Link className="button" to="/admin">Open admin panel</Link></p>}
       <form className="auth-form" onSubmit={save}>
         <label>Full name<input name="fullName" required maxLength={120} defaultValue={user.fullName} disabled={busy} /></label>
         <label>User type<select name="travelPreference" defaultValue={user.travelPreference} disabled={busy}>

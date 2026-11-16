@@ -2,6 +2,26 @@
 
 Last updated 14 November 2026, Asia/Kolkata.
 
+## 16 November: web-only administration
+
+Built `/admin` with overview, users, ride/booking records and status-change audit
+history. Administrator checks are enforced by the backend. Account suspension
+revokes sessions/push without deleting journeys or financial history. No native
+admin screens or APK changes. Designated existing admin: acs.sagar11@gmail.com.
+174 backend regression tests passed, final 31 focused tests passed after the
+scheduled-ride metric correction, 67 web tests/build passed, and the final browser
+audit passed including 16 responsive checks and access/mutation/error/logout flows.
+See [implementation and deployment audit](docs/admin-panel-2026-11-16.md).
+
+## 14 November: FCM configured, notification backend live, APK 0.2.4 built
+
+Dedicated FCM service identity and Expo credential are configured and validated.
+Push-enabled Render deployment is Live with migration V25; authenticated config
+returns enabled true. Google client remains configured and health is UP. Code is
+pushed at 7d66a5e; hosted CI passed. Expo APK 0.2.4/build 6 finished successfully.
+Physical delivery acceptance remains pending: no phone is connected. No iOS/APNs
+setup is claimed. See [release details and install link](docs/release-0.2.4.md).
+
 ## 14 November: user types, groups-first chat and phone push implementation
 
 Driver/Passenger/Both selection and backend authorization implemented. Chat now
