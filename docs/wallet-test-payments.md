@@ -70,3 +70,19 @@ automatically create an APK.
 - Backend coverage includes provider selection, invalid provider rejection,
   server-verified credit, duplicate sync and withdrawal settlement.
 - Actual provider checkout remains unverified until merchant test keys are saved.
+
+## Published release
+
+Application commit `eb8abbb919f87948f6edf035d1d34ecd53a26016` pushed to `app_v1`.
+Render deployment `dep-dbtdr4e417fc738gq0ug` reported Live on 16 November 2026.
+Database schema remained V27; no migration was necessary. Live `/wallet` returned
+200 with the new wallet bundle, health UP, and anonymous `/api/v1/wallet/options`
+returned 401. No live customer funds or payment records were modified for testing.
+
+Final targeted backend rerun: 31 passed after fixing the options route allowlist.
+The complete hosted backend, frontend and mobile jobs passed:
+https://github.com/sgrydv11/Rahi_/actions/runs/43850934850
+
+Native source is updated and typechecked; no APK build was requested or started.
+Merchant test-key setup and actual provider checkout remain owner follow-up;
+configuration presence alone does not establish a successful provider transaction.
