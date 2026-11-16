@@ -116,3 +116,8 @@ test('a discounted wallet booking uses the hold quote and sends no client-calcul
   assert.deepEqual(calls[1], { path: '/group/holds/hold/checkout',
     options: { method: 'POST', body: { method: 'WALLET' }, key: 'checkout-key' } });
 });
+
+test('wallet provider selection is explicit and configuration has its own endpoint', async()=>{
+ const {client,requests}=fixture();await client.paymentOptions();await client.topUp(1000,'same-key','stripe');await client.topUp(1000,'other-key','razorpay');
+ assert.equal(requests[0].path,'/wallet/options');assert.equal(requests[1].options.body.provider,'stripe');assert.equal(requests[2].options.body.provider,'razorpay');
+});

@@ -5,13 +5,15 @@ import * as SecureStore from 'expo-secure-store';
 import RazorpayCheckout from 'react-native-razorpay';
 import { groupWalletApi } from './api';
 import { parseTopUpPaise, type WalletOperation } from './groupWallet';
-import { Button, Card, Copy, ErrorText, Field, QueryState, date, useAction, useQuery } from './ui';
+import { Button, Card, Choice, Copy, ErrorText, Field, QueryState, date, useAction, useQuery } from './ui';
 
 const rupees = (paise: number) => 'INR ' + (paise / 100).toFixed(2);
 
 export function Wallet({ userId }: { userId: string }) {
   const storageKey = 'hoopr.wallet-top-up.' + userId;
   const withdrawalKey = 'hoopr.wallet-withdrawal.' + userId;
+  const [provider,setProvider]=useState<'razorpay'|'stripe'>('razorpay');
+  const options=useQuery('wallet-payment-options',groupWalletApi.paymentOptions);
   const [input, setInput] = useState('');
   const [withdrawInput, setWithdrawInput] = useState('');
   const [withdrawal, setWithdrawal] = useState<WalletOperation>();
@@ -27,7 +29,7 @@ export function Wallet({ userId }: { userId: string }) {
   const pending = useQuery(storageKey, () => SecureStore.getItemAsync(storageKey).then(id => ({ id })));
   const [topUpId, setTopUpId] = useState<string | null>();
   const activeId = topUpId === undefined ? pending.data?.id : topUpId;
-  const request = useRef<{ amount: number; key: string } | undefined>(undefined);
+  const request = useRef<{ amount: number; key: string; provider:string } | undefined>(undefined);
   const action = useAction();
   const balance = useQuery('balance', groupWalletApi.wallet);
   const history = useQuery(String(page), () => groupWalletApi.transactions(page));
@@ -68,13 +70,19 @@ export function Wallet({ userId }: { userId: string }) {
       <Copy>Wallet balance</Copy>
       {balance.data ? <Copy>{rupees(balance.data.availablePaise)} available · {rupees(balance.data.reservedPaise)} reserved</Copy> :
         <QueryState error={balance.error} reload={balance.reload} />}
-      <Copy>Test-mode top-ups</Copy>
+      <Copy>Test-mode top-ups · no real money</Copy>
+      <Choice label="Payment provider" values={[{value:'razorpay',label:'Razorpay'},{value:'stripe',label:'Stripe'}]} selected={provider} change={v=>setProvider(v as 'razorpay'|'stripe')}/>
+      <Copy>{provider==='razorpay'?'Razorpay test card: 4100 2800 0000 1007':'Stripe test card: 4242 4242 4242 4242'} · CVV 123 · any future expiry.</Copy>
+      <Copy>Enter the test card only in the provider checkout. Card details are not stored in FlexirRides.</Copy>
+      {options.data&&<Copy>{(provider==='razorpay'?options.data.razorpayEnabled:options.data.stripeEnabled)?'Test checkout configured.':'This provider needs test API keys before checkout is available.'}</Copy>}
+      {!options.data&&<QueryState error={options.error} reload={options.reload}/>}
+
       <Field label="Amount in INR (1 to 10,000)" value={input} change={setInput} numeric />
-      <Button label="Add test funds" disabled={action.busy || !!activeId || !pending.data || amount === null}
+      <Button label="Add test funds" disabled={action.busy || !!activeId || !pending.data || amount === null || !options.data || !(provider==='razorpay'?options.data.razorpayEnabled:options.data.stripeEnabled)}
         onPress={() => action.run(async () => {
           if (amount === null) return;
-          if (request.current?.amount !== amount) request.current = { amount, key: randomUUID() };
-          const { operation, checkout } = await groupWalletApi.topUp(amount, request.current.key);
+          if (request.current?.amount !== amount || request.current.provider!==provider) request.current = { amount, key: randomUUID(),provider };
+          const { operation, checkout } = await groupWalletApi.topUp(amount, request.current.key,provider);
           setTopUpId(operation.id);
           await SecureStore.setItemAsync(storageKey, operation.id);
           await openCheckout({ operation, checkout });
@@ -95,7 +103,7 @@ export function Wallet({ userId }: { userId: string }) {
       <Copy>This simulates a payout from the test balance.</Copy>
       <Field label="Withdrawal amount in INR" value={withdrawInput} change={setWithdrawInput} numeric />
       <Button label="Request test withdrawal" disabled={withdrawalAction.busy || !recoveredWithdrawal.data ||
-        withdrawalAmount === null || currentWithdrawal?.status === 'PENDING'}
+        withdrawalAmount === null || !options.data?.simulatedWithdrawalsEnabled || currentWithdrawal?.status === 'PENDING'}
         onPress={() => withdrawalAction.run(async () => {
           if (withdrawalAmount === null) return;
           if (withdrawRequest.current?.amount !== withdrawalAmount) {

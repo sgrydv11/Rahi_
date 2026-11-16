@@ -42,6 +42,13 @@ public class WalletController {
         this.withdrawalsEnabled = withdrawalsEnabled;
     }
 
+    @GetMapping("/options")
+    public Options options(@AuthenticationPrincipal Jwt jwt) {
+        user(jwt);
+        return new Options("test", provider, razorpay.enabled(), stripe.enabled(), withdrawalsEnabled);
+    }
+    public record Options(String mode,String defaultProvider,boolean razorpayEnabled,boolean stripeEnabled,boolean simulatedWithdrawalsEnabled) {}
+
     @GetMapping
     public Balance balance(@AuthenticationPrincipal Jwt jwt) {
         return jdbc.sql("SELECT available_paise, reserved_paise FROM wallets WHERE user_id = :user")
@@ -72,13 +79,16 @@ public class WalletController {
         UUID user = user(jwt);
         lockWallet(user);
         long amount = request.amountPaise();
+        String selected = request.provider()==null ? provider : request.provider();
+        if(!java.util.Set.of("razorpay","stripe").contains(selected))
+            throw new Failure(400,"INVALID_PROVIDER","Choose Razorpay or Stripe.");
         Stored existing = find(user, "request_key", key);
         if (existing != null) {
-            if (existing.amount() != amount)
+            if (existing.amount() != amount || (request.provider()!=null && !existing.provider().equals(selected)))
                 throw new Failure(409, "IDEMPOTENCY_CONFLICT", "Use a new key for a different amount.");
             return response(existing);
         }
-        boolean useStripe = "stripe".equals(provider);
+        boolean useStripe = "stripe".equals(selected);
         if (!(useStripe ? stripe.enabled() : razorpay.enabled()))
             throw new Failure(503, "PROVIDER_UNAVAILABLE", "Test checkout is unavailable.");
         UUID id = UUID.randomUUID();
@@ -93,7 +103,7 @@ public class WalletController {
                 INSERT INTO wallet_top_ups(id, user_id, request_key, amount_paise, provider, order_id, checkout_url)
                 VALUES (:id, :user, :key, :amount, :provider, :order, :url)
                 """).param("id", id).param("user", user).param("key", key).param("amount", amount)
-                .param("provider", provider).param("order", orderId).param("url", url).update();
+                .param("provider", selected).param("order", orderId).param("url", url).update();
         return response(find(user, "id", id));
     }
 
@@ -275,7 +285,10 @@ public class WalletController {
     }
 
     private record Stored(UUID id, long amount, String provider, String order, String url, String payment) {}
-    public record Amount(@NotNull @Min(100) @Max(1000000) Long amountPaise) {}
+    public record Amount(@NotNull @Min(100) @Max(1000000) Long amountPaise,
+                         @jakarta.validation.constraints.Pattern(regexp="razorpay|stripe") String provider) {
+        public Amount(Long amountPaise){this(amountPaise,null);}
+    }
     public record Balance(String currency, long availablePaise, long reservedPaise) {}
     public record Entry(UUID id, long amountPaise, String kind, Instant createdAt) {}
     public record History(List<Entry> content, int page, long totalPages) {}

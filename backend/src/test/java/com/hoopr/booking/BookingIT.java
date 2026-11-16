@@ -45,6 +45,22 @@ class BookingIT {
     @Autowired MockMvc mvc;
     @Autowired com.hoopr.wallet.WalletController wallet;
     @Autowired ObjectMapper json;
+    @Test void walletProviderSelectionUsesStripeAndCreditsOnlyVerifiedPaymentOnce() throws Exception {
+        when(stripe.enabled()).thenReturn(true);
+        when(stripe.walletCheckout(any(UUID.class),eq(5000L))).thenAnswer(invocation->json.readTree("{\"id\":\"cs_test_walletchoice\",\"client_reference_id\":\""+invocation.getArgument(0)+"\",\"livemode\":false,\"mode\":\"payment\",\"amount_total\":5000,\"currency\":\"inr\",\"url\":\"https://checkout.stripe.com/c/pay/cs_test_walletchoice\"}"));
+        mvc.perform(get("/api/v1/wallet/options")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/wallet/options").header("Authorization",passengerToken)).andExpect(status().isOk()).andExpect(jsonPath("$.mode").value("test")).andExpect(jsonPath("$.stripeEnabled").value(true)).andExpect(jsonPath("$.razorpayEnabled").value(false));
+        UUID key=UUID.randomUUID();String body="{\"amountPaise\":5000,\"provider\":\"stripe\"}";
+        String result=mvc.perform(post("/api/v1/wallet/top-ups").header("Authorization",passengerToken).header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.checkout.provider").value("stripe")).andReturn().getResponse().getContentAsString();
+        String id=json.readTree(result).path("operation").path("id").asText();
+        mvc.perform(post("/api/v1/wallet/top-ups").header("Authorization",passengerToken).header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON).content("{\"amountPaise\":5000,\"provider\":\"razorpay\"}")).andExpect(status().isConflict());
+        mvc.perform(post("/api/v1/wallet/top-ups").header("Authorization",passengerToken).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"amountPaise\":5000,\"provider\":\"invalid\"}")).andExpect(status().isBadRequest());
+        when(stripe.session("cs_test_walletchoice")).thenReturn(json.readTree("{\"id\":\"cs_test_walletchoice\",\"client_reference_id\":\""+id+"\",\"livemode\":false,\"mode\":\"payment\",\"amount_total\":5000,\"currency\":\"inr\",\"payment_status\":\"paid\",\"status\":\"complete\",\"payment_intent\":\"pi_walletchoice\"}"));
+        for(int attempt=0;attempt<2;attempt++)mvc.perform(post("/api/v1/wallet/top-ups/"+id+"/sync").header("Authorization",passengerToken)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUCCEEDED"));
+        assertEquals(5000L,jdbc.queryForObject("SELECT available_paise FROM wallets WHERE user_id=?",Long.class,passenger));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM wallet_entries WHERE user_id=?",Integer.class,passenger));
+        verify(gateway,never()).order(any(),anyLong());verify(stripe,times(1)).walletCheckout(any(),eq(5000L));
+    }
     @MockitoBean RazorpayGateway gateway;
     @MockitoBean StripeGateway stripe;
     UUID owner, passenger, stranger;

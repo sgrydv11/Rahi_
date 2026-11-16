@@ -14,6 +14,7 @@ import { BookingListPage, BookingDetailsPage } from '../features/bookings/Bookin
 import { NotificationsPage } from '../features/bookings/NotificationsPage';
 import { VehiclesPage } from '../features/vehicles/VehiclesPage';
 import { ChatPage } from '../features/chat/ChatPage';
+import { WalletPage } from '../features/wallet/WalletPage';
 import { AdminPage } from '../features/admin/AdminPage';
 
 export const router = createBrowserRouter([
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
     { element: <ProtectedRoute />, children: [
       { path: '/chat', element: <ChatPage /> },
       { path: '/profile', element: <ProfilePage /> },
+      { path: '/wallet', element: <WalletPage /> },
       { path: '/vehicles', element: <VehiclesPage /> },
       { path: '/notifications', element: <NotificationsPage /> },
       { path: '/bookings/mine', element: <BookingListPage /> },

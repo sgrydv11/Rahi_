@@ -45,8 +45,9 @@ export function createGroupWalletClient(send: Send) {
     cancel: (id: string) => send<SeatHold>(`${holdPath(id)}/cancel`, { method: 'POST' }),
     wallet: () => send<WalletBalance>('/wallet'),
     transactions: (page = 0) => send<Page<WalletEntry>>(`/wallet/transactions?page=${page}&size=20`),
-    topUp: (amountPaise: number, key: string) =>
-      send<{ operation: WalletOperation; checkout: Checkout }>('/wallet/top-ups', { method: 'POST', body: { amountPaise }, key }),
+    paymentOptions: () => send<{mode:'test'; defaultProvider:string; razorpayEnabled:boolean; stripeEnabled:boolean; simulatedWithdrawalsEnabled:boolean}>('/wallet/options'),
+    topUp: (amountPaise: number, key: string, provider?: 'razorpay'|'stripe') =>
+      send<{ operation: WalletOperation; checkout: Checkout }>('/wallet/top-ups', { method: 'POST', body: { amountPaise, ...(provider?{provider}:{}) }, key }),
     getTopUp: (id: string) => send<{ operation: WalletOperation; checkout: Checkout }>(topUpPath(id)),
     syncTopUp: (id: string, body?: Verification) =>
       send<WalletOperation>(`${topUpPath(id)}/sync`, { method: 'POST', body }),

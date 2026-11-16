@@ -50,7 +50,7 @@ export function ProfilePage() {
         <button className="button" disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
       </form>
       {saved && <p role="status">Profile saved.</p>}
-      <div className="account-links">{user.travelPreference!=='PASSENGER'&&<Link to="/vehicles">Manage vehicles</Link>}<Link to="/rides/mine">Ride history</Link><Link to="/bookings/mine">Booking history</Link><Link to="/notifications">Notifications</Link><Link to="/help">Help</Link></div><TravelPreferencesSettings/>
+      <div className="account-links"><Link to="/wallet">Test wallet</Link>{user.travelPreference!=='PASSENGER'&&<Link to="/vehicles">Manage vehicles</Link>}<Link to="/rides/mine">Ride history</Link><Link to="/bookings/mine">Booking history</Link><Link to="/notifications">Notifications</Link><Link to="/help">Help</Link></div><TravelPreferencesSettings/>
     </> : !error && <p role="status">Loading your profile…</p>}
   </div></section>;
 }

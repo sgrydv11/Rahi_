@@ -30,7 +30,7 @@ interface CheckoutOptions {
 }
 type Checkout = new (options: CheckoutOptions) => { open: () => void };
 let checkoutLoad: Promise<Checkout> | undefined;
-function loadCheckout() {
+export function loadCheckout() {
   checkoutLoad ??= new Promise<Checkout>((resolve, reject) => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
