@@ -91,10 +91,25 @@ owner is preserved, and affected sessions/push registrations are revoked.
 - [x] Frontend unit tests and production build.
 - [x] Full backend regression: 180 tests, zero failures/errors/skips.
 - [x] Web: 67 tests; production build; local browser workflow and responsive checks.
-- [ ] Publish and verify Render migration V27 / live admin bundle.
+- [x] Published `53f12c62898fbd3d0f9f77683e7314885018125c` on `app_v1`.
+- [x] Render deployment `dep-dbtdhctbedkc73d5mkl0` live; V27 applied successfully.
+- [x] Live `/admin` 200 with scoped panel bundle; health UP; all seven new
+  admin API categories reject anonymous requests with 401.
+- [x] Hosted mobile, frontend and backend regressions all passed: [CI run](https://github.com/sgrydv11/Rahi_/actions/runs/43847811917).
 - [ ] Owner acceptance using their real sign-in (no credentials/OTP bypassed).
 
 For a fresh deployment with no administrator, the operator-only
 `scripts/provision-admin.sql` explicitly provisions an existing active account.
 It is not a public bootstrap mechanism. Existing staff are not silently upgraded
 by that script. Additional staff accounts must be selected by the Owner.
+
+Release evidence: `.local/admin-full-tests.log`, `.local/admin-scope-browser.log`
+and `.local/admin-scope-live-verification.json` (ignored local artifacts).
+No live staff assignment, suspension, moderation or customer booking mutations
+were performed during verification. Existing designated account
+`acs.sagar11@gmail.com` remains the approved administrator; V27 preserves existing
+administrators as Owner. Actual owner sign-in remains an acceptance step.
+
+This documentation-only result commit uses `[skip render]` as documented by
+[Render](https://render.com/docs/deploys#skipping-an-auto-deploy), preserving the
+already verified application deployment without another image build.
