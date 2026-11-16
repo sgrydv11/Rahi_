@@ -51,3 +51,20 @@ Migration V26 adds the administrator status audit table and index.
 Live deployment and designated-account provisioning results will be recorded
 below after completion. A real-owner login remains a user acceptance step; no
 password or email OTP has been requested or bypassed.
+
+## Live completion
+
+Published on branch `app_v1` at `f1598c966fa9c2727a205c1b502115f20a24f459`.
+Render reports the deployment Live and migration V26 applied successfully.
+The designated account is ACTIVE / ADMIN; prior sessions were revoked.
+
+Live checks passed: `/admin` HTTP 200 with the new admin bundle; anonymous
+admin API 401; ordinary authenticated demo user 403; health UP; Google client
+configured; push enabled. Only the temporary demo session was logged out by
+verification. Hosted CI completed successfully:
+https://github.com/sgrydv11/Rahi_/actions/runs/43841918029
+
+Admin URL: https://rahi-1-c3vn.onrender.com/admin
+Sign in again using the designated account's existing login. Real-owner login
+acceptance is not claimed; account credentials/OTP were not requested or bypassed.
+The temporary local database connection file was removed after provisioning.

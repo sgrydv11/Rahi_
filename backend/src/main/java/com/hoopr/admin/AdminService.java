@@ -11,17 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AdminService {
     private final JdbcTemplate jdbc;
-    public AdminService(JdbcTemplate jdbc) { this.jdbc=jdbc; }
+    private final AdminAccess access;
+    public AdminService(JdbcTemplate jdbc,AdminAccess access) { this.jdbc=jdbc;this.access=access; }
     public record Page<T>(List<T> items,long total,int page,int pageSize) {}
     public record Overview(long users,long activeUsers,long upcomingRides,long bookings,long pendingBookings,long failedNotifications) {}
     public record UserRow(UUID id,String email,String fullName,String role,String status,String travelPreference,Instant createdAt) {}
     public record RideRow(UUID id,String driverName,String origin,String destination,Instant departureAt,String status,int availableSeats,int totalSeats,BigDecimal pricePerSeat,String currency) {}
     public record BookingRow(UUID id,UUID rideId,String passengerName,String email,String origin,String destination,Instant departureAt,String status,int seats,BigDecimal total,String currency) {}
-    public record AuditRow(long id,String actor,String target,String previousStatus,String newStatus,String reason,Instant createdAt) {}
+    public record AuditRow(long id,String actor,String target,String previousStatus,String newStatus,String reason,Instant createdAt,String action,String entityType,String entityId) {}
     public record StatusResult(boolean changed,String status) {}
     private void requireAdmin(UUID actor) {
-        if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND role='ADMIN' AND status='ACTIVE')",Boolean.class,actor)))
-            throw new AuthFailure(403,"Administrator access is required.");
+        access.require(actor,"OVERVIEW");
     }
     private static String term(String value) {
         if(value==null)return "%";
@@ -42,7 +42,7 @@ public class AdminService {
             """,(r,n)->new Overview(r.getLong(1),r.getLong(2),r.getLong(3),r.getLong(4),r.getLong(5),r.getLong(6)));
     }
     @Transactional(readOnly=true) public Page<UserRow> users(UUID actor,String query,int page) {
-        requireAdmin(actor);int offset=offset(page);String q=term(query);
+        access.require(actor,"USERS_READ");int offset=offset(page);String q=term(query);
         String where=" FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE (u.email ILIKE ? ESCAPE '!' OR p.full_name ILIKE ? ESCAPE '!')";
         long total=jdbc.queryForObject("SELECT count(*)"+where,Long.class,q,q);
         var rows=jdbc.query("SELECT u.id,u.email,p.full_name,u.role,u.status,p.travel_preference,u.created_at"+where+" ORDER BY u.created_at DESC,u.id LIMIT 25 OFFSET ?",
@@ -50,7 +50,7 @@ public class AdminService {
         return new Page<>(rows,total,page,25);
     }
     @Transactional(readOnly=true) public Page<RideRow> rides(UUID actor,String query,int page) {
-        requireAdmin(actor);int offset=offset(page);String q=term(query);
+        access.require(actor,"RIDES_READ");int offset=offset(page);String q=term(query);
         String where=" FROM rides r JOIN user_profiles p ON p.user_id=r.driver_id WHERE (r.source_name ILIKE ? ESCAPE '!' OR r.destination_name ILIKE ? ESCAPE '!' OR p.full_name ILIKE ? ESCAPE '!')";
         long total=jdbc.queryForObject("SELECT count(*)"+where,Long.class,q,q,q);
         var rows=jdbc.query("SELECT r.id,p.full_name,r.source_name,r.destination_name,r.departure_at,r.status,r.available_seats,r.total_seats,r.price_per_seat,r.currency"+where+" ORDER BY r.departure_at DESC,r.id LIMIT 25 OFFSET ?",
@@ -58,7 +58,7 @@ public class AdminService {
         return new Page<>(rows,total,page,25);
     }
     @Transactional(readOnly=true) public Page<BookingRow> bookings(UUID actor,String query,int page) {
-        requireAdmin(actor);int offset=offset(page);String q=term(query);
+        access.require(actor,"BOOKINGS_READ");int offset=offset(page);String q=term(query);
         String where=" FROM bookings b JOIN rides r ON r.id=b.ride_id JOIN users u ON u.id=b.passenger_id JOIN user_profiles p ON p.user_id=u.id WHERE (u.email ILIKE ? ESCAPE '!' OR r.source_name ILIKE ? ESCAPE '!' OR r.destination_name ILIKE ? ESCAPE '!')";
         long total=jdbc.queryForObject("SELECT count(*)"+where,Long.class,q,q,q);
         var rows=jdbc.query("SELECT b.id,b.ride_id,p.full_name,u.email,r.source_name,r.destination_name,r.departure_at,b.status,b.seats_booked,b.price_per_seat_snapshot*b.seats_booked,b.currency"+where+" ORDER BY b.created_at DESC,b.id LIMIT 25 OFFSET ?",
@@ -66,16 +66,16 @@ public class AdminService {
         return new Page<>(rows,total,page,25);
     }
     @Transactional(readOnly=true) public Page<AuditRow> audit(UUID actor,int page) {
-        requireAdmin(actor);int offset=offset(page);
+        access.require(actor,"AUDIT_READ");int offset=offset(page);
         var rows=jdbc.query("""
-            SELECT a.id,u.email,t.email,a.previous_status,a.new_status,a.reason,a.created_at
+            SELECT a.id,u.email,t.email,a.previous_status,a.new_status,a.reason,a.created_at,a.action,a.entity_type,a.entity_id
             FROM admin_audit_events a JOIN users u ON u.id=a.actor_user_id JOIN users t ON t.id=a.target_user_id
             ORDER BY a.id DESC LIMIT 25 OFFSET ?
-            """,(r,n)->new AuditRow(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getTimestamp(7).toInstant()),offset);
+            """,(r,n)->new AuditRow(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getTimestamp(7).toInstant(),r.getString(8),r.getString(9),r.getString(10)),offset);
         return new Page<>(rows,jdbc.queryForObject("SELECT count(*) FROM admin_audit_events",Long.class),page,25);
     }
     @Transactional public StatusResult status(UUID actor,UUID target,String status,String expectedStatus,String reason) {
-        requireAdmin(actor);
+        access.require(actor,"USER_STATUS");
         if(status==null||expectedStatus==null||!Set.of("ACTIVE","DISABLED").contains(status)||!Set.of("ACTIVE","DISABLED").contains(expectedStatus)||reason==null||reason.strip().length()<10||reason.strip().length()>500)
             throw new AuthFailure(400,"Select a valid status and give a reason of 10–500 characters.");
         var rows=jdbc.queryForList("SELECT role,status FROM users WHERE id=? FOR UPDATE",target);
@@ -90,7 +90,7 @@ public class AdminService {
             jdbc.update("UPDATE refresh_sessions SET revoked=true WHERE user_id=? AND NOT revoked",target);
             jdbc.update("UPDATE push_devices SET enabled=false WHERE user_id=?",target);
         }
-        jdbc.update("INSERT INTO admin_audit_events(actor_user_id,target_user_id,action,previous_status,new_status,reason) VALUES(?,?,'USER_STATUS_CHANGED',?,?,?)",actor,target,before,status,reason.strip());
+        access.audit(actor,target,"USER_STATUS_CHANGED","USER",target.toString(),before,status,reason);
         return new StatusResult(true,status);
     }
 }

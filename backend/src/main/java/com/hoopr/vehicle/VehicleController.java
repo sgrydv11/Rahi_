@@ -21,7 +21,7 @@ public class VehicleController {
     private static final RowMapper<Vehicle> VEHICLE = (row, index) -> new Vehicle(
             row.getObject("id", UUID.class), row.getString("make"), row.getString("model"),
             row.getString("color"), row.getString("registration_number"),
-            row.getInt("passenger_capacity"), row.getBoolean("active"));
+            row.getInt("passenger_capacity"), row.getBoolean("active") && !row.getBoolean("admin_blocked"));
     private final JdbcTemplate jdbc;
     private final AuthService auth;
 
@@ -56,6 +56,8 @@ public class VehicleController {
         UUID owner = owner(jwt);
         if (jdbc.query("SELECT * FROM vehicles WHERE id = ? AND driver_id = ? FOR UPDATE", VEHICLE, id, owner).isEmpty())
             throw new RideFailure(404, "Vehicle not found.");
+        if(body.active() && Boolean.TRUE.equals(jdbc.queryForObject("SELECT admin_blocked FROM vehicles WHERE id=?",Boolean.class,id)))
+            throw new RideFailure(403,"This vehicle is blocked by platform operations.");
         Boolean conflict = jdbc.queryForObject("""
                 SELECT EXISTS(SELECT 1 FROM rides WHERE vehicle_id = ?
                   AND status IN ('SCHEDULED', 'PUBLISHED', 'IN_PROGRESS') AND total_seats > ?)

@@ -40,7 +40,7 @@ public class PushStore {
   if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(6173052988)",Boolean.class)))return;
   var devices=jdbc.queryForList("SELECT d.* FROM push_devices d JOIN users u ON u.id=d.user_id JOIN refresh_sessions s ON s.id=d.session_id WHERE d.enabled AND u.status='ACTIVE' AND NOT s.revoked AND s.expires_at>now() ORDER BY d.checked_at LIMIT 100 FOR UPDATE OF d SKIP LOCKED");
   for(var d:devices){UUID device=(UUID)d.get("id"),uid=(UUID)d.get("user_id"),sid=(UUID)d.get("session_id");long after=((Number)d.get("last_chat_id")).longValue();
-   var messages=jdbc.queryForList("SELECT m.*,g.name,p.full_name FROM chat_messages m JOIN chat_groups g ON g.id=m.group_id JOIN user_profiles p ON p.user_id=m.sender_id LEFT JOIN chat_group_preferences s ON s.user_id=? AND s.group_id=m.group_id WHERE m.id>? AND m.sender_id<>? AND m.created_at>now()-interval '7 days' AND NOT coalesce(s.muted,false) AND m.id>coalesce(s.last_read_id,0) ORDER BY m.id LIMIT 100",uid,after,uid);
+   var messages=jdbc.queryForList("SELECT m.*,g.name,p.full_name FROM chat_messages m JOIN chat_groups g ON g.id=m.group_id JOIN user_profiles p ON p.user_id=m.sender_id LEFT JOIN chat_group_preferences s ON s.user_id=? AND s.group_id=m.group_id WHERE NOT m.hidden AND m.id>? AND m.sender_id<>? AND m.created_at>now()-interval '7 days' AND NOT coalesce(s.muted,false) AND m.id>coalesce(s.last_read_id,0) ORDER BY m.id LIMIT 100",uid,after,uid);
    for(var m:messages){long group=((Number)m.get("group_id")).longValue(),id=((Number)m.get("id")).longValue();String text=m.get("full_name")+": "+m.get("body");queue(device,uid,sid,"CHAT:"+id,m.get("name").toString(),text.substring(0,Math.min(300,text.length())),Map.of("link","/chat?group="+group,"groupId",group,"messageId",id),group,id);}
    // Advance in bounded ID batches; do not skip a burst larger than the batch.
    Long cursor=jdbc.queryForObject("SELECT coalesce(max(id),?) FROM (SELECT id FROM chat_messages WHERE id>? ORDER BY id LIMIT 100) batch",Long.class,after,after);
@@ -54,6 +54,7 @@ public class PushStore {
  private static String title(String kind){return switch(kind){case "TRAVEL_RIDE"->"Ride on your regular route";case "TRAVEL_BUDDY"->"Travel buddy available";case "RIDE_STARTED"->"Ride started";case "RIDE_COMPLETED"->"Journey completed";case "BOOKING_CONFIRMED"->"Booking confirmed";case "BOOKING_REQUESTED"->"New booking request";case "DEPARTURE_REMINDER"->"Upcoming ride";default->"Ride update";};}
  private static final String ELIGIBLE="""
   d.enabled AND d.user_id=o.user_id AND d.session_id=o.session_id AND u.status='ACTIVE' AND NOT s.revoked AND s.expires_at>now()
+  AND (o.message_id IS NULL OR EXISTS(SELECT 1 FROM chat_messages m WHERE m.id=o.message_id AND NOT m.hidden))
   AND (o.group_id IS NULL OR (NOT EXISTS(SELECT 1 FROM chat_group_preferences g WHERE g.user_id=d.user_id AND g.group_id=o.group_id AND (g.muted OR g.last_read_id>=o.message_id))))
   """;
  @Transactional public List<Delivery> claim(){
@@ -64,7 +65,7 @@ public class PushStore {
    ORDER BY o.id LIMIT 50 FOR UPDATE OF o SKIP LOCKED)
    UPDATE push_outbox o SET attempts=attempts+1,next_attempt_at=now()+interval '90 seconds' FROM due,push_devices d
    WHERE o.id=due.id AND d.id=o.device_id RETURNING o.*,d.token,
-    (SELECT count(*) FROM chat_messages m LEFT JOIN chat_group_preferences p ON p.user_id=d.user_id AND p.group_id=m.group_id WHERE m.sender_id<>d.user_id AND m.id>coalesce(p.last_read_id,0) AND NOT coalesce(p.muted,false) AND m.created_at>now()-interval '7 days') badge
+    (SELECT count(*) FROM chat_messages m LEFT JOIN chat_group_preferences p ON p.user_id=d.user_id AND p.group_id=m.group_id WHERE NOT m.hidden AND m.sender_id<>d.user_id AND m.id>coalesce(p.last_read_id,0) AND NOT coalesce(p.muted,false) AND m.created_at>now()-interval '7 days') badge
    """,(r,n)->new Delivery(r.getLong("id"),r.getString("token"),r.getString("title"),r.getString("body"),r.getString("data"),r.getInt("badge")));
  }
  public void retryClaim(long id){jdbc.update("UPDATE push_outbox SET state=CASE WHEN attempts>=6 THEN 'FAILED' ELSE 'PENDING' END,last_error='TransportFailure',next_attempt_at=now()+interval '5 minutes' WHERE id=? AND state='PENDING'",id);}

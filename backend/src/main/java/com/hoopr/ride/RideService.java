@@ -43,7 +43,7 @@ public class RideService {
         if (body.vehicleId() != null) {
             var vehicle = jdbc.query("""
                     SELECT make, model, color, passenger_capacity FROM vehicles
-                    WHERE id = ? AND driver_id = ? AND active FOR UPDATE
+                    WHERE id = ? AND driver_id = ? AND active AND NOT admin_blocked FOR UPDATE
                     """, (row, index) -> new VehicleSnapshot(
                     String.join(" ", Objects.toString(row.getString("color"), ""),
                             row.getString("make"), row.getString("model")).strip(),

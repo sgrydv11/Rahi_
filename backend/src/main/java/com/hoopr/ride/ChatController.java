@@ -32,7 +32,7 @@ public class ChatController {
 
     private static final String SELECT = """
         SELECT m.*, p.full_name, p.travel_preference, u.created_at AS member_since,
-               parent.id AS parent_id, parent.sender_id AS parent_sender, parent.body AS parent_body, parent_profile.full_name AS parent_name,
+               parent.id AS parent_id, parent.sender_id AS parent_sender, CASE WHEN parent.hidden THEN 'Message removed by moderation' ELSE parent.body END AS parent_body, parent_profile.full_name AS parent_name,
                u.mobile_number AS sender_mobile,
                u.mobile_verified AS sender_mobile_verified,
                r.source_name, r.destination_name, r.departure_at, r.departure_time_zone,
@@ -74,7 +74,8 @@ public class ChatController {
         if (body.isBlank()) throw new RideFailure(400,"Write a message before sending.");
         if (!previous.isEmpty()) {
             var message = previous.getFirst();
-            if (!message.body().equals(body) || message.groupId()!=group || !Objects.equals(message.replyTo()==null ? null : message.replyTo().id(),request.replyToId()) || !Objects.equals(message.ride()==null ? null : message.ride().id(),request.rideId()))
+            var stored=jdbc.queryForMap("SELECT body,group_id,reply_to_id,ride_id FROM chat_messages WHERE id=?",message.id());
+            if (!stored.get("body").equals(body) || ((Number)stored.get("group_id")).longValue()!=group || !Objects.equals(stored.get("reply_to_id"),request.replyToId()) || !Objects.equals(stored.get("ride_id"),request.rideId()))
                 throw new RideFailure(409,"This message retry has different content.");
             return message;
         }
@@ -85,7 +86,7 @@ public class ChatController {
             if (rides.isEmpty()) throw new RideFailure(400,"Share one of your own upcoming published rides.");
             if(group!=1 && !Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM chat_groups WHERE id=? AND ((lower(origin)=? AND lower(destination)=?) OR (lower(origin)=? AND lower(destination)=?)))",Boolean.class,group,rides.getFirst().get("source_key"),rides.getFirst().get("destination_key"),rides.getFirst().get("destination_key"),rides.getFirst().get("source_key"))))throw new RideFailure(400,"Share a ride matching this group's route.");
         }
-        if(request.replyToId()!=null && !Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM chat_messages WHERE id=? AND group_id=? AND created_at>=CURRENT_TIMESTAMP-interval '7 days')",Boolean.class,request.replyToId(),group)))
+        if(request.replyToId()!=null && !Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM chat_messages WHERE id=? AND group_id=? AND NOT hidden AND created_at>=CURRENT_TIMESTAMP-interval '7 days')",Boolean.class,request.replyToId(),group)))
             throw new RideFailure(400,"The message you are replying to is unavailable.");
         Long id = jdbc.queryForObject("INSERT INTO chat_messages(sender_id,client_id,body,ride_id,share_phone,reply_to_id,group_id) VALUES(?,?,?,?,?,?,?) RETURNING id",Long.class,sender,request.clientId(),body,request.rideId(),true,request.replyToId(),group);
         return jdbc.queryForObject(SELECT + " WHERE m.id=?",(rs,row)->map(rs),id);
@@ -97,12 +98,12 @@ public class ChatController {
         return id;
     }
     private Message map(java.sql.ResultSet rs) throws java.sql.SQLException {
-        UUID rideId = rs.getObject("ride_id",UUID.class);
+        UUID rideId = rs.getBoolean("hidden") ? null : rs.getObject("ride_id",UUID.class);
         Offer ride = rideId==null ? null : new Offer(rideId,rs.getString("source_name"),rs.getString("destination_name"),
             rs.getTimestamp("departure_at").toInstant(),rs.getString("departure_time_zone"),rs.getInt("seats"),
             rs.getBigDecimal("price_per_seat"),rs.getString("currency"),rs.getString("ride_status"));
         return new Message(rs.getLong("id"),rs.getObject("sender_id",UUID.class),rs.getString("full_name"),
-            rs.getString("body"),rs.getTimestamp("created_at").toInstant(),ride,true,rs.getString("sender_mobile"),rs.getBoolean("sender_mobile_verified"),
+            (rs.getBoolean("hidden") ? "Message removed by moderation" : rs.getString("body")),rs.getTimestamp("created_at").toInstant(),ride,true,rs.getString("sender_mobile"),rs.getBoolean("sender_mobile_verified"),
             rs.getObject("parent_id")==null ? null : new Reply(rs.getLong("parent_id"),rs.getObject("parent_sender",UUID.class),rs.getString("parent_name"),rs.getString("parent_body")),
             new Member(rs.getString("full_name"),rs.getString("travel_preference"),rs.getTimestamp("member_since").toInstant()),rs.getLong("group_id"));
     }

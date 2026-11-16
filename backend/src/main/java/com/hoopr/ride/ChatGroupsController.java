@@ -24,10 +24,10 @@ public class ChatGroupsController {
     public List<Group> groups(@AuthenticationPrincipal Jwt jwt){UUID id=user(jwt);initialize(id);
         return jdbc.query("""
             SELECT g.*,s.muted,
-             (SELECT count(*) FROM chat_messages m WHERE m.group_id=g.id AND m.id>s.last_read_id AND m.sender_id<>? AND m.created_at>=now()-interval '7 days') unread,
+             (SELECT count(*) FROM chat_messages m WHERE NOT m.hidden AND m.group_id=g.id AND m.id>s.last_read_id AND m.sender_id<>? AND m.created_at>=now()-interval '7 days') unread,
              last.id latest_id,last.body latest_body,p.full_name latest_sender
             FROM chat_groups g JOIN chat_group_preferences s ON s.group_id=g.id AND s.user_id=?
-            LEFT JOIN LATERAL (SELECT m.id,m.body,m.sender_id FROM chat_messages m WHERE m.group_id=g.id AND m.sender_id<>? AND m.id>s.last_read_id AND m.created_at>=now()-interval '7 days' ORDER BY m.id DESC LIMIT 1) last ON true
+            LEFT JOIN LATERAL (SELECT m.id,m.body,m.sender_id FROM chat_messages m WHERE NOT m.hidden AND m.group_id=g.id AND m.sender_id<>? AND m.id>s.last_read_id AND m.created_at>=now()-interval '7 days' ORDER BY m.id DESC LIMIT 1) last ON true
             LEFT JOIN user_profiles p ON p.user_id=last.sender_id ORDER BY g.id
             """,(r,n)->new Group(r.getLong("id"),r.getString("name"),r.getBoolean("muted"),r.getInt("unread"),r.getObject("latest_id")==null?null:new Preview(r.getLong("latest_id"),r.getString("latest_sender"),r.getString("latest_body"))),id,id,id);
     }
