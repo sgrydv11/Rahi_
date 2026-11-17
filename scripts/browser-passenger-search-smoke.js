@@ -40,7 +40,7 @@ async page => {
   await page.getByRole('button', { name: 'Sort by price ascending', exact: true }).click();
   await page.getByRole('button', { name: 'Sort by price ascending', exact: true }).click();
   await page.getByText('Filters', { exact: true }).click();
-  await page.getByLabel('Boarding point', { exact: true }).selectOption('Station');
+  await page.getByRole('combobox', { name: 'Boarding point', exact: true }).selectOption('Station');
   await page.getByRole('button', { name: 'Apply filters' }).click();
   const search = new URL(page.url()).searchParams;
   if (search.get('minimumSeats') !== '2' || search.get('boardingPoint') !== 'Station' || search.get('sort') !== 'PRICE_DESC')

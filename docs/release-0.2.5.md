@@ -34,9 +34,9 @@ rerun after the backend test suite released local database connections.
 ## Remaining verification
 
 - [x] Journey-rating popup, review persistence and appearance in results.
-- [ ] Finish refreshed passenger-search browser check.
-- [ ] EAS APK finished and artifact manifest/signature verified.
-- [ ] Verify production backend health and compatibility after build.
+- [x] Passenger search: minimum seats, sort, boarding filter and sign-in preserve two-seat booking.
+- [x] EAS APK finished; manifest, package/version, CRC, signing certificate, Firebase modules, production API URL and notification opt-in strings verified.
+- [x] Live backend health UP; `/wallet` 200; anonymous wallet options 401.
 - [ ] Physical-device permission dialog, notification delivery/tap and Google
   login. No Android device was attached during this run; these are not claimed.
 - [ ] Real Razorpay/Stripe sandbox checkout after merchant keys are configured.
@@ -44,3 +44,29 @@ rerun after the backend test suite released local database connections.
 No live customer chat messages, bookings or balances were changed for tests.
 First-launch permission choices are policy-tested and the APK will be inspected;
 this does not replace on-device OS dialog and background-delivery acceptance.
+
+## Completed release — 17 November 2026
+
+- APK source: `8847c40dbea53e0a22201db83e0c996612d73603`, branch `app_v1`.
+- Expo build: [10f2bc2f-ef07-45f1-b8bc-f0572e2be5e0](https://expo.dev/accounts/ydvsgr11s-team/projects/sagar-yadav/builds/10f2bc2f-ef07-45f1-b8bc-f0572e2be5e0), FINISHED.
+- [Download Android APK 0.2.5](https://expo.dev/artifacts/eas/3CPvRStLplt_KU7ZpZDCtPmNsEEAECWkivNWtSxY6ZU.apk).
+- Artifact size: 91,511,619 bytes. SHA-256:
+  `84f38c1537f8a6bd9bdf6b08fbd5b3f90b69f047b1023b97613bd78bf2d740b0`.
+- Signing certificate matches previous APK; Android version code 7.
+- All 11 browser suites passed after documented harness corrections. Final local
+  evidence: `.local/release-025-browser-final.json` and
+  `.local/release-025-apk-verification.json`.
+- [Hosted regression run](https://github.com/sgrydv11/Rahi_/actions/runs/43856791776)
+  completed successfully for the exact APK source commit.
+- Render continues serving backend/web commit `eb8abbb`; this release changes
+  native code and browser tests only, so no backend redeploy/migration was needed.
+- Initial terminal health probes were slow; the completed checks and browser both
+  confirmed UP. `.local/release-025-live-checks.json` records final HTTP results.
+- `adb devices` detected no phone on 17 November. On-device notification dialog,
+  actual background delivery/tap, Google login and merchant checkout remain
+  acceptance checks; they are not claimed as passed.
+
+The EAS submission logged a fingerprint-upload DNS error after creating the build.
+Its existing build was checked rather than resubmitted; it finished successfully.
+Account-usage approval-review interruptions delayed checks but did not change
+release source. Documentation/test-only follow-up uses `[skip render] [skip ci]`.
