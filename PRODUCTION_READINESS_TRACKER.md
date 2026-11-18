@@ -425,3 +425,8 @@ Source/local QA completed: resend countdown/link styling, compact replies, group
 ## 18 November 2026 — compact channels, demo card and signup consent
 
 Completed in source/local QA: reference-style group list with persistent private pins and per-group menu; isolated static-card demo wallet with safe debit/credit; separate required signup policy checkboxes and clearly marked draft readers. Verified 67 backend, 71 web and 35 native tests, production web build, native typecheck/Android JS export and browser regression suites. Production deployment/V29, owner-approved legal text and an updated APK/device check remain pending. See [audit](docs/channels-demo-wallet-consent-2026-11-18.md).
+
+
+## 18 November 2026 — frontend/backend deployment completed
+
+Deployed runtime d0a2741 from app_v1 to https://rahi-1-c3vn.onrender.com. Render reports Live; production schema upgraded to V29. Isolated demo wallet enabled, sender label updated to FlexiRides, 195 backend tests and GitHub CI passed. Live UI/API checks passed; existing user sessions preserved. Merchant keys, owner approval of draft policies and a new APK/device check remain pending. See [deployment record](docs/deployment-2026-11-18.md).
