@@ -40,13 +40,13 @@ public class PushStore {
   if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(6173052988)",Boolean.class)))return;
   var devices=jdbc.queryForList("SELECT d.* FROM push_devices d JOIN users u ON u.id=d.user_id JOIN refresh_sessions s ON s.id=d.session_id WHERE d.enabled AND u.status='ACTIVE' AND NOT s.revoked AND s.expires_at>now() ORDER BY d.checked_at LIMIT 100 FOR UPDATE OF d SKIP LOCKED");
   for(var d:devices){UUID device=(UUID)d.get("id"),uid=(UUID)d.get("user_id"),sid=(UUID)d.get("session_id");long after=((Number)d.get("last_chat_id")).longValue();
-   var messages=jdbc.queryForList("SELECT m.*,g.name,p.full_name FROM chat_messages m JOIN chat_groups g ON g.id=m.group_id JOIN user_profiles p ON p.user_id=m.sender_id LEFT JOIN chat_group_preferences s ON s.user_id=? AND s.group_id=m.group_id WHERE NOT m.hidden AND m.id>? AND m.sender_id<>? AND m.created_at>now()-interval '7 days' AND NOT coalesce(s.muted,false) AND m.id>coalesce(s.last_read_id,0) ORDER BY m.id LIMIT 100",uid,after,uid);
-   for(var m:messages){long group=((Number)m.get("group_id")).longValue(),id=((Number)m.get("id")).longValue();String text=m.get("full_name")+": "+m.get("body");queue(device,uid,sid,"CHAT:"+id,m.get("name").toString(),text.substring(0,Math.min(300,text.length())),Map.of("link","/chat?group="+group,"groupId",group,"messageId",id),group,id);}
+   var messages=jdbc.queryForList("SELECT m.*,g.name,p.full_name,sender_user.mobile_number AS sender_mobile FROM chat_messages m JOIN chat_groups g ON g.id=m.group_id JOIN user_profiles p ON p.user_id=m.sender_id JOIN users sender_user ON sender_user.id=m.sender_id LEFT JOIN chat_group_preferences s ON s.user_id=? AND s.group_id=m.group_id WHERE NOT m.hidden AND m.id>? AND m.sender_id<>? AND m.created_at>now()-interval '7 days' AND s.left_at IS NULL AND NOT coalesce(s.muted,false) AND m.id>coalesce(s.last_read_id,0) ORDER BY m.id LIMIT 100",uid,after,uid);
+   for(var m:messages){long group=((Number)m.get("group_id")).longValue(),id=((Number)m.get("id")).longValue();String text=Objects.toString(m.get("sender_mobile"),"Number unavailable")+": "+m.get("body");queue(device,uid,sid,"CHAT:"+id,m.get("name").toString(),text.substring(0,Math.min(300,text.length())),Map.of("link","/chat?group="+group,"groupId",group,"messageId",id),group,id);}
    // Advance in bounded ID batches; do not skip a burst larger than the batch.
    Long cursor=jdbc.queryForObject("SELECT coalesce(max(id),?) FROM (SELECT id FROM chat_messages WHERE id>? ORDER BY id LIMIT 100) batch",Long.class,after,after);
    jdbc.update("UPDATE push_devices SET last_chat_id=?,checked_at=now() WHERE id=?",cursor,device);
    var jwt=Jwt.withTokenValue("push-internal").header("alg","HS256").subject(uid.toString()).build();
-   for(var n:inbox.inbox(jwt)){if(n.time().isBefore(((Timestamp)d.get("created_at")).toInstant())&&!"DEPARTURE_REMINDER".equals(n.kind())){seen(device,n.id());continue;}int route=n.kind().startsWith("TRAVEL_")?NotificationController.routeGroup(n.origin(),n.destination()):0;queue(device,uid,sid,n.id(),title(n.kind()),n.origin()+" → "+n.destination(),Map.of("link",n.link()),route>1?(long)route:null,null);}
+   for(var n:inbox.inbox(jwt)){if(n.time().isBefore(((Timestamp)d.get("created_at")).toInstant())&&!"DEPARTURE_REMINDER".equals(n.kind())){seen(device,n.id());continue;}int route=n.kind().startsWith("TRAVEL_")?NotificationController.routeGroup(n.origin(),n.destination()):0;queue(device,uid,sid,n.id(),title(n.kind()),n.origin()+" Ã¢â€ ’ "+n.destination(),Map.of("link",n.link()),route>1?(long)route:null,null);}
   }
   jdbc.update("DELETE FROM push_seen_events WHERE created_at<now()-interval '35 days'");
   jdbc.update("DELETE FROM push_outbox WHERE created_at<now()-interval '7 days'");
@@ -55,7 +55,7 @@ public class PushStore {
  private static final String ELIGIBLE="""
   d.enabled AND d.user_id=o.user_id AND d.session_id=o.session_id AND u.status='ACTIVE' AND NOT s.revoked AND s.expires_at>now()
   AND (o.message_id IS NULL OR EXISTS(SELECT 1 FROM chat_messages m WHERE m.id=o.message_id AND NOT m.hidden))
-  AND (o.group_id IS NULL OR (NOT EXISTS(SELECT 1 FROM chat_group_preferences g WHERE g.user_id=d.user_id AND g.group_id=o.group_id AND (g.muted OR g.last_read_id>=o.message_id))))
+  AND (o.group_id IS NULL OR (NOT EXISTS(SELECT 1 FROM chat_group_preferences g WHERE g.user_id=d.user_id AND g.group_id=o.group_id AND (g.left_at IS NOT NULL OR g.muted OR g.last_read_id>=o.message_id))))
   """;
  @Transactional public List<Delivery> claim(){
   return jdbc.query("""
@@ -65,7 +65,7 @@ public class PushStore {
    ORDER BY o.id LIMIT 50 FOR UPDATE OF o SKIP LOCKED)
    UPDATE push_outbox o SET attempts=attempts+1,next_attempt_at=now()+interval '90 seconds' FROM due,push_devices d
    WHERE o.id=due.id AND d.id=o.device_id RETURNING o.*,d.token,
-    (SELECT count(*) FROM chat_messages m LEFT JOIN chat_group_preferences p ON p.user_id=d.user_id AND p.group_id=m.group_id WHERE NOT m.hidden AND m.sender_id<>d.user_id AND m.id>coalesce(p.last_read_id,0) AND NOT coalesce(p.muted,false) AND m.created_at>now()-interval '7 days') badge
+    (SELECT count(*) FROM chat_messages m LEFT JOIN chat_group_preferences p ON p.user_id=d.user_id AND p.group_id=m.group_id WHERE NOT m.hidden AND m.sender_id<>d.user_id AND m.id>coalesce(p.last_read_id,0) AND p.left_at IS NULL AND NOT coalesce(p.muted,false) AND m.created_at>now()-interval '7 days') badge
    """,(r,n)->new Delivery(r.getLong("id"),r.getString("token"),r.getString("title"),r.getString("body"),r.getString("data"),r.getInt("badge")));
  }
  public void retryClaim(long id){jdbc.update("UPDATE push_outbox SET state=CASE WHEN attempts>=6 THEN 'FAILED' ELSE 'PENDING' END,last_error='TransportFailure',next_attempt_at=now()+interval '5 minutes' WHERE id=? AND state='PENDING'",id);}

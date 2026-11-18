@@ -1,7 +1,7 @@
 import { createContext,useCallback,useContext,useEffect,useRef,useState } from 'react';
 import { api as authenticatedRequest } from './api';
 import { AppState } from 'react-native';
-export interface ChatGroup {id:number;name:string;muted:boolean;unreadCount:number;latest:null|{id:number;senderName:string;body:string}}
+export interface ChatGroup {id:number;name:string;muted:boolean;joined?:boolean;pinned?:boolean;joinedAt?:string;memberCount?:number;unreadCount:number;latest:null|{id:number;senderName:string;senderId?:string;mobileNumber?:string|null;body:string;createdAt?:string}}
 interface Toast {id:string;title:string;body:string;link:string}
 export function useCommunityState(user?:string,activeGroup?:number){
  const[groups,setGroups]=useState<ChatGroup[]>([]),[toast,setToast]=useState<Toast|null>(null),[error,setError]=useState('');
@@ -11,7 +11,7 @@ export function useCommunityState(user?:string,activeGroup?:number){
  useEffect(()=>{setGroups([]);setToast(null);setError('');if(!user)return;let alive=true,running=false,initialized=false,ticks=0;const seen=new Map<number,number>(),notices=new Set<string>(),c=new AbortController();
   async function poll(){if(running||AppState.currentState!=='active')return;running=true;try{
    const received=await authenticatedRequest<ChatGroup[]>('/chat/groups',{signal:c.signal});if(!alive)return;const next=received.map(g=>mutations.current.has(g.id)?{...g,muted:mutations.current.get(g.id)!}:g);
-   let alert:Toast|null=null;for(const g of next){if(initialized&&g.latest&&g.latest.id>(seen.get(g.id)||0)&&g.unreadCount&&!g.muted&&active.current!==g.id)alert={id:'chat:'+g.latest.id,title:g.name,body:g.latest.senderName+': '+g.latest.body.slice(0,160),link:'/chat?group='+g.id};seen.set(g.id,g.latest?.id||seen.get(g.id)||0);}
+   let alert:Toast|null=null;for(const g of next){if(initialized&&g.joined!==false&&g.latest&&g.latest.senderId!==user&&g.latest.id>(seen.get(g.id)||0)&&g.unreadCount&&!g.muted&&active.current!==g.id)alert={id:'chat:'+g.latest.id,title:g.name,body:g.latest.senderName+': '+g.latest.body.slice(0,160),link:'/chat?group='+g.id};seen.set(g.id,g.latest?.id||seen.get(g.id)||0);}
    setGroups(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);setError('');if(alert)setToast(alert);
    if(ticks++%5===0){const list=await authenticatedRequest<{id:string;kind:string;origin:string;destination:string;link:string}[]>('/notifications',{signal:c.signal});if(!alive)return;for(const n of list){if(initialized&&!notices.has(n.id)&&n.kind.startsWith('TRAVEL_')&&!alert)setToast({id:n.id,title:n.kind==='TRAVEL_RIDE'?'Ride on your regular route':'Travel buddy available',body:n.origin+' → '+n.destination,link:n.link});notices.add(n.id);}}
    initialized=true;

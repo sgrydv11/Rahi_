@@ -147,7 +147,7 @@ test('Google ID token uses native endpoint and persists only the app refresh ses
   const user=await f.client.loginWithGoogle('google-id-token','PASSENGER');
   assert.equal(user.id,session.user.id);
   assert.equal(f.calls[1].url,'https://example.test/api/v1/mobile/auth/google');
-  assert.deepEqual(JSON.parse(f.calls[1].options.body),{credential:'google-id-token',travelPreference:'PASSENGER'});
+  assert.deepEqual(JSON.parse(f.calls[1].options.body),{credential:'google-id-token',travelPreference:'PASSENGER',acceptedTerms:false,acceptedPrivacy:false});
   assert.equal(f.calls[1].options.headers.Authorization,undefined);
   assert.equal(f.token(),'rotated');
 });

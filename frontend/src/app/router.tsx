@@ -1,3 +1,4 @@
+import {LegalPage} from '../features/auth/LegalPage';
 import { createBrowserRouter } from 'react-router';
 import { AppLayout } from './layouts/AppLayout';
 import { HomePage } from '../features/home/HomePage';
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
   {path:'/admin',element:<AdminPage/>},
   { element: <AppLayout />, children: [
     { path: '/', element: <HomePage /> },
+    {path:'/terms',element:<LegalPage kind="terms"/>},{path:'/privacy',element:<LegalPage kind="privacy"/>},
     { path: '/help', element: <HelpPage /> },
     { path: '/login', element: <LoginPage /> },
     { path: '/register', element: <RegisterPage /> },

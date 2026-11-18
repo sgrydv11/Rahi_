@@ -1,0 +1,5 @@
+.auth-form .otp-resend{background:none;border:0;color:#245eea;text-align:left;justify-content:flex-start;padding:4px 0;min-height:36px;font-size:13px}.auth-form .otp-resend:disabled{color:#4c5e75}
+
+.legal-checks{border:0;padding:0;margin:0 0 16px;display:grid;gap:10px}.legal-checks legend{font-size:12px;color:#4c5e75;margin-bottom:10px}.legal-checks label{display:flex;align-items:flex-start;flex-wrap:wrap;gap:5px;font-size:13px;line-height:22px}.legal-checks label input{flex-shrink:0}.legal-checks a{color:#245eea}
+
+.legal-checks label{display:grid;grid-template-columns:20px minmax(0,1fr);flex-direction:row;align-items:start;gap:9px;min-height:40px;font-weight:400}.legal-checks label>span{display:block;min-width:0}.legal-checks label input{margin-top:2px}

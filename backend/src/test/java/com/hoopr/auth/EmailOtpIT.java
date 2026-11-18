@@ -54,7 +54,7 @@ class EmailOtpIT {
         var issued = otp.verify(challenge.challengeId(), code.get());
         assertEquals(email, issued.access.user().email());
         assertEquals("MORNING",jdbc.queryForObject("SELECT time_period FROM user_travel_routes WHERE user_id=?",String.class,issued.access.user().id()));
-        assertEquals("FlexirRides member", issued.access.user().fullName());
+        assertEquals("FlexiRides member", issued.access.user().fullName());
         assertEquals(mobile, jdbc.queryForObject("SELECT mobile_number FROM users WHERE id=?", String.class, issued.access.user().id()));
         assertEquals(false, jdbc.queryForObject("SELECT mobile_verified FROM users WHERE id=?", Boolean.class, issued.access.user().id()));
         assertThrows(AuthFailure.class, () -> otp.verify(challenge.challengeId(), code.get()));
@@ -117,4 +117,5 @@ class EmailOtpIT {
         when(mailer.enabled()).thenReturn(true);
         assertEquals(409,assertThrows(AuthFailure.class,()->otp.requireLegacyRegistrationAllowed()).status);
     }
+    @Test void registrationWithoutConsentEvidenceCannotCreateAccount(){var challenge=otp.requestRegistration(email,"OTP-test-password-long",mobile,TravelPreference.PASSENGER);jdbc.update("UPDATE email_otp_challenges SET consent_version=NULL,consent_at=NULL WHERE id=?",challenge.challengeId());assertThrows(AuthFailure.class,()->otp.verify(challenge.challengeId(),code.get()));assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM users WHERE email=?",Integer.class,email));}
 }

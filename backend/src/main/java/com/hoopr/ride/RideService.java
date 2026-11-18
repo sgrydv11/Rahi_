@@ -244,6 +244,10 @@ public class RideService {
             int minimumSeats, BigDecimal maximumPrice, int page, int size, String sort,
             String departureTime, String timeFrom, String timeTo, boolean womenOnly, boolean ac,
             boolean flexibleDropoff, String boardingPoint, String droppingPoint) {
+        return search(origin,destination,date,timeZone,minimumSeats,maximumPrice,page,size,sort,departureTime,timeFrom,timeTo,womenOnly,ac,flexibleDropoff,boardingPoint,droppingPoint,null);
+    }
+    @Transactional(readOnly=true)
+    public Results search(String origin,String destination,LocalDate date,String timeZone,int minimumSeats,BigDecimal maximumPrice,int page,int size,String sort,String departureTime,String timeFrom,String timeTo,boolean womenOnly,boolean ac,boolean flexibleDropoff,String boardingPoint,String droppingPoint,RidePreferences.RouteType routeType) {
         if (origin == null || origin.isBlank() || destination == null || destination.isBlank())
             return new Results(List.of(), page, size, 0, 0);
         validateLocations(origin, destination);
@@ -258,7 +262,7 @@ public class RideService {
         var order = Sort.by(sort.endsWith("DESC") ? Sort.Direction.DESC : Sort.Direction.ASC, property).and(Sort.by("id"));
         var available = RideSpecifications.available(clock.instant(), origin, destination, date, zone(timeZone), minimumSeats, maximumPrice);
         var extra = RideSpecifications.preferences(zone(timeZone), departureTime, timeFrom, timeTo, womenOnly, ac, flexibleDropoff, boardingPoint, droppingPoint);
-        return results(rides.findAll(available.and(extra), PageRequest.of(page, size, order)));
+        return results(rides.findAll(available.and(extra).and(RideSpecifications.routeType(routeType)), PageRequest.of(page, size, order)));
     }
     private static Pageable paging(int page, int size) { return PageRequest.of(page, size, Sort.by("departureAt").ascending().and(Sort.by("id"))); }
     private Results results(Page<Ride> page) {

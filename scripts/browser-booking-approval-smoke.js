@@ -42,7 +42,7 @@ async page => {
   await page.getByRole('button', { name: 'Calendar', exact: true }).click();
   await page.getByLabel('Custom date').fill(date);
   await page.getByLabel('Return date (optional)').fill(date);
-  await page.getByRole('combobox', { name: 'Passengers', exact: true }).selectOption('2');
+  await page.getByRole('combobox', { name: 'Seats', exact: true }).selectOption('2');
   await page.getByRole('button', { name: 'Search rides', exact: true }).click();
   await page.getByRole('link', { name: 'Find return rides on ' + date }).click();
   await page.locator('a.button[href="/rides/' + reverse.id + '?seats=2"]').waitFor();

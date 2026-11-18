@@ -1,8 +1,12 @@
+import {namedRides} from './namedRides';
+import {Ionicons} from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import {nearbyCity} from './nearbyCity';
 import {Text} from './Typography';
 import {useCityPoints} from './locations';
 import {Dropdown} from './dropdown';
-import { useState } from 'react';
-import { Alert, Linking, Pressable, Switch, View } from 'react-native';
+import { useEffect,useState } from 'react';
+import { Alert, Linking, Pressable, Switch, View,StyleSheet } from 'react-native';
 import { api, type Page, type Pins, type Ride, type RidePreferences, type User, type Vehicle } from './api';
 import type { Navigate } from './navigation';
 import { demoMode, demoRide, demoRides } from './demo';
@@ -37,11 +41,16 @@ export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (p
   </View>;
 }
 
-export function Rides({ mine = false, go,user }: { mine?: boolean; go: Navigate;user?:User|null }) {
+export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolean; go: Navigate;user?:User|null;onResultsChange?:(value:boolean)=>void }) {
   const canOffer=!!user&&user.travelPreference!=='PASSENGER',canBook=!user||user.travelPreference!=='DRIVER';
   const points=useCityPoints();
+  const [savedRoutes,setSavedRoutes]=useState<{origin:string;destination:string;period:string}[]>([]);
+  useEffect(()=>{if(!user)return;const c=new AbortController();api<{origin:string;destination:string;period:string}[]>('/travel-preferences',{signal:c.signal}).then(setSavedRoutes).catch(()=>{});return()=>c.abort();},[user?.id]);
+  const rideChoices=[...namedRides,...savedRoutes.map((r,i)=>({value:'saved-'+i,label:`${r.period==='MORNING'?'Office':r.period==='EVENING'?'Home':'Saved'} · ${r.origin} → ${r.destination}`,origin:r.origin,destination:r.destination,routeType:''}))];
   const [draft, setDraft] = useState<Record<string, string>>({ departureDate: day(), timeZone: tz(), sort: 'TIME_ASC', minimumSeats: '1' });
   const [query, setQuery] = useState('');
+  const [sortOpen,setSortOpen]=useState(false),[locating,setLocating]=useState(false),[locationMessage,setLocationMessage]=useState('');
+  useEffect(()=>{onResultsChange?.(!!query);},[query]);
   const requestedSeats = Number(new URLSearchParams(query).get('minimumSeats') || 1);
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState(false);
@@ -51,23 +60,32 @@ export function Rides({ mine = false, go,user }: { mine?: boolean; go: Navigate;
     if (!mine && !query) return { content: [], page: 0, totalPages: 0 } as Page<Ride>;
     return demoMode && !mine ? demoRides(query, page) : api<Page<Ride>>(path, { auth: mine, signal });
   });
+  async function locateCity(){
+    if(locating)return;setLocating(true);setLocationMessage('');
+    try{const permission=await Location.requestForegroundPermissionsAsync();if(permission.status!=='granted'){setLocationMessage('Location not allowed. Enter your city manually.');return;}
+      const position=await Location.getCurrentPositionAsync({accuracy:Location.Accuracy.Balanced});const city=nearbyCity(position.coords.latitude,position.coords.longitude);
+      if(city){update('origin',city);setLocationMessage(`Nearby city: ${city}. You can edit it.`);}else setLocationMessage('No supported city nearby. Enter your city manually.');
+    }catch{setLocationMessage('Unable to get location. Enter your city manually.');}finally{setLocating(false);}
+  }
   function apply(values = draft) {
     if (!values.origin?.trim() || !values.destination?.trim()) { setError('Select both From City and To City.'); return; }
     if (values.origin.trim().toLowerCase() === values.destination.trim().toLowerCase()) { setError('Choose different cities.'); return; }
     if (values.returnDate && values.returnDate < values.departureDate) { setError('Choose a return date on or after departure.'); return; }
     if (values.departureTime && (values.timeFrom || values.timeTo)) { setError('Choose a direct time or a range, not both.'); return; }
     setError(''); setPage(0);
-    setQuery(Object.entries(values).filter(([key, value]) => key !== 'returnDate' && key !== 'ac' && value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
+    setQuery(Object.entries(values).filter(([key, value]) => key !== 'returnDate' && key !== 'ac' && key !== 'namedRide' && value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
   }
-  function update(key: string, value: string) { setDraft(previous => ({ ...previous, [key]: value })); }
+  function update(key: string, value: string) { setDraft(previous => ({ ...previous, [key]: value,...(key==='origin'||key==='destination'?{namedRide:''}:{}) })); }
   const travelDate = draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined;
   function timeField(key: string, label: string) {
     return <DateField label={label} mode="time" value={draft[key] && draft[key] !== '24:00' ? new Date(draft.departureDate + 'T' + draft[key]) : undefined}
       change={value => update(key, String(value.getHours()).padStart(2, '0') + ':' + String(value.getMinutes()).padStart(2, '0'))}
       clear={() => update(key, '')} />;
   }
-  if (!mine && !query) return <Card>
+  if (!mine && !query) return <View style={rideUI.form}>
     <Field label="From City" value={draft.origin || ''} change={value => update('origin', value)} />
+    <Pressable accessibilityRole="button" disabled={locating} onPress={()=>void locateCity()} style={rideUI.location}><Ionicons name="locate-outline" size={18} color="#245EEA"/><Text style={rideUI.link}>{locating?'Locating…':'Use current city'}</Text></Pressable>
+    {!!locationMessage&&<Text accessibilityRole="alert" style={rideUI.secondary}>{locationMessage}</Text>}
     <Field label="To City" value={draft.destination || ''} change={value => update('destination', value)} />
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap: 8}}>
       <DateField label="Date of Journey" mode="date" minimumDate={new Date(day()+'T00:00')} value={travelDate} change={value => update('departureDate', localDate(value.toISOString()).slice(0, 10))} />
@@ -75,26 +93,26 @@ export function Rides({ mine = false, go,user }: { mine?: boolean; go: Navigate;
     </View>
     <DateField label="Return date (optional)" mode="date" value={draft.returnDate ? new Date(draft.returnDate + 'T12:00') : undefined}
       change={value => update('returnDate', localDate(value.toISOString()).slice(0, 10))} clear={() => update('returnDate', '')} />
-    <Choice label="Passengers" values={seatOptions} selected={draft.minimumSeats} change={value => update('minimumSeats', value)} />
+    <Choice label="Ride" values={[{value:'',label:'Choose a named route'},...rideChoices]} selected={draft.namedRide||''} change={v=>{const r=rideChoices.find(r=>r.value===v);if(r)setDraft(p=>({...p,origin:r.origin,destination:r.destination,routeType:r.routeType,namedRide:v}));}}/>
+    <Choice label="Seats" values={seatOptions} selected={draft.minimumSeats} change={value => update('minimumSeats', value)} />
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:12,borderWidth:1,borderColor:'#D5DEEA',borderRadius:12}}><View><Copy>Booking for women</Copy><Text style={{color:'#4C5E75',fontSize:12}}>Show women-only rides</Text></View><Switch accessibilityLabel="Women-only rides" value={draft.womenOnly==='true'} onValueChange={value=>update('womenOnly',value?'true':'')} trackColor={{true:'#245EEA'}}/></View>
     <ErrorText message={error} />
     <Button label="Search rides" onPress={() => apply()} />
-  </Card>;
+  </View>;
   return <>
     {mine ? <View style={styles.row}>
       {canBook&&<Button label="Find a ride" onPress={() => go({ kind: 'search' })} />}
       <Button label="My bookings" onPress={() => go({ kind: 'bookings' })} />
       {canOffer&&<Button label="Offer a ride" onPress={() => go({ kind: 'rideForm' })} />}
     </View> : <>
-      <Copy>{draft.origin} → {draft.destination} · {draft.departureDate} · {requestedSeats} {requestedSeats === 1 ? 'passenger' : 'passengers'}</Copy>
+      <View style={rideUI.summary}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={rideUI.route}>{draft.origin} → {draft.destination}</Text><View style={rideUI.meta}><Text numberOfLines={1} style={[rideUI.secondary,{fontSize:11}]}>{new Date(draft.departureDate+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} · {requestedSeats} {requestedSeats===1?'seat':'seats'}</Text><Pressable accessibilityRole="button" accessibilityLabel="Edit search" onPress={()=>{setQuery('');setError('');setFilters(false);setSortOpen(false);}} style={rideUI.edit}><Ionicons name="create-outline" size={20} color="#245EEA"/></Pressable></View></View>
       {draft.returnDate && <Button label={`Find return rides on ${draft.returnDate}`} onPress={() => {
         const next = { origin: draft.destination, destination: draft.origin, departureDate: draft.returnDate,
-          minimumSeats: draft.minimumSeats, womenOnly: draft.womenOnly || '', sort: 'TIME_ASC', timeZone: tz() };
+          routeType:draft.routeType==='HOME_TO_OFFICE'?'OFFICE_TO_HOME':draft.routeType==='OFFICE_TO_HOME'?'HOME_TO_OFFICE':draft.routeType||'',minimumSeats: draft.minimumSeats, womenOnly: draft.womenOnly || '', sort: 'TIME_ASC', timeZone: tz() };
         setDraft(next); apply(next);
       }} />}
-      <Button label="Change search" onPress={() => { setQuery(''); setError(''); }} />
-      <View style={styles.row}>{(['TIME','PRICE','RATING'] as const).map(key=><Button key={key} label={`${key[0]+key.slice(1).toLowerCase()} ${draft.sort===key+'_DESC'?'↓':'↑'}`} onPress={()=>{const next={...draft,sort:key+(draft.sort===key+'_ASC'?'_DESC':'_ASC')};setDraft(next);apply(next);}}/>)}</View>
-      <View style={styles.row}><Button label={filters?'Hide filters':'Filters'} onPress={()=>setFilters(v=>!v)}/><Button label="Clear filters" onPress={()=>{const next={origin:draft.origin,destination:draft.destination,departureDate:draft.departureDate,returnDate:draft.returnDate||'',timeZone:tz(),sort:'TIME_ASC',minimumSeats:'1'};setDraft(next);apply(next);}}/></View>
+      <View style={rideUI.toolbar}><Pressable accessibilityRole="button" accessibilityState={{expanded:sortOpen}} onPress={()=>{setSortOpen(v=>!v);setFilters(false);}} style={rideUI.control}><Ionicons name="swap-vertical-outline" size={16} color="#142D4E"/><Text style={rideUI.controlText}>Sort</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{expanded:filters}} onPress={()=>{setFilters(v=>!v);setSortOpen(false);}} style={rideUI.control}><Ionicons name="options-outline" size={16} color="#142D4E"/><Text style={rideUI.controlText}>Filters</Text></Pressable><Pressable accessibilityRole="button" onPress={()=>{const next={origin:draft.origin,destination:draft.destination,departureDate:draft.departureDate,returnDate:draft.returnDate||'',routeType:draft.routeType||'',timeZone:tz(),sort:'TIME_ASC',minimumSeats:'1'};setDraft(next);apply(next);}} style={rideUI.control}><Text style={rideUI.controlText}>Clear filters</Text></Pressable></View>
+      {sortOpen&&<View style={rideUI.form}><Choice label="Sort rides" values={sortOptions} selected={draft.sort} change={sort=>{const next={...draft,sort};setDraft(next);apply(next);setSortOpen(false);}}/></View>}
       {filters && <Card>
         {timeField('departureTime', 'Direct departure time')}
         <Choice label="Time range" selected={(draft.timeFrom || '') + ',' + (draft.timeTo || '')}
@@ -113,15 +131,15 @@ export function Rides({ mine = false, go,user }: { mine?: boolean; go: Navigate;
     </>}
     {!result.data ? <QueryState {...result} /> : <>
       {!result.data.content.length && <Copy>{mine ? 'You have not offered any rides yet.' : 'No rides match this route, date and filters.'}</Copy>}
-      {result.data.content.map(ride => <Card key={ride.id}>
-        <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}><Text style={{fontSize:23,fontWeight:'700',color:'#142D4E'}}>{departureClock(ride)}</Text><View><Text style={{fontSize:22,fontWeight:'700',color:'#142D4E'}}>{ride.currency==='INR'?'₹':ride.currency+' '}{ride.pricePerSeat}</Text><Text style={{fontSize:11,color:'#4C5E75',textAlign:'right'}}>per seat</Text></View></View>
-        <Copy>{ride.origin} → {ride.destination}</Copy><Copy>{date(ride.departureAt)}</Copy>
-        {ride.preferences?.requiresApproval && <Copy>Driver approval required</Copy>}
-        <Copy>{ride.currency} {ride.pricePerSeat} per seat · {ride.availableSeats} available</Copy>
-        <Copy>{ride.driverRating ? ride.driverRating.toFixed(1) + ' / 5' : 'No ratings yet'}{ride.preferences?.ac ? ' · AC' : ''}{ride.preferences?.womenOnly ? ' · Women only' : ''}</Copy>
-        {ride.reviews?.map((review, index) => <Copy key={index}>{review.score}/5 {review.text || ''}</Copy>)}
-        <Button label="View ride" onPress={() => go({ kind: 'ride', id: ride.id, requestedSeats })} />
-      </Card>)}
+      {result.data.content.map(ride => <View key={ride.id} style={rideUI.card}>
+        <View style={rideUI.cardTop}><Text style={rideUI.time}>{departureClock(ride)}</Text><View><Text style={rideUI.price}>{ride.currency==='INR'?'â‚¹':ride.currency+' '}{ride.pricePerSeat}</Text><Text style={rideUI.perSeat}>per seat</Text></View></View>
+        <Text style={rideUI.cardRoute}>{ride.origin} → {ride.destination}</Text>
+        {mine&&<Text style={rideUI.secondary}>{date(ride.departureAt)}</Text>}
+        <Text style={rideUI.secondary}>{ride.driver.displayName} · {ride.availableSeats} {ride.availableSeats===1?'seat':'seats'} available{ride.preferences?.womenOnly?' · Women only':''}</Text>
+        <View style={rideUI.cardBottom}><Text style={[rideUI.secondary,{flex:1}]}>{ride.preferences?.routeType==='HOME_TO_OFFICE'?'Home → Office':ride.preferences?.routeType==='OFFICE_TO_HOME'?'Office → Home':'Shared journey'} · {ride.driverRating?ride.driverRating.toFixed(1)+'/5':'No ratings yet'}</Text><Pressable accessibilityRole="button" onPress={()=>go({kind:'ride',id:ride.id,requestedSeats})} hitSlop={4} style={rideUI.view}><Text style={{color:'#fff',fontWeight:'600',fontSize:12}}>{mine?'View ride':'Book ride'}</Text></Pressable></View>
+        {ride.preferences?.requiresApproval&&<Text style={rideUI.secondary}>Driver approval required</Text>}
+        {!!ride.reviews?.length&&<Text style={rideUI.secondary}>{ride.reviews[0].score}/5 · {ride.reviews[0].text||''}</Text>}
+      </View>)}
       <Pagination data={result.data} setPage={setPage} />
     </>}
   </>;
@@ -245,7 +263,7 @@ function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; 
     <Choice label="Do you have a car?" values={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} selected={String(preferences.hasCar)} change={value => setPreferences(previous => ({ ...previous, hasCar: value === 'true' }))} />
     <Choice label="Booking mode" values={[{ value: 'instant', label: 'Instant booking' }, { value: 'approval', label: 'Review requests' }]}
       selected={preferences.requiresApproval ? 'approval' : 'instant'} change={value => setPreferences(previous => ({ ...previous, requiresApproval: value === 'approval' }))} />
-    <Choice label="Route type" values={[{ value: 'HOME_TO_OFFICE', label: 'Home to Office' }, { value: 'OFFICE_TO_HOME', label: 'Office to Home' }, { value: 'OTHER', label: 'Other' }]} selected={preferences.routeType} change={value => setPreferences(previous => ({ ...previous, routeType: value as RidePreferences['routeType'] }))} />
+    <Choice label="Route type" values={[{ value: 'HOME_TO_OFFICE', label: 'Office · Home to Office' }, { value: 'OFFICE_TO_HOME', label: 'Home · Office to Home' }, { value: 'OTHER', label: 'Other' }]} selected={preferences.routeType} change={value => setPreferences(previous => ({ ...previous, routeType: value as RidePreferences['routeType'] }))} />
     {points(draft.origin).length>0&&<Button label="Use city boarding points" onPress={()=>setBoarding(points(draft.origin).join('\n'))}/>}
     <Field label="Boarding points, one per line" value={boarding} change={setBoarding} multiline />
     {points(draft.destination).length>0&&<Button label="Use city dropping points" onPress={()=>setDropping(points(draft.destination).join('\n'))}/>}
@@ -317,3 +335,7 @@ export function PinsForm({ id, back }: { id: string; back: () => void }) {
   const result = useQuery(id, () => api<Ride>(ridePath(id)));
   return result.data ? <PinFields ride={result.data} back={back} /> : <QueryState {...result} />;
 }
+
+const rideUI=StyleSheet.create({
+ form:{padding:16,gap:12,borderRadius:16,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},location:{flexDirection:'row',alignItems:'center',gap:8,minHeight:40},link:{fontSize:14,color:'#245EEA',fontWeight:'600'},summary:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:4},route:{fontSize:15,fontWeight:'700',color:'#142D4E',flexShrink:1},meta:{flexDirection:'row',alignItems:'center',gap:4},secondary:{fontSize:13,lineHeight:19,color:'#4C5E75'},edit:{padding:6,minHeight:36,minWidth:32,justifyContent:'center'},toolbar:{flexDirection:'row',gap:8,flexWrap:'wrap'},control:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:12,minHeight:44,borderRadius:10,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},controlText:{fontSize:13,color:'#142D4E',fontWeight:'600'},card:{padding:14,gap:6,borderRadius:14,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},cardTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},time:{fontSize:22,fontWeight:'700',color:'#142D4E'},price:{fontSize:22,fontWeight:'700',color:'#142D4E',textAlign:'right'},perSeat:{fontSize:11,color:'#4C5E75',textAlign:'right'},cardRoute:{fontSize:14,fontWeight:'600',color:'#142D4E'},cardBottom:{flexDirection:'row',gap:8,alignItems:'center'},view:{backgroundColor:'#245EEA',paddingHorizontal:10,minHeight:36,borderRadius:10,justifyContent:'center'}
+});

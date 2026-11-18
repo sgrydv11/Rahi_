@@ -30,6 +30,9 @@ public final class RideSpecifications {
             return cb.and(predicates.toArray(Predicate[]::new));
         };
     }
+    public static Specification<Ride> routeType(RidePreferences.RouteType type) {
+        return (root,query,cb)->type==null?cb.conjunction():cb.equal(cb.coalesce(cb.function("jsonb_extract_path_text",String.class,root.get("preferences"),cb.literal("routeType")),"OTHER"),type.name());
+    }
     private static String prefix(String input) {
         return input.strip().toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
     }

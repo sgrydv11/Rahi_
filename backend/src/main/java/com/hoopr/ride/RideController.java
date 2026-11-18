@@ -35,7 +35,9 @@ public class RideController {
             @RequestParam(defaultValue = "false") boolean ac,
             @RequestParam(defaultValue = "false") boolean flexibleDropoff,
             @RequestParam(required = false) @Size(max = 200) String boardingPoint,
-            @RequestParam(required = false) @Size(max = 200) String droppingPoint) {
+            @RequestParam(required = false) @Size(max = 200) String droppingPoint,
+            @RequestParam(required=false) RidePreferences.RouteType routeType) {
+        if(routeType!=null)return rides.search(origin,destination,departureDate,timeZone,minimumSeats,maximumPrice,page,size,sort,departureTime,timeFrom,timeTo,womenOnly,ac,flexibleDropoff,boardingPoint,droppingPoint,routeType);
         return rides.search(origin, destination, departureDate, timeZone, minimumSeats, maximumPrice, page, size,
                 sort, departureTime, timeFrom, timeTo, womenOnly, ac, flexibleDropoff, boardingPoint, droppingPoint);
     }

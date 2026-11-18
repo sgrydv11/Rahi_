@@ -13,7 +13,7 @@ export interface Booking {
 export interface JourneyDetails {
   demoPaymentMethod?: 'DIRECT'|'QR'|'OTHER';
   boardingPoint: string; droppingPoint: string;
-  passengers: { name: string; age: number; gender: 'FEMALE' | 'MALE' | 'OTHER' }[];
+  passengers: { name: string; age: number; gender: 'FEMALE' | 'MALE' | 'OTHER' | 'NOT_SPECIFIED' }[];
 }
 export interface BookingPage { content: Booking[]; page: number; size: number; totalElements: number; totalPages: number }
 export const bookingsApi = {

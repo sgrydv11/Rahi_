@@ -41,7 +41,7 @@ describe('auth session client', () => {
     await auth.loginWithGoogle('signed-google-token', 'DRIVER');
     expect(fetcher.mock.calls[1][0]).toBe('/api/v1/auth/google');
     expect(fetcher.mock.calls[1][1]?.credentials).toBe('include');
-    expect(JSON.parse(fetcher.mock.calls[1][1]?.body as string)).toEqual({ credential: 'signed-google-token', travelPreference: 'DRIVER' });
+    expect(JSON.parse(fetcher.mock.calls[1][1]?.body as string)).toEqual({ credential: 'signed-google-token', travelPreference: 'DRIVER', acceptedTerms: false, acceptedPrivacy: false });
     expect(auth.authStore.snapshot()).toEqual(user);
   });
   it('logs in with CSRF and cookie credentials then sends bearer requests', async () => {

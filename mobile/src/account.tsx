@@ -1,3 +1,4 @@
+import {LegalChecks} from './LegalChecks';
 import {RegularRoutesEditor,TravelPreferencesSettings,type RegularRoute} from './regularRoutes';
 import { useEffect, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
@@ -13,6 +14,7 @@ function Preferences({ value, change }: { value: Preference; change: (value: Pre
 }
 
 export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user: User) => void; go: Navigate }) {
+  const[acceptedTerms,setAcceptedTerms]=useState(false),[acceptedPrivacy,setAcceptedPrivacy]=useState(false);
   const [regularRoutes,setRegularRoutes]=useState<RegularRoute[]>([]);
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
@@ -28,6 +30,7 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
   const action = useAction();
   async function submit() {
     if(challenge){if(!/^\d{6}$/.test(code))throw new Error('Enter the six-digit email code.');onUser(await verifyEmailOtp(challenge,code));return;}
+    if(create&&(!acceptedTerms||!acceptedPrivacy))throw new Error('Accept both draft policies to create an account.');
     const address = email.trim();
     const validEmail=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) && address.length<=254;
     const validPhone=/^(?:[6-9][0-9]{9}|\+[1-9][0-9]{7,14})$/.test(address.replace(/[ ()-]/g,''));
@@ -38,15 +41,16 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
       throw new Error('Enter a valid mobile number with country code for numbers outside India.');
     if (!password.trim() || (create && password.length < 12))
       throw new Error(create ? 'Use a password of at least 12 characters.' : 'Enter your password.');
-    if(create){const next=await requestRegistrationOtp(address,password,number,preference,regularRoutes);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());}
+    if(create){const next=await requestRegistrationOtp(address,password,number,preference,regularRoutes,{acceptedTerms,acceptedPrivacy});setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());}
     else onUser(await login(address,password));
   }
   return <Card>
-    {!challenge && <GoogleSignIn preference={preference} busy={action.busy} run={action.run} onUser={onUser}/>}
+    {create&&!challenge&&<LegalChecks terms={acceptedTerms} privacy={acceptedPrivacy} setTerms={setAcceptedTerms} setPrivacy={setAcceptedPrivacy} disabled={action.busy}/>}
+    {!challenge && <GoogleSignIn preference={preference} consent={create?{acceptedTerms,acceptedPrivacy}:undefined} busy={action.busy||(create&&(!acceptedTerms||!acceptedPrivacy))} run={action.run} onUser={onUser}/>}
     {challenge?<>
       <Copy>Verify your email</Copy><Copy>Enter the code sent to {email}. {create?'Your account is created only after verification.':'Verify the code to sign in.'} The code expires in five minutes.</Copy>
       <Field label="Email code" value={code} change={value=>setCode(value.replace(/\D/g,'').slice(0,6))} numeric />
-      <Button label={now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'} disabled={action.busy||now<resendAt} onPress={()=>void action.run(async()=>{const next=create?await requestRegistrationOtp(email.trim(),password,mobile,preference,regularRoutes):await requestEmailOtp(email.trim());setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());})}/>
+      <Button variant="link" label={now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend OTP'} disabled={action.busy||now<resendAt} onPress={()=>void action.run(async()=>{const next=create?await requestRegistrationOtp(email.trim(),password,mobile,preference,regularRoutes,{acceptedTerms,acceptedPrivacy}):await requestEmailOtp(email.trim());setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());})}/>
       <Button label="Change details" disabled={action.busy} onPress={()=>{setChallenge('');setCode('');}} />
     </>:<>
     {!create && <View style={styles.row}><Button label={'Password'+(!emailCodeLogin?' ✓':'')} disabled={action.busy} onPress={()=>setEmailCodeLogin(false)}/><Button label={'Email code'+(emailCodeLogin?' ✓':'')} disabled={action.busy} onPress={()=>setEmailCodeLogin(true)}/></View>}
@@ -59,7 +63,7 @@ export function SignIn({ create, onUser, go }: { create: boolean; onUser: (user:
     </>}
     {(create || !emailCodeLogin) && <Field label="Password" value={password} change={setPassword} secret={!showPassword} trailing={<Pressable accessibilityRole="button" accessibilityLabel={showPassword?'Hide password':'Show password'} onPress={()=>setShowPassword(v=>!v)} disabled={action.busy} style={{padding:12}}><Ionicons name={showPassword?'eye-off-outline':'eye-outline'} size={22} color="#245EEA" /></Pressable>} />}
     </>}
-    <Button label={action.busy ? 'Please wait…' : challenge?(create?'Verify and create account':'Verify and sign in'):create ? 'Create account' : emailCodeLogin?'Send email code':'Sign in'} disabled={action.busy}
+    <Button label={action.busy ? 'Please wait…' : challenge?(create?'Verify and create account':'Verify and sign in'):create ? 'Create account' : emailCodeLogin?'Send email code':'Sign in'} disabled={action.busy||(create&&(!acceptedTerms||!acceptedPrivacy))}
       onPress={() => void action.run(submit)} />
     <ErrorText message={action.error} />
     <Button label={create ? 'Already have an account?' : 'Create an account'} disabled={action.busy}

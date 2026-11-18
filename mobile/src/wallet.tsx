@@ -1,3 +1,4 @@
+import {DemoCard} from './demoWallet';
 import { useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { randomUUID } from 'expo-crypto';
@@ -60,20 +61,20 @@ export function Wallet({ userId }: { userId: string }) {
     } else {
       if (!checkout.keyId?.startsWith('rzp_test_') || !checkout.orderId) throw new Error('Test checkout is unavailable.');
       await RazorpayCheckout.open({ key: checkout.keyId, order_id: checkout.orderId,
-        amount: String(operation.amountPaise), currency: 'INR', name: 'FlexirRides', description: 'Test wallet top-up' });
+        amount: String(operation.amountPaise), currency: 'INR', name: 'FlexiRides', description: 'Test wallet top-up' });
       await sync(operation.id);
     }
   }
 
   return <>
-    <Card>
-      <Copy>Wallet balance</Copy>
+    <DemoCard/><Card>
+      <Copy>Provider test wallet balance</Copy>
       {balance.data ? <Copy>{rupees(balance.data.availablePaise)} available · {rupees(balance.data.reservedPaise)} reserved</Copy> :
         <QueryState error={balance.error} reload={balance.reload} />}
       <Copy>Test-mode top-ups · no real money</Copy>
       <Choice label="Payment provider" values={[{value:'razorpay',label:'Razorpay'},{value:'stripe',label:'Stripe'}]} selected={provider} change={v=>setProvider(v as 'razorpay'|'stripe')}/>
       <Copy>{provider==='razorpay'?'Razorpay test card: 4100 2800 0000 1007':'Stripe test card: 4242 4242 4242 4242'} · CVV 123 · any future expiry.</Copy>
-      <Copy>Enter the test card only in the provider checkout. Card details are not stored in FlexirRides.</Copy>
+      <Copy>Enter the test card only in the provider checkout. Card details are not stored in FlexiRides.</Copy>
       {options.data&&<Copy>{(provider==='razorpay'?options.data.razorpayEnabled:options.data.stripeEnabled)?'Test checkout configured.':'This provider needs test API keys before checkout is available.'}</Copy>}
       {!options.data&&<QueryState error={options.error} reload={options.reload}/>}
 

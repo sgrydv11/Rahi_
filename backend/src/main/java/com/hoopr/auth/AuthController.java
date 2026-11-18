@@ -42,6 +42,7 @@ public class AuthController {
         return java.util.Map.of("token", token.getToken(), "headerName", token.getHeaderName());
     }
     public static class GoogleRequest {
+        public boolean acceptedTerms; public boolean acceptedPrivacy;
         @NotBlank @Size(max = 10000) public String credential;
         @NotNull public com.hoopr.user.TravelPreference travelPreference = com.hoopr.user.TravelPreference.PASSENGER;
         @Override public String toString() { return "GoogleRequest[redacted]"; }
@@ -52,7 +53,7 @@ public class AuthController {
     @PostMapping("/google") public AuthService.Access google(@Valid @RequestBody GoogleRequest body,
             HttpServletRequest request, HttpServletResponse response) {
         limiter.check(request.getRemoteAddr());
-        var issued = googleSignIn.signIn(body.credential, body.travelPreference);
+        var issued = googleSignIn.signIn(body.credential, body.travelPreference,body.acceptedTerms,body.acceptedPrivacy);
         limiter.succeeded(request.getRemoteAddr());
         return respond(issued, response);
     }

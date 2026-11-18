@@ -30,7 +30,7 @@ export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride
     if (!boarding || !dropping) throw new Error('Select boarding and dropping points.');
     if (passengers.some(person => !/^\p{L}[\p{L}\p{M} .'-]{0,119}$/u.test(person.name.trim()) || !person.age.trim()
         || !Number.isInteger(Number(person.age)) || Number(person.age) < 0 || Number(person.age) > 120
-        || !['FEMALE', 'MALE', 'OTHER'].includes(person.gender))) throw new Error('Enter a valid name, age and gender for each passenger.');
+        || !['FEMALE', 'MALE', 'OTHER', 'NOT_SPECIFIED'].includes(person.gender))) throw new Error('Enter a valid name, age and gender for each passenger.');
     if (ride.preferences?.womenOnly && passengers.some(person => person.gender !== 'FEMALE')) throw new Error('This ride is for women passengers only.');
     return { demoPaymentMethod:payment, boardingPoint: boarding, droppingPoint: dropping, passengers: passengers.map(person => ({
       name: person.name.trim(), age: Number(person.age), gender: person.gender as Passenger['gender'],
@@ -64,7 +64,7 @@ export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride
         }} />}
         <Field label="Name" value={person.name} change={value => edit(index, 'name', value)} />
         <Field label="Age" value={person.age} numeric change={value => edit(index, 'age', value)} />
-        <Choice label="Gender" selected={person.gender} values={ride.preferences?.womenOnly ? [{ value: 'FEMALE', label: 'Female' }] : [{ value: 'FEMALE', label: 'Female' }, { value: 'MALE', label: 'Male' }, { value: 'OTHER', label: 'Other' }]}
+        <Choice label="Gender" selected={person.gender} values={ride.preferences?.womenOnly ? [{ value: 'FEMALE', label: 'Female' }] : [{ value: 'FEMALE', label: 'Female' }, { value: 'MALE', label: 'Male' }, { value: 'OTHER', label: 'Other' }, { value: 'NOT_SPECIFIED', label: 'Prefer not to say' }]}
           change={value => edit(index, 'gender', value)} />
       </View>)}
       <Button label="Review booking" onPress={() => void action.run(async () => { details(); setStage('review'); })} />

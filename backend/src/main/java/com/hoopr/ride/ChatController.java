@@ -20,7 +20,7 @@ public class ChatController {
         public Send(UUID clientId,String body,UUID rideId,boolean sharePhone) { this(clientId,body,rideId,sharePhone,null,null); }
         public Send(UUID clientId,String body,UUID rideId,boolean sharePhone,Long replyToId) { this(clientId,body,rideId,sharePhone,replyToId,null); }
     }
-    public record Reply(long id, UUID senderId, String senderName, String body) { }
+    public record Reply(long id, UUID senderId, String senderName, String body,String mobileNumber) { }
     public record Member(String fullName, String travelPreference, Instant memberSince) { }
     public record Offer(UUID id, String origin, String destination, Instant departureAt, String timeZone,
                         int availableSeats, BigDecimal pricePerSeat, String currency, String status) { }
@@ -32,7 +32,7 @@ public class ChatController {
 
     private static final String SELECT = """
         SELECT m.*, p.full_name, p.travel_preference, u.created_at AS member_since,
-               parent.id AS parent_id, parent.sender_id AS parent_sender, CASE WHEN parent.hidden THEN 'Message removed by moderation' ELSE parent.body END AS parent_body, parent_profile.full_name AS parent_name,
+               parent.id AS parent_id, parent.sender_id AS parent_sender, CASE WHEN parent.hidden THEN 'Message removed by moderation' ELSE parent.body END AS parent_body, parent_profile.full_name AS parent_name,parent_user.mobile_number AS parent_mobile,
                u.mobile_number AS sender_mobile,
                u.mobile_verified AS sender_mobile_verified,
                r.source_name, r.destination_name, r.departure_at, r.departure_time_zone,
@@ -40,14 +40,14 @@ public class ChatController {
                greatest(0,r.available_seats - coalesce((SELECT sum(h.seats) FROM group_seat_holds h
                  WHERE h.ride_id=r.id AND h.status='HELD' AND h.expires_at>CURRENT_TIMESTAMP),0)) AS seats
         FROM chat_messages m JOIN user_profiles p ON p.user_id=m.sender_id JOIN users u ON u.id=m.sender_id LEFT JOIN rides r ON r.id=m.ride_id
-        LEFT JOIN chat_messages parent ON parent.id=m.reply_to_id AND parent.group_id=m.group_id AND parent.created_at>=CURRENT_TIMESTAMP-interval '7 days' LEFT JOIN user_profiles parent_profile ON parent_profile.user_id=parent.sender_id
+        LEFT JOIN chat_messages parent ON parent.id=m.reply_to_id AND parent.group_id=m.group_id AND parent.created_at>=CURRENT_TIMESTAMP-interval '7 days' LEFT JOIN user_profiles parent_profile ON parent_profile.user_id=parent.sender_id LEFT JOIN users parent_user ON parent_user.id=parent.sender_id
         """;
 
     public Messages list(Jwt jwt,long after) { return list(jwt,after,1,0); }
-    @GetMapping @Transactional(readOnly=true)
+    @GetMapping @Transactional
     public Messages list(@AuthenticationPrincipal Jwt jwt,@RequestParam(defaultValue="0") @Min(0) long after,
                          @RequestParam(defaultValue="1") @Min(1) long groupId,@RequestParam(defaultValue="0") @Min(0) long before) {
-        active(jwt); requireGroup(groupId);
+        UUID member=active(jwt); requireGroup(groupId); requireMember(member,groupId);
         var args=new ArrayList<Object>();args.add(groupId);
         String where=" WHERE m.group_id=? AND m.created_at>=CURRENT_TIMESTAMP-interval '7 days'";
         if(after>0){where+=" AND m.id>?";args.add(after);}else if(before>0){where+=" AND m.id<?";args.add(before);}
@@ -58,6 +58,10 @@ public class ChatController {
         boolean older=oldest>0 && Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM chat_messages WHERE group_id=? AND id<? AND created_at>=CURRENT_TIMESTAMP-interval '7 days')",Boolean.class,groupId,oldest));
         return new Messages(messages,messages.isEmpty()?after:messages.getLast().id(),ascending&&more,oldest,older);
     }
+    private void requireMember(UUID member,long group) {
+        jdbc.update("INSERT INTO chat_group_preferences(user_id,group_id,last_read_id) VALUES(?,?,coalesce((SELECT max(id) FROM chat_messages WHERE group_id=?),0)) ON CONFLICT DO NOTHING",member,group,group);
+        if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM chat_group_preferences WHERE user_id=? AND group_id=? AND left_at IS NOT NULL)",Boolean.class,member,group)))throw new RideFailure(403,"Join this group to view or send messages.");
+    }
     private void requireGroup(long group) {
         if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM chat_groups WHERE id=?)",Boolean.class,group)))throw new RideFailure(404,"Group not found.");
     }
@@ -66,7 +70,7 @@ public class ChatController {
     @Transactional
     public Message send(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Send request) {
         UUID sender = active(jwt);
-        long group=request.groupId()==null?1:request.groupId();requireGroup(group);
+        long group=request.groupId()==null?1:request.groupId();requireGroup(group); requireMember(sender,group);
         // Serialize sequence assignment with commit order so cursor polling cannot skip an uncommitted message.
         jdbc.queryForList("SELECT pg_advisory_xact_lock(6173052901)");
         var previous = jdbc.query(SELECT + " WHERE m.sender_id=? AND m.client_id=?", (rs,row) -> map(rs), sender,request.clientId());
@@ -104,7 +108,7 @@ public class ChatController {
             rs.getBigDecimal("price_per_seat"),rs.getString("currency"),rs.getString("ride_status"));
         return new Message(rs.getLong("id"),rs.getObject("sender_id",UUID.class),rs.getString("full_name"),
             (rs.getBoolean("hidden") ? "Message removed by moderation" : rs.getString("body")),rs.getTimestamp("created_at").toInstant(),ride,true,rs.getString("sender_mobile"),rs.getBoolean("sender_mobile_verified"),
-            rs.getObject("parent_id")==null ? null : new Reply(rs.getLong("parent_id"),rs.getObject("parent_sender",UUID.class),rs.getString("parent_name"),rs.getString("parent_body")),
+            rs.getObject("parent_id")==null ? null : new Reply(rs.getLong("parent_id"),rs.getObject("parent_sender",UUID.class),rs.getString("parent_name"),rs.getString("parent_body"),rs.getString("parent_mobile")),
             new Member(rs.getString("full_name"),rs.getString("travel_preference"),rs.getTimestamp("member_since").toInstant()),rs.getLong("group_id"));
     }
 }

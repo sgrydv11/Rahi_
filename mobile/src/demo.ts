@@ -29,6 +29,7 @@ export function demoRides(query: string, page: number): Page<Ride> {
   const minimum = Number(filters.get('minimumSeats') || 1);
   const maximum = Number(filters.get('maximumPrice') || Infinity);
   const matching = rides.filter(ride => {
+    if(filters.get('routeType')&&ride.preferences?.routeType!==filters.get('routeType'))return false;
     if (origin && !ride.origin.toLowerCase().startsWith(origin)) return false;
     if (destination && !ride.destination.toLowerCase().startsWith(destination)) return false;
     if (ride.availableSeats < minimum || ride.pricePerSeat > maximum) return false;

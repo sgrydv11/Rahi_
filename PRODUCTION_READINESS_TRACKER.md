@@ -1,4 +1,4 @@
-# FlexirRides carpool readiness tracker
+# FlexiRides carpool readiness tracker
 
 Last updated 14 November 2026, Asia/Kolkata.
 
@@ -140,7 +140,7 @@ This file is the persistent plan, evidence record, and handoff for work across a
 
 - Current objective is a reliable, testable carpool pilot, followed by the remaining production readiness work.
 - Active service is scheduled carpooling. Rentals will have a clearly labelled Coming soon card without booking actions. Rental implementation is excluded from this plan.
-- Use FlexirRides as the customer-facing brand and blue as the primary theme.
+- Use FlexiRides as the customer-facing brand and blue as the primary theme.
 - Create an APK only when the user explicitly commands an APK/app build. Do not submit EAS builds automatically after changes.
 - Preserve existing uncommitted work. Do not reset, discard, or overwrite unrelated changes.
 - Account limits are not visible to the agent. Do not promise that this backlog fits the remaining allowance. Record a handoff before stopping.
@@ -415,3 +415,13 @@ Expo abbcb267-192a-4770-96e2-bff8747936fc FINISHED, Android0.2.2/code4, source d
 APK ZIP CRC passes; manifest package/version and Google native module verified; signing certificate matches the previous APK. SHA256 7de27a75238c0a9d0ba752e6c243a09fa83374cec8730bbb0a0c0e9647dd3fab. Render dep-dbrmblh42hec73cc370g is Live, V21–V23 applied, health UP; 17 live API/asset checks, 24 live responsive cases and 15 loaded selected-date ride cards/detail/Book Seat navigation passed. GitHub43493200825 passed all jobs. Full isolated backend157, web57, native24, exports, UI72/link25, signup/calendar/chat booking/reply/contact and security/concurrency tests passed. Additional ambiguous-delivery chat test passes same-key retry/draft retention and no duplication after reload.
 
 Release code pushed on app_v1. Verification documentation is committed with [skip render] [skip ci] so it does not redeploy unchanged code. No email or live community messages were sent. Physical Android acceptance, Google Cloud setup and the remaining combined-audit items are not claimed complete. See docs/release-0.2.2.md for links and limits.
+
+
+## 18 November 2026 — chat controls and ride presets
+
+Source/local QA completed: resend countdown/link styling, compact replies, group member/notification/leave/rejoin controls with server permissions, named route autofill, optional gender disclosure, and guarded local dummy-number seed. Verified 71 web + 35 native + 17 backend tests, production web build, native TypeScript/Android JS export and browser workflows. Deployment, V28 on production and an updated APK/device check remain pending. See [detailed audit](docs/chat-group-controls-2026-11-18.md).
+
+
+## 18 November 2026 — compact channels, demo card and signup consent
+
+Completed in source/local QA: reference-style group list with persistent private pins and per-group menu; isolated static-card demo wallet with safe debit/credit; separate required signup policy checkboxes and clearly marked draft readers. Verified 67 backend, 71 web and 35 native tests, production web build, native typecheck/Android JS export and browser regression suites. Production deployment/V29, owner-approved legal text and an updated APK/device check remain pending. See [audit](docs/channels-demo-wallet-consent-2026-11-18.md).

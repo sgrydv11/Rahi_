@@ -41,7 +41,7 @@ public class EmailOtpService {
         if (password.isBlank() || password.length()<12) throw new AuthFailure(400,"Use a password of at least 12 characters.");
         if (mobile==null || mobile.isBlank()) throw new AuthFailure(400,"Enter your mobile number.");
         var challenge=challenge(email,mobile,preference,passwords.encode(password),true);
-        jdbc.update("UPDATE email_otp_challenges SET regular_routes=?::jsonb WHERE id=?",routeJson(routes),challenge.challengeId());
+        jdbc.update("UPDATE email_otp_challenges SET regular_routes=?::jsonb,consent_version=?,consent_at=? WHERE id=?",routeJson(routes),LegalConsent.VERSION,clock.instant().atOffset(ZoneOffset.UTC),challenge.challengeId());
         return challenge;
     }
     public static String mobile(String value) {
@@ -93,12 +93,13 @@ public class EmailOtpService {
         jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtext(?))", "email:" + email);
         var user = users.findByEmail(email).orElse(null);
         String signupHash = (String) challenge.get("registration_password_hash");
-        if ("REGISTER".equals(challenge.get("purpose")) && user!=null) throw invalid();
+        if ("REGISTER".equals(challenge.get("purpose")) && (user!=null||challenge.get("consent_version")==null||challenge.get("consent_at")==null)) throw invalid();
         if ("LOGIN".equals(challenge.get("purpose")) && user==null) throw invalid();
         if (user == null) {
-            var profile = auth.register(email, UUID.randomUUID().toString(), "FlexirRides member", TravelPreference.valueOf(challenge.get("travel_preference").toString()), (String)challenge.get("mobile_number"));
+            var profile = auth.register(email, UUID.randomUUID().toString(), "FlexiRides member", TravelPreference.valueOf(challenge.get("travel_preference").toString()), (String)challenge.get("mobile_number"));
             user = users.findById(profile.id()).orElseThrow();
             if (signupHash!=null) { user.passwordHash=signupHash; users.saveAndFlush(user); }
+            if(challenge.get("consent_version")!=null)LegalConsent.record(jdbc,user.id,challenge.get("consent_version").toString(),((java.sql.Timestamp)challenge.get("consent_at")).toInstant(),"EMAIL");
             for(var route:readRoutes(challenge.get("regular_routes").toString()))
                 jdbc.update("INSERT INTO user_travel_routes(user_id,origin,destination,time_period) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",user.id,route.origin(),route.destination(),route.period().name());
         }

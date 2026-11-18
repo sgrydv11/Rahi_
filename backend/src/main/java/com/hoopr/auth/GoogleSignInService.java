@@ -20,7 +20,9 @@ public class GoogleSignInService {
     }
 
     @Transactional
-    public AuthService.Issued signIn(String credential, TravelPreference preference) {
+    public AuthService.Issued signIn(String credential, TravelPreference preference) {return signIn(credential,preference,false,false);}
+    @Transactional
+    public AuthService.Issued signIn(String credential,TravelPreference preference,boolean acceptedTerms,boolean acceptedPrivacy) {
         var token = verifier.verify(credential);
         String subject = token.getSubject();
         String email = AuthService.normalize(token.getClaimAsString("email"));
@@ -36,11 +38,13 @@ public class GoogleSignInService {
                 if (user.googleSubject != null || !authoritative)
                     throw new AuthFailure(409, "This email already has an account. Please sign in with your existing method.");
             } else {
+                if(!acceptedTerms||!acceptedPrivacy)throw new AuthFailure(409,"Open Create account and accept the Terms & Conditions and Privacy Policy first.");
                 String name = token.getClaimAsString("name");
                 if (name == null || name.isBlank()) name = email.substring(0, email.indexOf('@'));
                 name = name.strip();
                 var profile = auth.register(email, UUID.randomUUID().toString(), name.substring(0, Math.min(120, name.length())), preference);
                 user = users.findById(profile.id()).orElseThrow();
+                LegalConsent.record(jdbc,user.id,clock.instant(),"GOOGLE");
             }
             if (!"ACTIVE".equals(user.status)) throw new AuthFailure(401, "This account is unavailable.");
             user.googleSubject = subject;

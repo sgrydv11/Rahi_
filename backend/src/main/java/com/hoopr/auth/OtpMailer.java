@@ -27,7 +27,7 @@ public class OtpMailer {
 
     public OtpMailer(@Value("${BREVO_API_KEY:}") String brevoKey, @Value("${RESEND_API_KEY:}") String resendKey,
                      @Value("${OTP_EMAIL_FROM:}") String from,
-                     @Value("${OTP_EMAIL_FROM_NAME:FlexirRides}") String senderName,
+                     @Value("${OTP_EMAIL_FROM_NAME:FlexiRides}") String senderName,
                      @Value("${EMAIL_OTP_ENABLED:false}") boolean enabled) {
         this.enabled = enabled;
         this.brevo = !brevoKey.isBlank();
@@ -55,8 +55,8 @@ public class OtpMailer {
         if (apiKey.isBlank() || from.isBlank())
             throw new AuthFailure(503, "Email verification is awaiting email delivery setup. Please try again later.");
         try {
-            String subject = "Your FlexirRides verification code";
-            String text = "Your FlexirRides code is " + code
+            String subject = "Your FlexiRides verification code";
+            String text = "Your FlexiRides code is " + code
                     + ". It expires in 5 minutes. Do not share it. If you did not request this code, ignore this email.";
             String html = template.replace("{{CODE}}", HtmlUtils.htmlEscape(code));
             var payload = brevo

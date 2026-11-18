@@ -177,7 +177,7 @@ Phases 1–10 cover the application foundation through test checkout. Sandbox ch
 
 The login and registration pages use Google Identity Services. The backend verifies signed Google ID tokens and issues the existing app session. Flyway V15 adds a unique Google subject to users. Existing passwords remain usable.
 
-1. In Google Cloud Console, create/select the FlexirRides project and open Google Auth Platform.
+1. In Google Cloud Console, create/select the FlexiRides project and open Google Auth Platform.
 2. Configure Branding, Audience and the consent screen. For external testing, add the Google accounts that will test sign-in.
 3. Create an OAuth client with application type Web application.
 4. Add authorized JavaScript origins `http://localhost`, `http://localhost:5173`, and the exact HTTPS origin of the deployed frontend. Origins contain no route such as `/login`.

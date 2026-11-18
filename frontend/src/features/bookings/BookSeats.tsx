@@ -55,11 +55,11 @@ export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedS
     const details: JourneyDetails = confirm && review.current ? review.current : {
       boardingPoint: String(data.get('boardingPoint') || ''), droppingPoint: String(data.get('droppingPoint') || ''),
       passengers: Array.from({ length: seats }, (_, index) => ({ name: String(data.get(`name${index}`) || '').trim(),
-        age: Number(data.get(`age${index}`)), gender: String(data.get(`gender${index}`)) as 'FEMALE' | 'MALE' | 'OTHER' })),
+        age: Number(data.get(`age${index}`)), gender: String(data.get(`gender${index}`)) as 'FEMALE' | 'MALE' | 'OTHER' | 'NOT_SPECIFIED' })),
     };
     if (!confirm && (!details.boardingPoint || !details.droppingPoint || details.passengers.some((person, index) =>
       !/^\p{L}[\p{L}\p{M} .'-]{0,119}$/u.test(person.name) || !String(data.get(`age${index}`) || '').trim()
-      || !Number.isInteger(person.age) || person.age < 0 || person.age > 120 || !['FEMALE', 'MALE', 'OTHER'].includes(person.gender)))) {
+      || !Number.isInteger(person.age) || person.age < 0 || person.age > 120 || !['FEMALE', 'MALE', 'OTHER', 'NOT_SPECIFIED'].includes(person.gender)))) {
       setError('Select stops and enter a valid name, age and gender for each passenger.'); return;
     }
     if (!confirm) { review.current = details; setConfirm(true); return; }
@@ -84,7 +84,7 @@ export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedS
       </select></label>}
       <label>Name<input name={`name${index}`} required maxLength={120} /></label>
       <label>Age<input name={`age${index}`} type="number" required min={0} max={120} step={1} /></label>
-      <label>Gender<select name={`gender${index}`} required defaultValue=""><option value="">Select gender</option><option value="FEMALE">Female</option>{!ride.preferences?.womenOnly && <><option value="MALE">Male</option><option value="OTHER">Other</option></>}</select></label>
+      <label>Gender<select name={`gender${index}`} required defaultValue=""><option value="">Select gender</option><option value="FEMALE">Female</option>{!ride.preferences?.womenOnly && <><option value="MALE">Male</option><option value="OTHER">Other</option><option value="NOT_SPECIFIED">Prefer not to say</option></>}</select></label>
     </fieldset>)}
     <p>Total: <strong>{ride.currency} {(Number(ride.pricePerSeat) * seats).toFixed(2)}</strong>. No payment is collected here.</p>
     {confirm && <fieldset disabled={busy || Boolean(request.current)}><legend>Payment choice · demo only</legend><label>Payment option<select aria-label="Demo payment option" value={demoPaymentMethod} onChange={e=>setDemoPaymentMethod(e.target.value as 'DIRECT'|'QR'|'OTHER')}><option value="DIRECT">Direct payment to driver (demo)</option><option value="QR">QR code (demo)</option><option value="OTHER">Other method (demo)</option></select></label>{demoPaymentMethod==='QR'&&<div className="demo-qr" role="img" aria-label="Demo QR placeholder, not a payment code">DEMO</div>}<p>No money is collected. This records a preference only; it does not mark the booking paid.</p></fieldset>}

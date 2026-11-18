@@ -1,0 +1,1 @@
+export function parseAmount(input:string){if(!/^\d{1,5}(\.\d{1,2})?$/.test(input.trim()))return null;const[a,b='']=input.trim().split('.');const amount=Number(a)*100+Number(b.padEnd(2,'0'));return amount>=100&&amount<=1000000?amount:null;}

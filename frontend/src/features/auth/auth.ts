@@ -67,17 +67,17 @@ export async function login(email: string, password: string) {
 export async function register(email: string, password: string, fullName: string, travelPreference: TravelPreference = 'BOTH', mobileNumber?: string) {
   return mutate<User>('/auth/register', { email, password, fullName, travelPreference, mobileNumber });
 }
-export async function loginWithGoogle(credential: string, travelPreference: TravelPreference = 'PASSENGER') {
+export async function loginWithGoogle(credential: string, travelPreference: TravelPreference = 'PASSENGER',consent?:{acceptedTerms:boolean;acceptedPrivacy:boolean}) {
   if (refreshPending) await refreshPending.catch(() => {});
   generation++;
-  const next = await mutate<Session>('/auth/google', { credential, travelPreference });
+  const next = await mutate<Session>('/auth/google', { credential, travelPreference,acceptedTerms:consent?.acceptedTerms===true,acceptedPrivacy:consent?.acceptedPrivacy===true });
   publish(next);
 }
 export function requestEmailOtp(identifier: string, mobileNumber?: string, travelPreference: TravelPreference = 'PASSENGER') {
   return mutate<{ challengeId: string; expiresIn: number; delivery: string }>('/auth/otp/request', { identifier, mobileNumber, travelPreference });
 }
-export function requestRegistrationOtp(identifier:string,password:string,mobileNumber:string,travelPreference:TravelPreference,regularRoutes:import('../profile/RegularRoutes').RegularRoute[]=[]) {
-  return mutate<{challengeId:string;expiresIn:number;delivery:string}>('/auth/registration/request',{identifier,password,mobileNumber,travelPreference,regularRoutes});
+export function requestRegistrationOtp(identifier:string,password:string,mobileNumber:string,travelPreference:TravelPreference,regularRoutes:import('../profile/RegularRoutes').RegularRoute[]=[],consent?:{acceptedTerms:boolean;acceptedPrivacy:boolean}) {
+  return mutate<{challengeId:string;expiresIn:number;delivery:string}>('/auth/registration/request',{identifier,password,mobileNumber,travelPreference,regularRoutes,acceptedTerms:consent?.acceptedTerms===true,acceptedPrivacy:consent?.acceptedPrivacy===true});
 }
 export async function verifyEmailOtp(challengeId: string, code: string) {
   if (refreshPending) await refreshPending.catch(() => {});

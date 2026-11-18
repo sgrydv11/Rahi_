@@ -28,6 +28,17 @@ class RideChangesIT {
     @Autowired RideService rides;
     @Autowired BookingService bookings;
     @Autowired JdbcTemplate jdbc;
+    @Test void commutePreferenceFiltersOfficeHomeAndLegacyOtherWithoutChangingSeatFilters() {
+        var office=offer(users.get(0),9,"100",prefs(false,false));
+        var home=offer(users.get(0),17,"100",new RidePreferences(List.of("Station"),List.of("Tower"),true,false,false,false,RidePreferences.RouteType.OFFICE_TO_HOME));
+        var other=offer(users.get(0),12,"100",null);
+        assertEquals(3,search("TIME_ASC",null,null,null,false,false,null).totalElements());
+        for(var entry:Map.of(RidePreferences.RouteType.HOME_TO_OFFICE,office.id(),RidePreferences.RouteType.OFFICE_TO_HOME,home.id(),RidePreferences.RouteType.OTHER,other.id()).entrySet()){
+            var found=rides.search(origin,"Ujjain",tomorrow,"Asia/Kolkata",1,null,0,20,"TIME_ASC",null,null,null,false,false,false,null,null,entry.getKey());
+            assertEquals(1,found.totalElements());assertEquals(entry.getValue(),found.content().getFirst().id());
+            assertEquals(0,rides.search(origin,"Ujjain",tomorrow,"Asia/Kolkata",3,null,0,20,"TIME_ASC",null,null,null,false,false,false,null,null,entry.getKey()).totalElements());
+        }
+    }
     List<UUID> users;
     LocalDate tomorrow;
     String origin;

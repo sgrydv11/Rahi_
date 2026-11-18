@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class WebAppRoutes implements WebMvcConfigurer {
-    public static final String[] PAGES = {"/", "/admin", "/help", "/chat", "/login", "/register", "/profile", "/wallet", "/vehicles", "/notifications",
+    public static final String[] PAGES = {"/", "/terms", "/privacy", "/admin", "/help", "/chat", "/login", "/register", "/profile", "/wallet", "/vehicles", "/notifications",
             "/rides", "/rides/mine", "/rides/new", "/rides/{id}", "/rides/{id}/edit", "/rides/{id}/bookings",
             "/bookings/mine", "/bookings/{id}"};
     public static final String[] ASSETS = {"/index.html", "/assets/**", "/fonts/**", "/icons/**", "/flexirrides-icon.png", "/favicon.png"};

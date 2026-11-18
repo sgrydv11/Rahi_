@@ -1,0 +1,32 @@
+// Local QA fixtures only; browser location is simulated, never a real user's coordinates.
+const {chromium,expect}=require('../.tools/audit-playwright/node_modules/playwright/test');
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const base='http://127.0.0.1:5177',api='http://127.0.0.1:8084/api/v1';
+(async()=>{
+ const stamp=Date.now(),email=`compact-${stamp}@qa.example.test`,password='Compact-search-test-password-long';
+ async function post(path,body,token,status=200){const r=await fetch(api+path,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});assert.equal(r.status,status,await r.clone().text());return r.json();}
+ await post('/mobile/auth/register',{email,password,fullName:'Preview Driver',travelPreference:'BOTH'},null,201);
+ const session=await post('/mobile/auth/login',{email,password});
+ const day=new Date(Date.now()+3*86400000).toLocaleDateString('sv-SE',{timeZone:'Asia/Kolkata'}),office=[];
+ const offer={origin:'Indore',destination:'Ujjain',timeZone:'Asia/Kolkata',totalSeats:3,currency:'INR'};
+ for(const [hour,price] of [[7,120],[8,150],[9,100]])office.push(await post('/rides',{...offer,departureAt:`${day}T0${hour}:30:00+05:30`,pricePerSeat:price,preferences:{boardingPoints:['Vijay Nagar'],droppingPoints:['Nanakheda'],hasCar:true,ac:false,flexibleDropoff:false,womenOnly:false,routeType:'HOME_TO_OFFICE'}},session.accessToken,201));
+ const home=await post('/rides',{...offer,departureAt:`${day}T17:30:00+05:30`,pricePerSeat:110,preferences:{boardingPoints:['Vijay Nagar'],droppingPoints:['Nanakheda'],hasCar:true,ac:false,flexibleDropoff:false,womenOnly:false,routeType:'OFFICE_TO_HOME'}},session.accessToken,201);
+ const browser=await chromium.launch({channel:'chrome',headless:true});try{
+  const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,geolocation:{latitude:22.7196,longitude:75.8577},permissions:['geolocation']});const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/rides');
+  await page.getByRole('button',{name:'Use current city',exact:true}).click();await expect(page.getByLabel('From City',{exact:true})).toHaveValue('Indore');
+  await page.getByLabel('To City',{exact:true}).fill('Ujjain');await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Custom date').fill(day);await page.getByRole('combobox',{name:'Ride',exact:true}).selectOption('office-ujjain');await page.getByRole('button',{name:'Search rides',exact:true}).click();
+  await expect(page.locator(`a.button[href='/rides/${office[0].id}']`)).toBeVisible();await expect(page.locator(`a.button[href='/rides/${home.id}']`)).toBeVisible();
+  await expect(page.getByRole('heading',{level:1})).toHaveCount(0);await expect(page.getByText('Change search',{exact:true})).toHaveCount(0);await expect(page.locator('.search-summary-meta')).toContainText('1 seat');await expect(page.getByRole('group',{name:'Sort rides'})).toBeHidden();
+  await page.getByText('Sort',{exact:true}).click();await page.getByRole('button',{name:'Sort by price ascending',exact:true}).click();await page.getByRole('button',{name:'Sort by price ascending',exact:true}).click();await expect(page.locator('.ride-results')).toHaveAttribute('aria-busy','false');
+  assert.equal(new URL(page.url()).searchParams.get('origin'),'Indore');assert.equal(new URL(page.url()).searchParams.get('sort'),'PRICE_DESC');await page.getByText('Sort',{exact:true}).click();
+  await page.getByRole('button',{name:'Edit search',exact:true}).click();await expect(page.getByLabel('From City',{exact:true})).toHaveValue('Indore');await expect(page.getByRole('combobox',{name:'Ride',exact:true})).toHaveValue('office-ujjain');await page.getByRole('combobox',{name:'Seats',exact:true}).selectOption('2');await page.getByRole('button',{name:'Search rides',exact:true}).click();await expect(page.locator('.search-summary-meta')).toContainText('2 seats');
+  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow at ${width}`);}
+  // Preserve two actual rendered phone previews for user review.
+  await page.setViewportSize({width:390,height:844});await expect(page.locator('.ride-results')).toHaveAttribute('aria-busy','false');await page.screenshot({path:'.local/ride-search-phone-results.png',fullPage:false});
+  await page.getByRole('button',{name:'Edit search',exact:true}).click();await page.screenshot({path:'.local/ride-search-phone-form.png',fullPage:true});
+  // Commute-purpose filtering remains compatible at the real API boundary.
+  for(const [type,included,excluded] of [['HOME_TO_OFFICE',office[0].id,home.id],['OFFICE_TO_HOME',home.id,office[0].id]]){const r=await fetch(api+'/rides?'+new URLSearchParams({origin:'Indore',destination:'Ujjain',departureDate:day,timeZone:'Asia/Kolkata',routeType:type,page:'0',size:'50'}));assert.equal(r.status,200);const data=await r.json();assert(data.content.some(x=>x.id===included));assert(!data.content.some(x=>x.id===excluded));}
+  const denied=await browser.newContext({viewport:{width:390,height:844},permissions:[]});const other=await denied.newPage();await other.goto(base+'/rides');await other.getByLabel('From City',{exact:true}).fill('Dewas');await other.getByRole('button',{name:'Use current city',exact:true}).click();await expect(other.getByRole('status').filter({hasText:'Location was unavailable or not allowed'})).toBeVisible({timeout:15000});await expect(other.getByLabel('From City',{exact:true})).toHaveValue('Dewas');await denied.close();
+  assert.deepEqual(errors,[]);fs.writeFileSync('.local/compact-search-qa.json',JSON.stringify({passed:true,viewports:[320,390,768,1440],location:'simulated granted/denied; no real location used',backendPreferenceFilter:true,day},null,2));console.log('PASS: Named route autofill, Office/Home backend filters, local current-city detection, permission denial/manual fallback, compact result summary, Sort disclosure, edit/seat preservation and responsive phone previews.');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

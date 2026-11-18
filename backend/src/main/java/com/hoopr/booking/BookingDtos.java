@@ -9,7 +9,7 @@ public final class BookingDtos {
     private BookingDtos() { }
     public record Passenger(@NotBlank @Size(max = 120) @Pattern(regexp = "\\p{L}[\\p{L}\\p{M} .'-]{0,119}") String name,
                             @NotNull @Min(0) @Max(120) Integer age, @NotNull Gender gender) { }
-    public enum Gender { FEMALE, MALE, OTHER }
+    public enum Gender { FEMALE, MALE, OTHER, NOT_SPECIFIED }
     public record JourneyDetails(@NotBlank @Size(max = 200) String boardingPoint,
                                  @NotBlank @Size(max = 200) String droppingPoint,
                                  @NotNull @Size(min = 1, max = 6) List<@NotNull @jakarta.validation.Valid Passenger> passengers,

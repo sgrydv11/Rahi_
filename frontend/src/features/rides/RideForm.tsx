@@ -52,7 +52,7 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       <label>Going to<input name="destination" required maxLength={200} value={destination} onChange={e=>setDestination(e.target.value)} /></label>
       <label>Departure<input name="departure" type="datetime-local" required defaultValue={ride ? localDateTime(ride.departureAt) : ''} /></label>
       <label>Do you have a car?<select name="hasCar" required defaultValue={ride?.preferences?.hasCar ? 'yes' : ''}><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
-      <label>Route type<select name="routeType" defaultValue={ride?.preferences?.routeType || 'OTHER'}><option value="HOME_TO_OFFICE">Home to Office</option><option value="OFFICE_TO_HOME">Office to Home</option><option value="OTHER">Other</option></select></label>
+      <label>Route type<select name="routeType" defaultValue={ride?.preferences?.routeType || 'OTHER'}><option value="HOME_TO_OFFICE">Office · Home to Office</option><option value="OFFICE_TO_HOME">Home · Office to Home</option><option value="OTHER">Other</option></select></label>
       <label>Boarding points, one per line<textarea name="boardingPoints" required value={boarding} onChange={e=>setBoarding(e.target.value)} /></label>
       <label>Dropping points, one per line<textarea name="droppingPoints" required value={dropping} onChange={e=>setDropping(e.target.value)} /></label>
       {cityPoints(origin).length>0&&<button type="button" onClick={()=>setBoarding(cityPoints(origin).join('\n'))}>Use city boarding points</button>}

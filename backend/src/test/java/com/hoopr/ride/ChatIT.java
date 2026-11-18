@@ -16,7 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties={"hoopr.auth.jwt-secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     "hoopr.auth.issuer=hoopr-test","hoopr.auth.origins=http://localhost:5173",
     "hoopr.auth.cookie-secure=true","hoopr.auth.cookie-same-site=Lax","hoopr.auth.refresh-lifetime=30d"})
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 class ChatIT {
+    @Autowired org.springframework.test.web.servlet.MockMvc mvc;
     @DynamicPropertySource static void database(DynamicPropertyRegistry r) {
         r.add("spring.datasource.url",()->TestDatabase.required("TEST_DB_URL"));
         r.add("spring.datasource.username",()->TestDatabase.required("TEST_DB_USERNAME"));
@@ -166,4 +168,28 @@ class ChatIT {
         assertEquals(403,assertThrows(RideFailure.class,()->chat.list(a,0)).status);
         assertEquals(403,assertThrows(RideFailure.class,()->chat.send(a,new ChatController.Send(UUID.randomUUID(),"Blocked",null))).status);
     }
+    @Test void leavingStopsAccessAndUnreadUntilRejoin() {
+        var a=member();var b=member();groups.groups(a);groups.groups(b);
+        assertTrue(groups.members(a,2).stream().anyMatch(m->m.id().toString().equals(b.getSubject())));
+        groups.membership(b,2,new ChatGroupsController.Membership(false));
+        assertEquals(403,assertThrows(RideFailure.class,()->chat.list(b,0,2,0)).status);
+        assertEquals(403,assertThrows(RideFailure.class,()->chat.send(b,new ChatController.Send(UUID.randomUUID(),"Must not send",null,false,null,2L))).status);
+        assertEquals(403,assertThrows(RideFailure.class,()->groups.members(b,2)).status);
+        chat.send(a,new ChatController.Send(UUID.randomUUID(),"Message after leave",null,false,null,2L));
+        var left=groups.groups(b).stream().filter(g->g.id()==2).findFirst().orElseThrow();
+        assertFalse(left.joined());assertEquals(0,left.unreadCount());assertNull(left.latest());
+        assertFalse(groups.members(a,2).stream().anyMatch(m->m.id().toString().equals(b.getSubject())));
+        groups.membership(b,2,new ChatGroupsController.Membership(true));
+        assertTrue(groups.groups(b).stream().filter(g->g.id()==2).findFirst().orElseThrow().joined());
+        assertDoesNotThrow(()->chat.list(b,0,2,0));
+    }
+    @Test void groupHttpEndpointsRequireAuthenticationAndAllowMembers() throws Exception {
+        var a=member();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/chat/groups/2/members")).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+        var identity=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt().jwt(j->j.subject(a.getSubject())).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/chat/groups/2/members").with(identity)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/chat/groups/2/membership").with(identity).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).contentType("application/json").content("{\"joined\":false}")).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/chat/groups/2/members").with(identity)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
+    @Test void pinsArePrivateAndLastMessagePreviewSurvivesRead(){var a=member();var b=member();groups.groups(a);groups.groups(b);groups.pin(a,4,new ChatGroupsController.Pin(true));assertEquals(4,groups.groups(a).getFirst().id());assertTrue(groups.groups(a).getFirst().pinned());assertFalse(groups.groups(b).stream().anyMatch(ChatGroupsController.Group::pinned));var sent=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Preview after read",null,false,null,4L));groups.read(b,4,new ChatGroupsController.Read(sent.id()));var preview=groups.groups(b).stream().filter(g->g.id()==4).findFirst().orElseThrow();assertEquals(0,preview.unreadCount());assertEquals(sent.id(),preview.latest().id());}
 }

@@ -1,3 +1,4 @@
+import './otp.css';
 import { useEffect, useState, type FormEvent } from 'react';
 import { errorMessage, requestEmailOtp, verifyEmailOtp, travelPreferenceLabels, type TravelPreference } from './auth';
 
@@ -7,14 +8,11 @@ export function OtpSignIn({ registering, onAuthenticated }: { registering: boole
   const [preference, setPreference] = useState<TravelPreference>('PASSENGER');
   const [challenge, setChallenge] = useState('');
   const [code, setCode] = useState('');
-  const [wait, setWait] = useState(0);
+  const [resendAt,setResendAt]=useState(0),[now,setNow]=useState(Date.now());
+  const wait=Math.max(0,Math.ceil((resendAt-now)/1000));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => {
-    if (!wait) return;
-    const timer = setTimeout(() => setWait(value => Math.max(0, value - 1)), 1000);
-    return () => clearTimeout(timer);
-  }, [wait]);
+  useEffect(()=>{if(!challenge)return;const tick=()=>setNow(Date.now());const timer=setInterval(tick,1000);document.addEventListener('visibilitychange',tick);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',tick);};},[challenge]);
   async function send() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 254) { setError('Enter a valid email address.'); return; }
     const number = mobile.replace(/[ ()-]/g, '');
@@ -22,7 +20,7 @@ export function OtpSignIn({ registering, onAuthenticated }: { registering: boole
     setBusy(true); setError('');
     try {
       const next = await requestEmailOtp(email.trim(), number || undefined, preference);
-      setChallenge(next.challengeId); setCode(''); setWait(60);
+      setChallenge(next.challengeId); setCode(''); setResendAt(Date.now()+60000);setNow(Date.now());
     } catch (failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); }
   }
@@ -48,7 +46,7 @@ export function OtpSignIn({ registering, onAuthenticated }: { registering: boole
     </> : <>
       <p role="status">Enter the code sent to your email. It expires in 5 minutes.</p>
       <label>Email code<input autoComplete="one-time-code" inputMode="numeric" maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} disabled={busy} /></label>
-      <button type="button" disabled={busy || wait > 0} onClick={() => void send()}>{wait ? `Resend in ${wait}s` : 'Resend code'}</button>
+      <button className="otp-resend" type="button" disabled={busy || wait > 0} onClick={() => void send()}>{wait ? `Resend in ${wait}s` : 'Resend OTP'}</button>
       <button type="button" disabled={busy} onClick={() => { setChallenge(''); setCode(''); setError(''); }}>Change email</button>
     </>}
     {error && <p role="alert">{error}</p>}

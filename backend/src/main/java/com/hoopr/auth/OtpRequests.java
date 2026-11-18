@@ -19,6 +19,8 @@ public final class OtpRequests {
         @Override public String toString() { return "OtpVerify[redacted]"; }
     }
     public static class Registration extends Request {
+        @AssertTrue(message="Accept the Terms & Conditions.") public boolean acceptedTerms;
+        @AssertTrue(message="Accept the Privacy Policy.") public boolean acceptedPrivacy;
         @Size(max=6) public java.util.List<@NotNull @jakarta.validation.Valid Route> regularRoutes=java.util.List.of();
         @NotBlank @Size(min=12,max=72) public String password;
         @Override public String toString() { return "Registration[redacted]"; }

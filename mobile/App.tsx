@@ -21,7 +21,7 @@ const titles: Record<Screen['kind'], string> = {
   chat: 'Ride community',
   group: 'Open Ride Group', wallet: 'Wallet', home: 'Share the journey.', search: 'Find a ride', rides: 'My rides', bookings: 'My bookings',
   notifications: 'Notifications', profile: 'Your profile', vehicles: 'My vehicles',
-  settings: 'Account', login: 'Welcome back', register: 'Join FlexirRides', ride: 'Ride details', booking: 'Booking details',
+  settings: 'Account', login: 'Welcome back', register: 'Join FlexiRides', ride: 'Ride details', booking: 'Booking details',
   manifest: 'Passenger bookings', pins: 'Route pins', rideForm: 'Ride offer', vehicleForm: 'Vehicle details',
 };
 const publicScreens = new Set<Screen['kind']>(['home', 'search', 'ride', 'login', 'register']);
@@ -68,6 +68,7 @@ function NativeApp() {
   }, []);
   const action = useAction();
   const screen = stack[stack.length - 1];
+  const [searchResults,setSearchResults]=useState(false);
   const [chatGroup,setChatGroup]=useState<number|undefined>();
   const canOffer=!!user&&user.travelPreference!=='PASSENGER';
   const canBook=!user||user.travelPreference!=='DRIVER';
@@ -127,7 +128,7 @@ function NativeApp() {
     switch (screen.kind) {
       case 'chat': return user && <Chat userId={user.id} preference={user.travelPreference} go={go} groupId={chatGroup} setGroup={setChatGroup} />;
       case 'login': case 'register': return <SignIn key={screen.kind} create={screen.kind === 'register'} onUser={signedIn} go={go} />;
-      case 'search': if(!canBook)return <Card><Copy>Select Passenger or Both in Account to book rides.</Copy></Card>;return <Rides user={user} go={go}/>;
+      case 'search': if(!canBook)return <Card><Copy>Select Passenger or Both in Account to book rides.</Copy></Card>;return <Rides user={user} go={go} onResultsChange={setSearchResults}/>;
       case 'rides': return <Rides user={user} mine={screen.kind === 'rides'} go={go} />;
       case 'ride': return <RideDetails id={screen.id} requestedSeats={screen.requestedSeats} user={user} go={go} />;
       case 'rideForm': if(!canOffer)return <Card><Copy>Select Driver or Both in Account to offer rides.</Copy></Card>;return <RideForm id={screen.id} go={next => setStack(previous => [...previous.slice(0, -1), next])} />;
@@ -152,7 +153,7 @@ function NativeApp() {
       case 'vehicles': return <Vehicles go={go} />;
       case 'vehicleForm': return <VehicleForm id={screen.id} back={back} />;
       default: return <>
-        <Card><Copy>{demoMode ? 'Browse sample rides in the FlexirRides demo.' : 'Find and offer shared rides with FlexirRides.'}</Copy>
+        <Card><Copy>{demoMode ? 'Browse sample rides in the FlexiRides demo.' : 'Find and offer shared rides with FlexiRides.'}</Copy>
           {user && <Copy>Welcome, {user.fullName}.</Copy>}
           {user&&phonePush.configured&&!phonePush.enabled&&<PhonePushSettings state={phonePush}/>}
           {canBook&&<Button label="Find a ride" onPress={() => go({ kind: 'search' })} />}
@@ -161,7 +162,7 @@ function NativeApp() {
         <Card>
           <Text accessibilityRole="header" style={styles.body}>Rentals</Text>
           <Copy>Coming soon</Copy>
-          <Copy>Self-drive car and bike rentals are coming to FlexirRides.</Copy>
+          <Copy>Self-drive car and bike rentals are coming to FlexiRides.</Copy>
         </Card>
         {demoMode ? null : user ? <View style={styles.row}>
 
@@ -186,18 +187,18 @@ function NativeApp() {
       {stack.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Back" style={layout.icon} onPress={back}>
         <Ionicons name="arrow-back" size={24} color={colors.accent} />
       </Pressable>}
-      <Pressable accessibilityRole="link" accessibilityLabel="FlexirRides home" onPress={()=>{Keyboard.dismiss();setStack([home]);}} style={layout.brandGroup}>
+      <Pressable accessibilityRole="link" accessibilityLabel="FlexiRides home" onPress={()=>{Keyboard.dismiss();setStack([home]);}} style={layout.brandGroup}>
         <Image source={require('./assets/flexirrides-icon.png')} style={layout.logo} />
-        <Text accessibilityRole="header" style={layout.brand}>FlexirRides</Text>
+        <Text accessibilityRole="header" style={layout.brand}>FlexiRides</Text>
       </Pressable>
     </View>
     {community.toast && <View style={{backgroundColor:'#EDF3FF',padding: 12,flexDirection:'row',alignItems:'center'}}><Pressable accessibilityRole="button" style={{flex:1}} onPress={()=>{const t=community.toast!;community.dismiss();if(t.link.startsWith('/chat')){setChatGroup(Number(t.link.split('group=')[1])||1);setStack([home,{kind:'chat'}]);}else if(t.link.startsWith('/rides/'))go({kind:'ride',id:t.link.split('/')[2]});}}><Text style={{fontWeight:'700'}}>{community.toast.title}</Text><Text numberOfLines={2}>{community.toast.body}</Text></Pressable><Button label="Dismiss" onPress={community.dismiss}/></View>}
     <KeyboardAvoidingView style={layout.flex} behavior="padding">
       <FieldFocus.Provider value={() => { if (Keyboard.isVisible()) requestAnimationFrame(revealField); }}>
-        {screen.kind==='chat' && user?<View style={{flex:1,padding: 12}}>{content()}</View>:<ScrollView ref={scroll} key={key} contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled"
+        {screen.kind==='chat' && user?<View style={{flex:1,padding: 12}}>{content()}</View>:<ScrollView ref={scroll} key={key} contentContainerStyle={[layout.content,screen.kind==='search'?{gap:12,paddingTop:12,paddingHorizontal:16}:{}]} keyboardShouldPersistTaps="handled"
           onLayout={() => { if (Keyboard.isVisible()) revealField(); }}
           onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
-          <Text accessibilityRole="header" style={styles.title}>{!user && !publicScreens.has(screen.kind) ? titles.login : titles[screen.kind]}</Text>
+          {!(screen.kind==='search'&&searchResults)&&<Text accessibilityRole="header" style={styles.title}>{!user && !publicScreens.has(screen.kind) ? titles.login : titles[screen.kind]}</Text>}
           {restoring && (screen.kind === 'home' || screen.kind === 'search') && <Copy>Reconnecting your account… You can browse rides while we connect.</Copy>}
           {restoreError && !restoring && <Card>
             <ErrorText message={restoreError} />
@@ -223,7 +224,7 @@ function NativeApp() {
 }
 export default function App() {
  const[loaded,error]=useFonts({Inter:require('./assets/fonts/Inter-Regular.ttf'),InterSemiBold:require('./assets/fonts/Inter-SemiBold.ttf'),InterBold:require('./assets/fonts/Inter-Bold.ttf')});
- return <SafeAreaProvider>{loaded?<NativeApp/>:<SafeAreaView style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'#F7F9FC'}}>{error?<Text accessibilityRole="alert">Unable to load app fonts. Please reopen the app.</Text>:<ActivityIndicator accessibilityLabel="Loading FlexirRides" color="#245EEA"/>}</SafeAreaView>}</SafeAreaProvider>;
+ return <SafeAreaProvider>{loaded?<NativeApp/>:<SafeAreaView style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'#F7F9FC'}}>{error?<Text accessibilityRole="alert">Unable to load app fonts. Please reopen the app.</Text>:<ActivityIndicator accessibilityLabel="Loading FlexiRides" color="#245EEA"/>}</SafeAreaView>}</SafeAreaProvider>;
 }
 
 const layout = StyleSheet.create({

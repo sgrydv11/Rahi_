@@ -55,7 +55,8 @@ export function searchDemoRides(query: URLSearchParams, signal?: AbortSignal): R
   const maximumPrice = query.has('maximumPrice') ? Number(query.get('maximumPrice')) : Number.POSITIVE_INFINITY;
   const matchingRides = demoRides.filter(ride => {
     const rideDate = new Intl.DateTimeFormat('en-CA', { timeZone: ride.timeZone }).format(new Date(ride.departureAt));
-    return (!origin || ride.origin.toLocaleLowerCase().startsWith(origin))
+    return (!query.get('routeType')||ride.preferences?.routeType===query.get('routeType'))
+      && (!origin || ride.origin.toLocaleLowerCase().startsWith(origin))
       && (!destination || ride.destination.toLocaleLowerCase().startsWith(destination))
       && (!departureDate || departureDate === rideDate)
       && ride.availableSeats >= minimumSeats

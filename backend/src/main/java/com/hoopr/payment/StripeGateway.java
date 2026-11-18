@@ -48,7 +48,7 @@ public class StripeGateway {
     }
 
     public JsonNode walletCheckout(UUID operation, long amount) {
-        return checkout(operation, amount, null, "/wallet", "FlexirRides test wallet top-up");
+        return checkout(operation, amount, null, "/wallet", "FlexiRides test wallet top-up");
     }
 
     private JsonNode checkout(UUID booking, long amount, String previous, String returnPath) {

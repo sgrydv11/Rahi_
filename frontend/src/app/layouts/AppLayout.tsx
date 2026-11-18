@@ -63,7 +63,7 @@ export function AppLayout() {
   return <CommunityContext.Provider value={community}><div className="app-shell">
     <a className="skip-link" href="#main">Skip to content</a>
     <header className="site-header">
-      <Link className="brand" to="/" aria-label="FlexirRides home">FlexirRides<Icon name="arrow-forward-outline"/></Link>
+      <Link className="brand" to="/" aria-label="FlexiRides home">FlexiRides<Icon name="arrow-forward-outline"/></Link>
       <button ref={menuButton} type="button" className="menu-toggle" aria-label={menuOpen?'Close menu':'Open menu'} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={()=>setMenuOpen(value=>!value)}><Icon name={menuOpen?'close-outline':'menu-outline'}/></button>
       <nav id="primary-navigation" className={`primary-navigation${menuOpen?' is-open':''}`} aria-label="Main navigation">
         {canBook(user)&&<NavLink to="/rides" end>Find a ride</NavLink>}
@@ -74,7 +74,7 @@ export function AppLayout() {
           <NavLink to="/profile">Account</NavLink>
           <button className="button button-small" disabled={busy} onClick={signOut}>{busy ? 'Logging out…' : 'Log out'}</button>
         </> : demoMode ? <span className="demo-nav-note">Sample app</span> : <><NavLink to="/login">Log in</NavLink>
-          <NavLink className="button button-small" to="/register">Join FlexirRides</NavLink></>}
+          <NavLink className="button button-small" to="/register">Join FlexiRides</NavLink></>}
         {!user&&<NavLink to="/help">Help</NavLink>}
       </nav>
     </header>
@@ -82,7 +82,7 @@ export function AppLayout() {
     {error && <p role="alert">{error}</p>}
     {demoMode && <p className="demo-banner" role="status">Sample app · Browse demo rides. Accounts and bookings are disabled.</p>}
     <main id="main" tabIndex={-1}><Outlet /></main>
-    <footer className="site-footer"><Link className="footer-brand" to="/">FlexirRides</Link><nav aria-label="Footer navigation"><Link to="/">Home</Link><Link to="/rides">Find a ride</Link><Link to="/help">Help</Link></nav><small>© {new Date().getFullYear()} FlexirRides</small></footer>
+    <footer className="site-footer"><Link className="footer-brand" to="/">FlexiRides</Link><nav aria-label="Footer navigation"><Link to="/">Home</Link><Link to="/rides">Find a ride</Link><Link to="/help">Help</Link></nav><small>© {new Date().getFullYear()} FlexiRides</small></footer>
     <nav className="mobile-nav" aria-label="App navigation">
       <MobileNavLink to="/" label="Home" icon="home" end />
       {canBook(user)&&<MobileNavLink to="/bookings/mine" label="My Bookings" icon="bookings" />}

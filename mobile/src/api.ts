@@ -12,7 +12,7 @@ export interface RidePreferences {
   boardingPoints: string[]; droppingPoints: string[]; hasCar: boolean | null; ac: boolean | null;
   flexibleDropoff: boolean; womenOnly: boolean; routeType: 'HOME_TO_OFFICE' | 'OFFICE_TO_HOME' | 'OTHER';
 }
-export interface Passenger { name: string; age: number; gender: 'FEMALE' | 'MALE' | 'OTHER' }
+export interface Passenger { name: string; age: number; gender: 'FEMALE' | 'MALE' | 'OTHER' | 'NOT_SPECIFIED' }
 export interface JourneyDetails { boardingPoint: string; droppingPoint: string; passengers: Passenger[]; demoPaymentMethod?: 'DIRECT'|'QR'|'OTHER' }
 export interface Ride {
   id: string; origin: string; destination: string; driver: { id: string; displayName: string };
@@ -53,7 +53,7 @@ let sessionInvalidated = () => {};
 export function onSessionInvalidated(listener: () => void) { sessionInvalidated = listener; }
 
 async function request<T>(path: string, options: Options = {}, token?: string): Promise<T> {
-  if (!baseUrl || !/^https:\/\//i.test(baseUrl)) throw new Error('Set EXPO_PUBLIC_API_BASE_URL to the HTTPS FlexirRides API address.');
+  if (!baseUrl || !/^https:\/\//i.test(baseUrl)) throw new Error('Set EXPO_PUBLIC_API_BASE_URL to the HTTPS FlexiRides API address.');
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.key) headers['Idempotency-Key'] = options.key;
@@ -125,17 +125,17 @@ export async function register(email: string, password: string, fullName: string
 export function googleConfig() {
   return request<{clientId:string}>('/auth/google/config');
 }
-export async function loginWithGoogle(credential:string, travelPreference:Preference='PASSENGER') {
-  return (await save(await request<Session>('/mobile/auth/google', {method:'POST',body:{credential,travelPreference}}))).user;
+export async function loginWithGoogle(credential:string, travelPreference:Preference='PASSENGER',consent?:{acceptedTerms:boolean;acceptedPrivacy:boolean}) {
+  return (await save(await request<Session>('/mobile/auth/google', {method:'POST',body:{credential,travelPreference,acceptedTerms:consent?.acceptedTerms===true,acceptedPrivacy:consent?.acceptedPrivacy===true}}))).user;
 }
 export function requestEmailOtp(identifier: string, mobileNumber?: string, travelPreference: Preference = 'PASSENGER') {
   return request<{ challengeId: string; expiresIn: number; delivery: string }>('/mobile/auth/otp/request', {
     method: 'POST', body: { identifier, mobileNumber, travelPreference },
   });
 }
-export function requestRegistrationOtp(identifier:string,password:string,mobileNumber:string,travelPreference:Preference,regularRoutes:RegularRoute[]=[]) {
+export function requestRegistrationOtp(identifier:string,password:string,mobileNumber:string,travelPreference:Preference,regularRoutes:RegularRoute[]=[],consent?:{acceptedTerms:boolean;acceptedPrivacy:boolean}) {
   return request<{challengeId:string;expiresIn:number;delivery:string}>('/mobile/auth/registration/request',{
-    method:'POST',body:{identifier,password,mobileNumber,travelPreference,regularRoutes},
+    method:'POST',body:{identifier,password,mobileNumber,travelPreference,regularRoutes,acceptedTerms:consent?.acceptedTerms===true,acceptedPrivacy:consent?.acceptedPrivacy===true},
   });
 }
 export async function verifyEmailOtp(challengeId: string, code: string) {

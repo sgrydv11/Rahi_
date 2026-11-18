@@ -1,4 +1,4 @@
-FlexirRides - third-party services, configuration and library inventory
+FlexiRides - third-party services, configuration and library inventory
 Updated: 13 November 2026 (Asia/Calcutta)
 Source branch: app_v1
 
@@ -49,7 +49,7 @@ Project owner: ydvsgr11s-team
 Project slug: sagar-yadav
 Project ID: 940de3d2-d322-4618-90fd-a471acf8b416
 Project: https://expo.dev/accounts/ydvsgr11s-team/projects/sagar-yadav
-App name: FlexirRides
+App name: FlexiRides
 Android application ID / iOS bundle ID: com.hoopr.app
 Configuration: mobile/app.json and mobile/eas.json.
 Android APK profile: preview (internal distribution).

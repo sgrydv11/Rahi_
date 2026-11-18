@@ -50,7 +50,7 @@ public class MobileAuthController {
     @PostMapping("/google")
     public ResponseEntity<Session> google(@Valid @RequestBody AuthController.GoogleRequest body,HttpServletRequest request) {
         requireNativeRequest(request); limiter.check(request.getRemoteAddr());
-        var issued=google.signIn(body.credential,body.travelPreference);
+        var issued=google.signIn(body.credential,body.travelPreference,body.acceptedTerms,body.acceptedPrivacy);
         limiter.succeeded(request.getRemoteAddr());
         return session(issued);
     }

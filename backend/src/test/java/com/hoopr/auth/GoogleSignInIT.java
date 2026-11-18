@@ -50,8 +50,8 @@ class GoogleSignInIT {
         }
     }
     @Test void createsOneAccountAndReturnsUsableRotatingSessions() {
-        var first = google.signIn("credential", TravelPreference.DRIVER);
-        var second = google.signIn("credential", TravelPreference.PASSENGER);
+        var first = google.signIn("credential", TravelPreference.DRIVER,true,true);
+        var second = google.signIn("credential", TravelPreference.PASSENGER,true,true);
         assertEquals(first.access.user().id(), second.access.user().id());
         assertEquals(TravelPreference.DRIVER, second.access.user().travelPreference());
         assertEquals(first.access.user().id(), auth.refresh(first.refresh).access.user().id());
@@ -59,30 +59,31 @@ class GoogleSignInIT {
     }
     @Test void linksAuthoritativeGmailWithoutReplacingExistingPasswordOrPreference() {
         var existing = auth.register(email, "existing-password-123", "Existing Rider", TravelPreference.BOTH);
-        assertEquals(existing.id(), google.signIn("credential", TravelPreference.PASSENGER).access.user().id());
+        assertEquals(existing.id(), google.signIn("credential", TravelPreference.PASSENGER,true,true).access.user().id());
         assertEquals(existing.id(), auth.login(email, "existing-password-123").access.user().id());
         assertEquals(TravelPreference.BOTH, auth.profile(existing.id()).travelPreference());
     }
     @Test void rejectsAutomaticLinkingForThirdPartyEmail() {
         email = subject + "@example.test"; verified(email);
         auth.register(email, "existing-password-123", "Existing Rider");
-        assertEquals(409, assertThrows(AuthFailure.class, () -> google.signIn("credential", TravelPreference.BOTH)).status);
+        assertEquals(409, assertThrows(AuthFailure.class, () -> google.signIn("credential", TravelPreference.BOTH,true,true)).status);
         assertNull(jdbc.queryForObject("SELECT google_subject FROM users WHERE email = ?", String.class, email));
     }
     @Test void blocksInactiveAccount() {
-        var account = google.signIn("credential", TravelPreference.PASSENGER).access.user();
+        var account = google.signIn("credential", TravelPreference.PASSENGER,true,true).access.user();
         jdbc.update("UPDATE users SET status = 'DISABLED' WHERE id = ?", account.id());
-        assertEquals(401, assertThrows(AuthFailure.class, () -> google.signIn("credential", TravelPreference.BOTH)).status);
+        assertEquals(401, assertThrows(AuthFailure.class, () -> google.signIn("credential", TravelPreference.BOTH,true,true)).status);
     }
     @Test void concurrentFirstSignInsCreateOneAccount() throws Exception {
         try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
             var start = new java.util.concurrent.CountDownLatch(1);
             java.util.concurrent.Callable<UUID> signIn = () -> {
-                start.await(); return google.signIn("credential", TravelPreference.PASSENGER).access.user().id();
+                start.await(); return google.signIn("credential", TravelPreference.PASSENGER,true,true).access.user().id();
             };
             var first = pool.submit(signIn); var second = pool.submit(signIn);
             start.countDown();
             assertEquals(first.get(20, java.util.concurrent.TimeUnit.SECONDS), second.get(20, java.util.concurrent.TimeUnit.SECONDS));
         }
     }
+    @Test void newGoogleAccountRequiresBothConsentsAndRecordsDraftVersion(){assertEquals(409,assertThrows(AuthFailure.class,()->google.signIn("credential",TravelPreference.BOTH,false,true)).status);assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM users WHERE email=?",Integer.class,email));var account=google.signIn("credential",TravelPreference.BOTH,true,true).access.user();assertEquals("2026-11-18-draft",jdbc.queryForObject("SELECT terms_version FROM user_legal_consents WHERE user_id=?",String.class,account.id()));assertDoesNotThrow(()->google.signIn("credential",TravelPreference.BOTH));}
 }

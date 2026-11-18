@@ -40,6 +40,8 @@ management:
       show-details: never
 
 hoopr:
+  wallet:
+    demo-enabled: ${DEMO_WALLET_ENABLED:false}
   push:
     enabled: ${PUSH_NOTIFICATIONS_ENABLED:false}
     expo-access-token: ${EXPO_PUSH_ACCESS_TOKEN:}

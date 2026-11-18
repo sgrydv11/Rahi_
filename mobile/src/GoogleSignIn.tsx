@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { googleConfig, loginWithGoogle, type Preference, type User } from './api';
 import { Button } from './ui';
 
-export function GoogleSignIn({preference,busy,run,onUser}:{preference:Preference;busy:boolean;run:(action:()=>Promise<void>)=>Promise<void>;onUser:(user:User)=>void}) {
+export function GoogleSignIn({preference,busy,run,onUser,consent}:{preference:Preference;consent?:{acceptedTerms:boolean;acceptedPrivacy:boolean};busy:boolean;run:(action:()=>Promise<void>)=>Promise<void>;onUser:(user:User)=>void}) {
   if(Platform.OS!=='android')return null;
   async function signIn() {
     const {clientId}=await googleConfig();
@@ -17,7 +17,7 @@ export function GoogleSignIn({preference,busy,run,onUser}:{preference:Preference
       const response=await sdk.GoogleSignin.signIn();
       if(!sdk.isSuccessResponse(response))return;
       if(!response.data.idToken)throw new Error('Google did not return an identity token. Check the Web client ID setup.');
-      onUser(await loginWithGoogle(response.data.idToken,preference));
+      onUser(await loginWithGoogle(response.data.idToken,preference,consent));
     } catch(error) {
       if(sdk.isErrorWithCode(error)) {
         if(error.code===sdk.statusCodes.SIGN_IN_CANCELLED)return;

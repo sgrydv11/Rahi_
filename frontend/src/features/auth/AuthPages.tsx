@@ -8,6 +8,7 @@ import { OtpSignIn } from './OtpSignIn';
 import { demoMode } from '../rides/api';
 
 function AuthForm({ registering = false }: { registering?: boolean }) {
+  const[acceptedTerms,setAcceptedTerms]=useState(false),[acceptedPrivacy,setAcceptedPrivacy]=useState(false);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [regularRoutes,setRegularRoutes]=useState<RegularRoute[]>([]);
@@ -19,7 +20,7 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
   const [now,setNow]=useState(Date.now());
   useEffect(()=>{if(!challenge)return;const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[challenge]);
   async function sendSignup(value:NonNullable<typeof signup>) {
-    const next=await requestRegistrationOtp(value.email,value.password,value.mobile,value.preference,value.regularRoutes);
+    const next=await requestRegistrationOtp(value.email,value.password,value.mobile,value.preference,value.regularRoutes,{acceptedTerms,acceptedPrivacy});
     setSignup(value);setChallenge(next.challengeId);setCode('');setResendAt(Date.now()+60000);setNow(Date.now());
   }
   const [error, setError] = useState('');
@@ -31,8 +32,9 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
   }
   async function google(credential: string) {
     if (busy) return;
+    if(registering&&(!acceptedTerms||!acceptedPrivacy)){setError('Accept both draft policies to create an account.');return;}
     setBusy(true); setError('');
-    try { await loginWithGoogle(credential, preference); finish(); }
+    try { await loginWithGoogle(credential, preference,registering?{acceptedTerms,acceptedPrivacy}:undefined); finish(); }
     catch (failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); }
   }
@@ -45,6 +47,7 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
       catch(failure){setError(errorMessage(failure));}finally{setBusy(false);}
       return;
     }
+    if(registering&&(!acceptedTerms||!acceptedPrivacy)){setError('Accept both draft policies to create an account.');return;}
     const data = new FormData(event.currentTarget);
     const email = String(data.get('email') || '').trim();
     const password = String(data.get('password') || '');
@@ -65,14 +68,15 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
     {location.state?.message==='You have been logged out.' && <p role="status">You have been logged out.</p>}
     <div className="panel">
       {demoMode ? <p>Accounts are disabled in sample mode. <Link to="/rides">Browse rides</Link></p> : <>
-        {!challenge && <GoogleSignIn registering={registering} busy={busy} onCredential={credential => void google(credential)} />}
+        {registering&&!challenge&&<fieldset className="legal-checks"><legend>Draft policies · owner review pending</legend><label><input type="checkbox" checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)} disabled={busy}/><span>I accept the <Link target="_blank" rel="noopener" to="/terms">Terms & Conditions (draft)</Link></span></label><label><input type="checkbox" checked={acceptedPrivacy} onChange={e=>setAcceptedPrivacy(e.target.checked)} disabled={busy}/><span>I accept the <Link target="_blank" rel="noopener" to="/privacy">Privacy Policy (draft)</Link></span></label></fieldset>}
+        {!challenge && <GoogleSignIn registering={registering} busy={busy||(registering&&(!acceptedTerms||!acceptedPrivacy))} onCredential={credential => void google(credential)} />}
         {!registering && <div className="ride-actions" aria-label="Sign-in method"><button type="button" aria-pressed={!emailCodeLogin} onClick={()=>{setEmailCodeLogin(false);setError('');}}>Password</button><button type="button" aria-pressed={emailCodeLogin} onClick={()=>{setEmailCodeLogin(true);setError('');}}>Email code</button></div>}
         {emailCodeLogin && !registering ? <OtpSignIn registering={false} onAuthenticated={finish}/> : <form key={String(registering)} className="auth-form" onSubmit={submit} aria-busy={busy}>
           {challenge ? <div className="signup-verification">
             <h2>Verify your email</h2><p>We sent a six-digit code to {signup?.email}. Your account is created only after verification.</p>
             <label>Email code<input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} disabled={busy} /></label>
             <p>The code expires in five minutes.</p>
-            <button type="button" disabled={busy || now<resendAt} onClick={async()=>{if(!signup)return;setBusy(true);setError('');try{await sendSignup(signup);}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}}>{now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend code'}</button>
+            <button className="otp-resend" type="button" disabled={busy || now<resendAt} onClick={async()=>{if(!signup)return;setBusy(true);setError('');try{await sendSignup(signup);}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}}>{now<resendAt?`Resend in ${Math.ceil((resendAt-now)/1000)}s`:'Resend OTP'}</button>
             <button type="button" disabled={busy} onClick={()=>{setChallenge('');setCode('');setSignup(undefined);setError('');}}>Change details</button>
           </div> : <>
           <label>{registering?'Email address':'Email or mobile number'}<input name="email" type={registering?'email':'text'} autoComplete={registering?'email':'username'} required maxLength={254} disabled={busy} /></label>
@@ -86,11 +90,11 @@ function AuthForm({ registering = false }: { registering?: boolean }) {
           <button className="password-eye" type="button" aria-label={showPassword?'Hide password':'Show password'} aria-pressed={showPassword} disabled={busy} onClick={()=>setShowPassword(v=>!v)}><Icon name={showPassword?'eye-off-outline':'eye-outline'}/></button></div>
           {registering && <p>Use at least 12 characters, up to 72 UTF-8 bytes.</p>}
           </>}
-          <button className="button" type="submit" disabled={busy}>{busy ? 'Please wait…' : challenge?'Verify and create account':registering ? 'Create account' : 'Log in'}</button>
+          <button className="button" type="submit" disabled={busy||(registering&&(!acceptedTerms||!acceptedPrivacy))}>{busy ? 'Please wait…' : challenge?'Verify and create account':registering ? 'Create account' : 'Log in'}</button>
         </form>}
         {error && <p role="alert">{error}</p>}
       </>}
-      <p><Link state={location.state} to={registering ? '/login' : '/register'}>{registering ? 'Already have an account? Log in' : 'New to FlexirRides? Join us'}</Link></p>
+      <p><Link state={location.state} to={registering ? '/login' : '/register'}>{registering ? 'Already have an account? Log in' : 'New to FlexiRides? Join us'}</Link></p>
     </div>
   </section>;
 }

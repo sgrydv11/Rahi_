@@ -32,11 +32,12 @@ async page => {
   await page.getByLabel('To City', { exact: true }).fill('Ujjain');
   await page.getByRole('button', { name: 'Calendar', exact: true }).click();
   await page.getByLabel('Custom date').fill(date);
-  await page.getByRole('combobox', { name: 'Passengers', exact: true }).selectOption('2');
+  await page.getByRole('combobox', { name: 'Seats', exact: true }).selectOption('2');
   await page.getByRole('button', { name: 'Search rides', exact: true }).click();
   const card = id => page.locator('a.button[href^="/rides/' + id + '"]');
   await card(rides[1].id).waitFor();
   if (await card(rides[0].id).count()) throw new Error('One-seat ride leaked into a two-passenger search');
+  await page.getByText('Sort',{exact:true}).click();
   await page.getByRole('button', { name: 'Sort by price ascending', exact: true }).click();
   await page.getByRole('button', { name: 'Sort by price ascending', exact: true }).click();
   await page.getByText('Filters', { exact: true }).click();

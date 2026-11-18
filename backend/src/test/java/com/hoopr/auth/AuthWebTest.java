@@ -43,6 +43,7 @@ class AuthWebTest {
     @MockitoBean EmailOtpService emailOtp;
     @MockitoBean com.hoopr.ride.RideService rides;
     @MockitoBean com.hoopr.ride.ChatController chat;
+    @MockitoBean com.hoopr.wallet.DemoWalletController demoWallet;
     @MockitoBean com.hoopr.push.PushStore pushStore;
     @MockitoBean com.hoopr.ride.ChatGroupsController groups;
     @MockitoBean com.hoopr.user.TravelRoutesController routes;
@@ -82,7 +83,7 @@ class AuthWebTest {
         when(emailOtp.requestRegistration(anyString(),anyString(),anyString(),org.mockito.ArgumentMatchers.any(com.hoopr.user.TravelPreference.class),anyList()))
             .thenReturn(new EmailOtpService.Challenge(challenge,300,"EMAIL"));
         mvc.perform(write("registration/request").contentType(MediaType.APPLICATION_JSON)
-            .content("{\"identifier\":\"new@example.test\",\"password\":\"long-password-123\",\"mobileNumber\":\"+919876543210\",\"travelPreference\":\"PASSENGER\"}"))
+            .content("{\"acceptedTerms\":true,\"acceptedPrivacy\":true,\"identifier\":\"new@example.test\",\"password\":\"long-password-123\",\"mobileNumber\":\"+919876543210\",\"travelPreference\":\"PASSENGER\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.challengeId").value(challenge.toString()));
         verifyNoInteractions(auth);
     }
@@ -147,7 +148,7 @@ class AuthWebTest {
                 .andExpect(status().isNoContent()).andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
     }
     @Test void nativeGoogleExchangesVerifiedTokenForStoredSessionAndRejectsBrowserRequests() throws Exception {
-        when(googleSignIn.signIn("native-credential",com.hoopr.user.TravelPreference.PASSENGER))
+        when(googleSignIn.signIn("native-credential",com.hoopr.user.TravelPreference.PASSENGER,false,false))
             .thenReturn(new AuthService.Issued(new AuthService.Access("native-access","Bearer",900,profile()),"r".repeat(43),Instant.now().plusSeconds(1000)));
         mvc.perform(post("/api/v1/mobile/auth/google").contentType(MediaType.APPLICATION_JSON)
             .content("{\"credential\":\"native-credential\",\"travelPreference\":\"PASSENGER\"}"))
@@ -156,13 +157,13 @@ class AuthWebTest {
         mvc.perform(post("/api/v1/mobile/auth/google").header("Origin","http://localhost:5173")
             .contentType(MediaType.APPLICATION_JSON).content("{\"credential\":\"native-credential\"}"))
             .andExpect(status().isForbidden());
-        when(googleSignIn.signIn("invalid",com.hoopr.user.TravelPreference.PASSENGER)).thenThrow(new AuthFailure(401,"Invalid Google identity."));
+        when(googleSignIn.signIn("invalid",com.hoopr.user.TravelPreference.PASSENGER,false,false)).thenThrow(new AuthFailure(401,"Invalid Google identity."));
         mvc.perform(post("/api/v1/mobile/auth/google").contentType(MediaType.APPLICATION_JSON)
             .content("{\"credential\":\"invalid\",\"travelPreference\":\"PASSENGER\"}"))
             .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.refreshToken").doesNotExist());
     }
     @Test void googleSignInUsesTheSameSecureSessionCookie() throws Exception {
-        when(googleSignIn.signIn("verified-credential", com.hoopr.user.TravelPreference.PASSENGER))
+        when(googleSignIn.signIn("verified-credential",com.hoopr.user.TravelPreference.PASSENGER,false,false))
                 .thenReturn(new AuthService.Issued(new AuthService.Access("google-access", "Bearer", 900, profile()),
                         "b".repeat(43), Instant.now().plusSeconds(1000)));
         mvc.perform(write("google").contentType(MediaType.APPLICATION_JSON)
@@ -272,6 +273,10 @@ class AuthWebTest {
         mvc.perform(write("register").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"alice@example.test\",\"password\":\"long-password-123\",\"fullName\":\"Alice\"}"))
                 .andExpect(status().isConflict());
+    }
+    @Test void registrationRequiresSeparateTermsAndPrivacyChoices() throws Exception {
+        for(String choices:List.of("",",\"acceptedTerms\":true",",\"acceptedPrivacy\":true"))mvc.perform(write("registration/request").contentType(MediaType.APPLICATION_JSON).content("{\"identifier\":\"consent@example.test\",\"password\":\"long-password-123\",\"mobileNumber\":\"+919876543210\""+choices+"}")).andExpect(status().isBadRequest());
+        verifyNoInteractions(emailOtp);
     }
 }
 
