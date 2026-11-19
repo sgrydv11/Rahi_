@@ -18,6 +18,7 @@ const pages = [
   ['/vehicles', 'My vehicles', 'Add and manage the vehicles you use to offer shared rides.'],
   ['/notifications', 'Notifications', 'Read your latest booking requests and ride updates.'],
   ['/chat', 'Ride community', 'Chat with the FlexiRides community, share ride offers and reply to messages.'],
+  ['/wallet', 'Wallet · Coming soon', 'Wallet features are coming soon to FlexiRides.'],
   ['/help', 'Help', 'Learn how to find, offer and book rides, manage your account and use community chat.'],
 ] as const;
 

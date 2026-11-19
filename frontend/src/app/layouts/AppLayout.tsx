@@ -60,7 +60,7 @@ export function AppLayout() {
   }
 
 
-  return <CommunityContext.Provider value={community}><div className="app-shell">
+  return <CommunityContext.Provider value={community}><div className={`app-shell${location.pathname==='/chat'?' chat-shell':''}`}>
     <a className="skip-link" href="#main">Skip to content</a>
     <header className="site-header">
       <Link className="brand" to="/" aria-label="FlexiRides home">FlexiRides<Icon name="arrow-forward-outline"/></Link>
@@ -81,7 +81,7 @@ export function AppLayout() {
     {community.toast && <div className="community-toast" role="status"><button type="button" onClick={()=>{navigate(community.toast!.link);community.dismiss();}}><strong>{community.toast.title}</strong><span>{community.toast.body}</span></button><button type="button" aria-label="Dismiss notification" onClick={community.dismiss}><Icon name="close-outline"/></button></div>}
     {error && <p role="alert">{error}</p>}
     {demoMode && <p className="demo-banner" role="status">Sample app · Browse demo rides. Accounts and bookings are disabled.</p>}
-    <main id="main" tabIndex={-1}><Outlet /></main>
+    <main id="main" className={location.pathname==='/chat'?'chat-main':undefined} tabIndex={-1}><Outlet /></main>
     <footer className="site-footer"><Link className="footer-brand" to="/">FlexiRides</Link><nav aria-label="Footer navigation"><Link to="/">Home</Link><Link to="/rides">Find a ride</Link><Link to="/help">Help</Link></nav><small>© {new Date().getFullYear()} FlexiRides</small></footer>
     <nav className="mobile-nav" aria-label="App navigation">
       <MobileNavLink to="/" label="Home" icon="home" end />

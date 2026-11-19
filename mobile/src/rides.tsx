@@ -1,3 +1,4 @@
+import {SelectField} from './SelectField';
 import {namedRides} from './namedRides';
 import {Ionicons} from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -83,8 +84,7 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
       clear={() => update(key, '')} />;
   }
   if (!mine && !query) return <View style={rideUI.form}>
-    <Field label="From City" value={draft.origin || ''} change={value => update('origin', value)} />
-    <Pressable accessibilityRole="button" disabled={locating} onPress={()=>void locateCity()} style={rideUI.location}><Ionicons name="locate-outline" size={18} color="#245EEA"/><Text style={rideUI.link}>{locating?'Locating…':'Use current city'}</Text></Pressable>
+    <Field label="From City" value={draft.origin || ''} change={value => update('origin', value)} labelAction={<Pressable accessibilityRole="button" accessibilityLabel="Use current city" disabled={locating} onPress={()=>void locateCity()} style={{padding:8}}><Ionicons name="locate-outline" size={20} color="#245EEA"/></Pressable>}/>
     {!!locationMessage&&<Text accessibilityRole="alert" style={rideUI.secondary}>{locationMessage}</Text>}
     <Field label="To City" value={draft.destination || ''} change={value => update('destination', value)} />
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap: 8}}>
@@ -93,7 +93,7 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
     </View>
     <DateField label="Return date (optional)" mode="date" value={draft.returnDate ? new Date(draft.returnDate + 'T12:00') : undefined}
       change={value => update('returnDate', localDate(value.toISOString()).slice(0, 10))} clear={() => update('returnDate', '')} />
-    <Choice label="Ride" values={[{value:'',label:'Choose a named route'},...rideChoices]} selected={draft.namedRide||''} change={v=>{const r=rideChoices.find(r=>r.value===v);if(r)setDraft(p=>({...p,origin:r.origin,destination:r.destination,routeType:r.routeType,namedRide:v}));}}/>
+    <SelectField label="Choose a ride" options={[{value:'',label:'Choose a ride'},...rideChoices]} value={draft.namedRide||''} onChange={v=>{const r=rideChoices.find(r=>r.value===v);setDraft(p=>r?({...p,origin:r.origin,destination:r.destination,routeType:r.routeType,namedRide:v}):({...p,namedRide:v}));}}/>
     <Choice label="Seats" values={seatOptions} selected={draft.minimumSeats} change={value => update('minimumSeats', value)} />
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:12,borderWidth:1,borderColor:'#D5DEEA',borderRadius:12}}><View><Copy>Booking for women</Copy><Text style={{color:'#4C5E75',fontSize:12}}>Show women-only rides</Text></View><Switch accessibilityLabel="Women-only rides" value={draft.womenOnly==='true'} onValueChange={value=>update('womenOnly',value?'true':'')} trackColor={{true:'#245EEA'}}/></View>
     <ErrorText message={error} />
@@ -132,7 +132,7 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
     {!result.data ? <QueryState {...result} /> : <>
       {!result.data.content.length && <Copy>{mine ? 'You have not offered any rides yet.' : 'No rides match this route, date and filters.'}</Copy>}
       {result.data.content.map(ride => <View key={ride.id} style={rideUI.card}>
-        <View style={rideUI.cardTop}><Text style={rideUI.time}>{departureClock(ride)}</Text><View><Text style={rideUI.price}>{ride.currency==='INR'?'â‚¹':ride.currency+' '}{ride.pricePerSeat}</Text><Text style={rideUI.perSeat}>per seat</Text></View></View>
+        <View style={rideUI.cardTop}><Text style={rideUI.time}>{departureClock(ride)}</Text><View><Text style={rideUI.price}>{ride.currency==='INR'?'\u20B9':ride.currency+' '}{ride.pricePerSeat}</Text><Text style={rideUI.perSeat}>per seat</Text></View></View>
         <Text style={rideUI.cardRoute}>{ride.origin} → {ride.destination}</Text>
         {mine&&<Text style={rideUI.secondary}>{date(ride.departureAt)}</Text>}
         <Text style={rideUI.secondary}>{ride.driver.displayName} · {ride.availableSeats} {ride.availableSeats===1?'seat':'seats'} available{ride.preferences?.womenOnly?' · Women only':''}</Text>

@@ -138,3 +138,9 @@ summary {min-height:44px;cursor:pointer;align-content:center;font-weight:600}
 .auth-form fieldset {border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:0}
 .auth-form label:has(>input[type=radio]),.auth-form label:has(>input[type=checkbox]),.ride-filter label:has(>input[type=checkbox]) {display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;min-height:44px}
 .auth-form legend {padding:0 4px}
+
+.chat-main .channel-page{padding:0!important;margin-top:0}.chat-main .channel-list{margin-top:0}.chat-main{padding-top:8px}.mobile-nav-item{position:relative}.mobile-nav-item>.unread-badge{position:absolute;top:2px;left:calc(50% + 6px)}
+@media(max-width:700px){.mobile-nav{bottom:0;margin:0;min-height:64px}.mobile-nav-item{font-size:10px!important;line-height:14px;min-height:52px;gap:4px}.mobile-nav-icon{width:22px;height:22px}.mobile-nav-label{font-size:10px;line-height:14px;white-space:nowrap}.app-shell{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}.site-footer{display:none}.chat-main{padding-top:0}.chat-main .chat-page{margin-top:0;height:calc(100dvh - 150px)}}
+
+/* Chat groups begin directly below the header without a separator above the box. */
+.chat-shell .site-header{border-bottom:0}

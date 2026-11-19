@@ -1,0 +1,9 @@
+import {useState} from 'react';
+import {Modal,Pressable,ScrollView,View} from 'react-native';
+import {Ionicons} from '@expo/vector-icons';
+import {Text} from './Typography';
+import {Button} from './ui';
+export function SelectField({label,options,value,onChange}:{label:string;options:{value:string;label:string}[];value:string;onChange:(value:string)=>void}){
+ const[open,setOpen]=useState(false),selected=options.find(o=>o.value===value);
+ return <View style={{gap:7}}><Text style={{fontSize:14,color:'#142D4E'}}>{label}</Text><Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityValue={{text:selected?.label||'Choose a ride'}} accessibilityState={{expanded:open}} onPress={()=>setOpen(true)} style={{minHeight:48,borderWidth:1,borderColor:'#D5DEEA',borderRadius:12,padding:12,backgroundColor:'#fff',flexDirection:'row',alignItems:'center',gap:8}}><Text numberOfLines={1} style={{flex:1,fontSize:14,color:'#142D4E'}}>{selected?.label||'Choose a ride'}</Text><Ionicons name="chevron-down-outline" size={20} color="#245EEA"/></Pressable><Modal transparent visible={open} animationType="fade" onRequestClose={()=>setOpen(false)}><View style={{flex:1,justifyContent:'center',padding:20,backgroundColor:'#142D4E66'}}><View accessibilityViewIsModal style={{maxHeight:'80%',padding:16,borderRadius:16,backgroundColor:'#fff',gap:12}}><Text accessibilityRole="header" style={{fontSize:18,fontWeight:'600'}}>{label}</Text><ScrollView>{options.map(o=><Pressable key={o.value} accessibilityRole="radio" accessibilityState={{selected:value===o.value}} onPress={()=>{onChange(o.value);setOpen(false);}} style={{minHeight:48,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:8}}><Text style={{flex:1,fontSize:14}}>{o.label}</Text>{value===o.value&&<Ionicons name="checkmark-outline" size={20} color="#245EEA"/>}</Pressable>)}</ScrollView><Button variant="link" label="Close" onPress={()=>setOpen(false)}/></View></View></Modal></View>;
+}

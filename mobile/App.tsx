@@ -1,4 +1,5 @@
-import {usePhonePush,PhonePushSettings,disablePhonePush,NotificationWelcome} from './src/push';
+import {PermissionWelcome} from './src/PermissionWelcome';
+import {usePhonePush,PhonePushSettings,disablePhonePush} from './src/push';
 import {useFonts} from 'expo-font';
 import {Text,TextInput} from './src/Typography';
 import {CommunityContext,useCommunityState} from './src/community';
@@ -8,7 +9,7 @@ import { Chat } from './src/chat';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Image, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView,useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout, onSessionInvalidated, restore, type User } from './src/api';
 import { Profile, SignIn, VehicleForm, Vehicles } from './src/account';
 import { BookingDetails, Bookings, Notifications } from './src/bookings';
@@ -35,6 +36,7 @@ const footer = [
 ] as const;
 
 function NativeApp() {
+  const insets=useSafeAreaInsets();
   const [stack, setStack] = useState<Screen[]>([home]);
   const [user, setUser] = useState<User | null>(null);
   const [restoring, setRestoring] = useState(!demoMode);
@@ -181,7 +183,7 @@ function NativeApp() {
   }
   const key = `${stack.length}-${screen.kind}-${'id' in screen ? screen.id ?? '' : ''}`;
   useEffect(() => { scrollOffset.current = 0; }, [key]);
-  return <CommunityContext.Provider value={community}><SafeAreaView style={layout.surface}>
+  return <CommunityContext.Provider value={community}><SafeAreaView edges={['top','left','right']} style={layout.surface}>
     <StatusBar barStyle="dark-content" />
     <View style={layout.header}>
       {stack.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Back" style={layout.icon} onPress={back}>
@@ -195,7 +197,7 @@ function NativeApp() {
     {community.toast && <View style={{backgroundColor:'#EDF3FF',padding: 12,flexDirection:'row',alignItems:'center'}}><Pressable accessibilityRole="button" style={{flex:1}} onPress={()=>{const t=community.toast!;community.dismiss();if(t.link.startsWith('/chat')){setChatGroup(Number(t.link.split('group=')[1])||1);setStack([home,{kind:'chat'}]);}else if(t.link.startsWith('/rides/'))go({kind:'ride',id:t.link.split('/')[2]});}}><Text style={{fontWeight:'700'}}>{community.toast.title}</Text><Text numberOfLines={2}>{community.toast.body}</Text></Pressable><Button label="Dismiss" onPress={community.dismiss}/></View>}
     <KeyboardAvoidingView style={layout.flex} behavior="padding">
       <FieldFocus.Provider value={() => { if (Keyboard.isVisible()) requestAnimationFrame(revealField); }}>
-        {screen.kind==='chat' && user?<View style={{flex:1,padding: 12}}>{content()}</View>:<ScrollView ref={scroll} key={key} contentContainerStyle={[layout.content,screen.kind==='search'?{gap:12,paddingTop:12,paddingHorizontal:16}:{}]} keyboardShouldPersistTaps="handled"
+        {screen.kind==='chat' && user?<View style={{flex:1,minHeight:0}}>{content()}</View>:<ScrollView ref={scroll} key={key} contentContainerStyle={[layout.content,screen.kind==='search'?{gap:12,paddingTop:12,paddingHorizontal:16}:{}]} keyboardShouldPersistTaps="handled"
           onLayout={() => { if (Keyboard.isVisible()) revealField(); }}
           onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
           {!(screen.kind==='search'&&searchResults)&&<Text accessibilityRole="header" style={styles.title}>{!user && !publicScreens.has(screen.kind) ? titles.login : titles[screen.kind]}</Text>}
@@ -207,23 +209,23 @@ function NativeApp() {
           {content()}
         </ScrollView>}
       </FieldFocus.Provider>
-      {!demoMode && !keyboardVisible && <View style={layout.footer}>
+      {!demoMode && !keyboardVisible && <View style={[layout.footer,{paddingBottom:Math.max(insets.bottom,4)}]}>
         {footer.filter(item=>(item.kind!=='rides'||canOffer)&&(item.kind!=='bookings'||canBook)).map(({ kind, label, icon }) => <Pressable key={kind} accessibilityRole="tab"
           accessibilityLabel={label} accessibilityState={{ selected: screen.kind === kind }} onPress={() => {
             Keyboard.dismiss();
             if(kind==='chat')setChatGroup(undefined);
             setStack(kind === 'home' ? [home] : [home, { kind }]);
           }} style={layout.tab}>
-          <Ionicons accessible={false} name={icon} size={23} color={screen.kind === kind ? colors.accent : colors.muted} />
-          <Text style={{ color: screen.kind === kind ? colors.accent : colors.muted }}>{label}{kind==='chat' && community.unread>0?` (${community.unread>99?'99+':community.unread})`:''}</Text>
+          <Ionicons accessible={false} name={icon} size={22} color={screen.kind === kind ? colors.accent : colors.muted} />
+          <Text numberOfLines={1} style={{fontSize:10,lineHeight:14,fontWeight:'500',textAlign:'center',color: screen.kind === kind ? colors.accent : colors.muted }}>{label}{kind==='chat' && community.unread>0?` (${community.unread>99?'99+':community.unread})`:''}</Text>
         </Pressable>)}
       </View>}
     </KeyboardAvoidingView>
-    {!demoMode&&<NotificationWelcome onEnabled={()=>{void phonePush.enable(false);}}/>}
+    {!demoMode&&<PermissionWelcome onNotificationsEnabled={()=>{void phonePush.enable(false);}}/>}
   </SafeAreaView></CommunityContext.Provider>;
 }
 export default function App() {
- const[loaded,error]=useFonts({Inter:require('./assets/fonts/Inter-Regular.ttf'),InterSemiBold:require('./assets/fonts/Inter-SemiBold.ttf'),InterBold:require('./assets/fonts/Inter-Bold.ttf')});
+ const[loaded,error]=useFonts({...Ionicons.font,Inter:require('./assets/fonts/Inter-Regular.ttf'),InterSemiBold:require('./assets/fonts/Inter-SemiBold.ttf'),InterBold:require('./assets/fonts/Inter-Bold.ttf')});
  return <SafeAreaProvider>{loaded?<NativeApp/>:<SafeAreaView style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'#F7F9FC'}}>{error?<Text accessibilityRole="alert">Unable to load app fonts. Please reopen the app.</Text>:<ActivityIndicator accessibilityLabel="Loading FlexiRides" color="#245EEA"/>}</SafeAreaView>}</SafeAreaProvider>;
 }
 
@@ -237,6 +239,6 @@ const layout = StyleSheet.create({
   icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   menu: { alignSelf: 'flex-end', padding: 12, gap: 8, backgroundColor: '#fff' },
   footer: { flexDirection: 'row', borderTopWidth: 1, borderColor: colors.line, backgroundColor: '#fff' },
-  tab: { flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  tab: { flex: 1, minHeight: 56, paddingHorizontal:2, alignItems: 'center', justifyContent: 'center', gap: 3 },
   content: { padding: 24, gap: 24, maxWidth: 720, width: '100%', alignSelf: 'center' },
 });

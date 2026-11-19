@@ -26,7 +26,7 @@ async function login(page,email) {
   await page.getByRole('button',{name:'Log in',exact:true}).click();
   await page.getByRole('heading',{name:'Your profile.',exact:true}).waitFor();
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Chat',exact:true}).click();
-  await page.getByRole('heading',{name:'Chats',exact:true}).waitFor();await page.getByRole('button',{name:'Ride community',exact:true}).click();await page.getByRole('heading',{name:'Ride community',exact:true}).waitFor();
+  await page.locator('.channel-list').waitFor();await page.getByRole('button',{name:'Ride community',exact:true}).click();await page.getByRole('heading',{name:'Ride community',exact:true}).waitFor();
 }
 (async()=>{
   await api('/chat/messages',{status:401});
