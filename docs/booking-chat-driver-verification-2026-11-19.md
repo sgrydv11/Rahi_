@@ -22,7 +22,7 @@
 Ignored workspace artifacts: .local/booking-reply-test.json, .local/one-seat-booking-confirmed.png, .local/reply-delivery-phone.png, .local/driver-verification-phone.png, .local/verification-full-tests.log, .local/verification-retests.log, .local/verification-http-tests.log.
 
 ## Remaining release/device checks
-- Not pushed, deployed or included in the existing 0.2.7 APK. A new APK is needed for the document-picker native dependency and Android reply control changes.
+- Pushed and deployed in release 0.2.8; V30 applied to the live database. APK versionCode 10 passed signature/configuration/native-module checks. See release-0.2.8-2026-11-19.md for links and final CI verification.
 - Physical Android reply gestures/taps and document picking/upload still require on-device testing.
 - This is manual staff review, not government/DigiLocker/transport-authority validation, identity-liveness checks or automated fraud/virus scanning. No external verification provider has been configured.
 - Draft privacy/terms and document retention/deletion procedures need owner review before collecting real identity documents. No real licences, RCs or insurance files were used for tests.
