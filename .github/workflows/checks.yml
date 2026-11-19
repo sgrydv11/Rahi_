@@ -79,6 +79,7 @@ jobs:
           DB_PASSWORD: ${{ env.TEST_DB_PASSWORD }}
           JWT_SECRET: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           SERVER_PORT: '8082'
+          SMOKE_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           java -jar backend/target/hoopr-backend-0.1.0-SNAPSHOT-exec.jar > backend-smoke.log 2>&1 &
           server_pid=$!

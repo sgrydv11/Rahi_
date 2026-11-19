@@ -1,3 +1,4 @@
+import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
@@ -30,7 +31,7 @@ async function account(label) {
   const login = await request('/mobile/auth/login', { method: 'POST', body: { email, password } });
   assert.equal(login.status, 200);
   sessions.push(login.data);
-  return login.data;
+  return {...login.data,fixtureCredentials:{email,password}};
 }
 
 try {
@@ -38,11 +39,31 @@ try {
   const owner = await account('provider');
   const first = await account('passenger1');
   const second = await account('passenger2');
+  // Bootstrap a disposable reviewer only in the dedicated loopback test database.
+  const database=new URL((process.env.TEST_DB_URL||'').replace(/^jdbc:/,''));
+  assert.equal(database.pathname,'/hoopr_test');
+  assert.ok(['127.0.0.1','localhost'].includes(database.hostname));
+  const reviewer=await account('document-reviewer');
+  assert.match(reviewer.user.id,/^[a-f0-9-]{36}$/);
+  const sql=`UPDATE users SET role='ADMIN' WHERE id='${reviewer.user.id}'::uuid; INSERT INTO admin_memberships(user_id,staff_role) VALUES('${reviewer.user.id}'::uuid,'OPERATIONS');`;
+  if(process.env.SMOKE_POSTGRES_CONTAINER){
+    execFileSync('docker',['exec','-i',process.env.SMOKE_POSTGRES_CONTAINER,'psql','-U',process.env.TEST_DB_USERNAME,'-d','hoopr_test','-v','ON_ERROR_STOP=1','-c',sql],{stdio:'pipe'});
+  }else{
+    execFileSync(process.env.SMOKE_PSQL_BIN||'psql',['-h',database.hostname,'-p',database.port||'5432','-U',process.env.TEST_DB_USERNAME,'-d','hoopr_test','-v','ON_ERROR_STOP=1','-c',sql],{env:{...process.env,PGPASSWORD:process.env.TEST_DB_PASSWORD},stdio:'pipe'});
+  }
+  const elevated=await request('/mobile/auth/login',{method:'POST',body:reviewer.fixtureCredentials});assert.equal(elevated.status,200);sessions.push(elevated.data);
+  const vehicle=await request('/vehicles',{token:owner.accessToken,method:'POST',body:{make:'QA',model:'Smoke fixture',color:'Blue',registrationNumber:'QA-TEST-ONLY',passengerCapacity:4,active:true}});assert.equal(vehicle.status,201);
+  const verificationPath=`/vehicles/${vehicle.data.id}/verification`;
+  const expiry=new Date(Date.now()+365*86400000).toISOString().slice(0,10);
+  assert.equal((await request(verificationPath,{token:owner.accessToken,method:'PUT',body:{licenceNumber:'QA-LICENCE-ONLY',licenceExpiry:expiry,insuranceNumber:'QA-INSURANCE-ONLY',insuranceExpiry:expiry}})).status,200);
+  for(const kind of ['LICENCE','RC','INSURANCE'])assert.equal((await request(verificationPath+'/documents/'+kind,{token:owner.accessToken,method:'PUT',body:{content:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jK1cAAAAASUVORK5CYII='}})).status,200);
+  const pending=await request(verificationPath+'/submit',{token:owner.accessToken,method:'POST'});assert.equal(pending.status,200);assert.equal(pending.data.status,'PENDING');
+  const approved=await request(`/admin/driver-verifications/${vehicle.data.id}/review`,{token:elevated.data.accessToken,method:'POST',body:{decision:'APPROVED',revision:pending.data.revision,reason:'Reviewed fictional smoke-test documents only'}});assert.equal(approved.status,200);assert.equal(approved.data.status,'APPROVED');
   const offered = await request('/rides', {
     token: owner.accessToken, method: 'POST', body: {
       origin: 'Indore', destination: 'Ujjain',
       departureAt: new Date(Date.now() + 86400000).toISOString(), timeZone: 'Asia/Kolkata',
-      totalSeats: 1, pricePerSeat: 120, currency: 'INR', notes: `Local smoke ${run}`,
+      vehicleId:vehicle.data.id,totalSeats: 1, pricePerSeat: 120, currency: 'INR', notes: `Local smoke ${run}`,
       preferences: { boardingPoints: ['Station'], droppingPoints: ['Tower'], hasCar: true, ac: true,
         flexibleDropoff: true, womenOnly: false, routeType: 'HOME_TO_OFFICE' },
     },
@@ -88,7 +109,7 @@ try {
     token: owner.accessToken, method: 'POST', body: { version: restored.data.version, reason: 'Smoke test completed' },
   });
   assert.equal(closed.status, 200);
-  console.log('PASS registration, login, publish, public search/details, last-seat race, replay, booking history, cancellation and seat restoration');
+  console.log('PASS registration, login, private document submission/admin approval, verified publish, public search/details, last-seat race, replay, booking history, cancellation and seat restoration');
 } finally {
   for (const session of sessions) {
     const result = await request('/mobile/auth/logout', { method: 'POST', body: { refreshToken: session.refreshToken } });
