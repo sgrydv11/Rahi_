@@ -11,7 +11,7 @@ export function RideDetailsPage() {
   const { user } = useAuth();
   const location = useLocation();
   const seatParam = new URLSearchParams(location.search).get('seats');
-  const requestedSeats = seatParam && /^[1-6]$/.test(seatParam) ? Number(seatParam) : 1;
+  const requestedSeats = seatParam && /^[1-4]$/.test(seatParam) ? Number(seatParam) : 1;
   const [ride, setRide] = useState<Ride | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -48,16 +48,16 @@ export function RideDetailsPage() {
         <dt>Departure</dt><dd>{departureLabel(ride)}</dd>
         {ride.startedAt && <><dt>Started</dt><dd>{new Date(ride.startedAt).toLocaleString()}</dd></>}
         {ride.completedAt && <><dt>Completed</dt><dd>{new Date(ride.completedAt).toLocaleString()}</dd></>}
-        <dt>Driver</dt><dd>{ride.driver.displayName}</dd>
         <dt>Available seats</dt><dd>{ride.availableSeats} of {ride.totalSeats}</dd>
         <dt>Price per seat</dt><dd>{money(ride)}</dd>
         {ride.pickupDescription && <><dt>Pickup</dt><dd>{ride.pickupDescription}</dd></>}
         {ride.dropoffDescription && <><dt>Drop-off</dt><dd>{ride.dropoffDescription}</dd></>}
-        {ride.vehicleDetails && <><dt>Vehicle</dt><dd>{ride.vehicleDetails}</dd></>}
         {ride.notes && <><dt>Notes</dt><dd className="preserve-lines">{ride.notes}</dd></>}
         {ride.cancelledAt && <><dt>Cancelled</dt><dd>{new Date(ride.cancelledAt).toLocaleString()}</dd></>}
         {ride.cancellationReason && <><dt>Cancellation reason</dt><dd>{ride.cancellationReason}</dd></>}
       </dl></div>
+      <section className="panel"><h2>Driver details</h2><p>{ride.driver.displayName}</p><p>{ride.driverRating ? `${ride.driverRating.toFixed(1)}/5 passenger rating` : 'No passenger ratings yet'}</p>{ride.reviews?.map((review,index)=><p key={index}>{review.score}/5{review.text?' · '+review.text:''}</p>)}</section>
+      <section className="panel"><h2>Vehicle details</h2><p>{ride.vehicleDetails?.trim()||'Vehicle details have not been provided by the driver.'}</p><p>{ride.totalSeats} passenger seats{ride.preferences?.ac!=null ? (ride.preferences.ac?' · Air conditioned':' · No AC') : ''}</p></section>
       {ride.route && <RoutePreview pins={ride.route} />}
       {user?.id === ride.driver.id && canManage(ride) && ride.availableSeats === ride.totalSeats &&
         <RouteEditor key={ride.id} ride={ride} onSaved={updated => { setRide(updated); setMessage('Route updated.'); }} />}

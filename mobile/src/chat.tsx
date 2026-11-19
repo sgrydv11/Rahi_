@@ -106,42 +106,42 @@ function Conversation({userId,go,groupId,onBack,draftStore,pendingStore,canOffer
   return <View style={{flex:1,borderRadius:16,overflow:'hidden',backgroundColor:'#F7F9FC'}}>
     <ErrorText message={community.error}/>
     <View style={{flexDirection:'row',gap:6,alignItems:'center',padding: 8,backgroundColor:'#fff'}}><Pressable accessibilityRole="button" accessibilityLabel="Back to groups" onPress={onBack} style={{padding:6}}><Ionicons accessible={false} name="arrow-back-outline" size={24} color="#245EEA"/></Pressable><Ionicons accessible={false} name="people-outline" size={26} color="#245EEA"/><View style={{flex:1}}><Text numberOfLines={2} style={{fontSize:14,fontWeight:'700',color:'#142D4E'}}>{community.groups.find(g=>g.id===groupId)?.name||'Ride community'}</Text><Text style={{fontSize:12,color:'#4C5E75'}}>{community.groups.find(g=>g.id===groupId)?.memberCount??0} members</Text></View>{community.groups.find(g=>g.id===groupId)?.joined!==undefined&&<GroupControls group={community.groups.find(g=>g.id===groupId)} onLeave={onBack}/>}</View>
-    <View style={{paddingHorizontal:12,paddingVertical:4,gap:2}}><Pressable accessibilityRole="button" disabled={contacts.busy} onPress={()=>void contacts.enable()}><Text style={{color:'#245EEA',fontSize:12,paddingVertical:6}}>{contacts.denied?'Contact settings':contacts.busy?'Loading contact namesÃ¢â‚¬Â¦':'Use saved contact names'}</Text></Pressable>{!!contacts.message&&<Text style={{fontSize:11,color:'#4C5E75'}}>{contacts.message}</Text>}</View>
+    <View style={{paddingHorizontal:12,paddingVertical:4,gap:2}}><Pressable accessibilityRole="button" disabled={contacts.busy} onPress={()=>void contacts.enable()}><Text style={{color:'#245EEA',fontSize:12,paddingVertical:6}}>{contacts.denied?'Contact settings':contacts.busy?'Loading contact names…':'Use saved contact names'}</Text></Pressable>{!!contacts.message&&<Text style={{fontSize:11,color:'#4C5E75'}}>{contacts.message}</Text>}</View>
     <ErrorText message={error} /><ErrorText message={feedError}/>
-    {!loaded && !error && <Copy>Loading chatÃ¢â‚¬Â¦</Copy>}
+    {!loaded && !error && <Copy>Loading chat…</Copy>}
     {loaded && !messages.length && <Copy>No messages yet. Start the conversation.</Copy>}
     <ScrollView ref={feed} style={{flex:1}} contentContainerStyle={{padding:12}} keyboardShouldPersistTaps="handled" accessibilityLabel="Community messages"
       scrollEventThrottle={100} onScroll={({nativeEvent:e})=>{dimensions.current.offset=e.contentOffset.y;following.current=e.contentSize.height-e.contentOffset.y-e.layoutMeasurement.height<100;if(following.current)setNewMessages(false);if(following.current&&messages.length)void mark(messages[messages.length-1].id);}}
       onContentSizeChange={(_,height)=>{dimensions.current.height=height;if(preserve.current){feed.current?.scrollTo({y:preserve.current.offset+height-preserve.current.height,animated:false});preserve.current=null;}else if(following.current)feed.current?.scrollToEnd({animated:true});}}>
-      {hasOlder && <Button label={olderBusy?'LoadingÃ¢â‚¬Â¦':'Load earlier messages'} disabled={olderBusy} onPress={()=>void older()}/>}
+      {hasOlder && <Button label={olderBusy?'Loading…':'Load earlier messages'} disabled={olderBusy} onPress={()=>void older()}/>}
       <View style={{gap: 5}}>{messages.map((message,index)=><View key={message.id}>
         {(index===0||chatDay(messages[index-1].createdAt)!==chatDay(message.createdAt))&&<Text style={{textAlign:'center',padding:8,color:'#4C5E75'}}>{chatDay(message.createdAt)}</Text>}
-        <SwipeReply disabled={busy} reply={()=>{setReplyTo(message);composer.current?.focus();}}><View style={{maxWidth:'88%',alignSelf:message.senderId===userId?'flex-end':'flex-start',backgroundColor:message.senderId===userId?'#EDF3FF':'#fff',paddingHorizontal:10,paddingVertical:6,borderRadius:12,gap:3}}>
+        <SwipeReply disabled={busy} reply={()=>{setReplyTo(message);requestAnimationFrame(()=>composer.current?.focus());}}><View style={{maxWidth:'88%',alignSelf:message.senderId===userId?'flex-end':'flex-start',backgroundColor:message.senderId===userId?'#EDF3FF':'#fff',paddingHorizontal:10,paddingVertical:6,borderRadius:12,gap:3}}>
         {message.senderId!==userId&&<Pressable accessibilityRole="button" accessibilityLabel={`View member details for ${message.mobileNumber||'member'}`} onPress={()=>setSelectedMember(message)}><Text style={{fontWeight:'600',fontSize:12,color:'#245EEA'}}>{label(message.mobileNumber)}</Text></Pressable>}
         {message.replyTo && <View style={{borderLeftWidth:3,borderLeftColor:"#245EEA",backgroundColor:"#EDF3FF",height:48,padding:5,borderRadius:6,overflow:"hidden"}}><Text style={{fontWeight:"700",color:"#245EEA"}}>{message.replyTo.senderId===userId?'You':label(message.replyTo.mobileNumber)}</Text><Text numberOfLines={1} ellipsizeMode="tail" style={{fontSize:12}}>{message.replyTo.body}</Text></View>}
         <Text style={{fontSize:14,lineHeight:20,color:'#142D4E'}}>{message.body}</Text>
         {message.ride && <>
-          <Copy>{message.ride.origin} Ã¢â€ ’ {message.ride.destination}</Copy>
+          <Copy>{message.ride.origin} → {message.ride.destination}</Copy>
           <Copy>{date(message.ride.departureAt)}</Copy>
-          <Copy>{message.ride.availableSeats} seats available Ã‚· {message.ride.currency} {message.ride.pricePerSeat} per seat</Copy>
+          <Copy>{message.ride.availableSeats} seats available · {message.ride.currency} {message.ride.pricePerSeat} per seat</Copy>
           {message.ride.status==='SCHEDULED' && Date.parse(message.ride.departureAt)>Date.now() && message.ride.availableSeats>0
             ? <Button label={canBook?"View ride / book seats":"View ride"} onPress={()=>go({kind:'ride',id:message.ride!.id})} />
             : <Copy>This ride is no longer available to book.</Copy>}
         </>}
-        <Pressable accessibilityRole="button" accessibilityLabel={`Reply to ${message.senderId===userId?'your message':label(message.mobileNumber)}`} disabled={busy} onPress={()=>{setReplyTo(message);composer.current?.focus();}} hitSlop={8} style={{paddingVertical:2}}><Text style={{color:"#245EEA",fontSize:11}}>Ã¢â€ Â© Reply</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Reply to ${message.senderId===userId?'your message':label(message.mobileNumber)}`} disabled={busy} onPress={()=>{setReplyTo(message);requestAnimationFrame(()=>composer.current?.focus());}} hitSlop={8} style={{minHeight:44,minWidth:64,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:5}}><Ionicons accessible={false} name="return-up-back-outline" size={18} color="#245EEA"/><Text style={{color:"#245EEA",fontSize:12}}>Reply</Text></Pressable>
         <Text style={{fontSize:10,color:'#4C5E75',textAlign:'right'}}>{new Date(message.createdAt).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'})}</Text>
       </View></SwipeReply></View>)}</View>
     </ScrollView>
-    {newMessages&&<Button label="New messages Ã¢â€ “" onPress={()=>{following.current=true;setNewMessages(false);feed.current?.scrollToEnd({animated:true});if(messages.length)void mark(messages[messages.length-1].id);}}/>}
+    {newMessages&&<Button label="New messages ↓" onPress={()=>{following.current=true;setNewMessages(false);feed.current?.scrollToEnd({animated:true});if(messages.length)void mark(messages[messages.length-1].id);}}/>}
     <View style={{backgroundColor:'#F7F9FC',padding: 12,gap:8}}>
       {replyTo && <View style={{flexDirection:"row",alignItems:"center",gap:8,padding:6,height:48,overflow:'hidden',borderLeftWidth:3,borderLeftColor:"#245EEA",backgroundColor:"#EDF3FF"}}><View style={{flex:1}}><Text numberOfLines={1} style={{fontWeight:"600",fontSize:12}}>Replying to {replyTo.senderId===userId?'You':label(replyTo.mobileNumber)}</Text><Text numberOfLines={1} ellipsizeMode="tail" style={{fontSize:12}}>{replyTo.body}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Cancel reply" disabled={busy} onPress={()=>setReplyTo(null)} style={{padding:12}}><Ionicons name="close" size={22}/></Pressable></View>}
-      <View style={{flexDirection:'row',gap:8,alignItems:'center'}}>{canOffer&&<Pressable accessibilityRole="button" accessibilityLabel="Share a ride" onPress={()=>setShare(v=>!v)} style={{padding:8}}><Ionicons name="attach-outline" size={25} color="#245EEA"/></Pressable>}<TextInput ref={composer} editable={!busy} accessibilityLabel="Message" placeholder="Message" value={draft} onChangeText={setDraft} multiline maxLength={1000} style={{flex:1,minHeight:44,maxHeight:100,padding:12,backgroundColor:'#fff',borderRadius:12,color:'#142D4E'}}/><Pressable accessibilityRole="button" accessibilityLabel={busy?'SendingÃ¢â‚¬Â¦':'Send message'} disabled={busy||!draft.trim()} onPress={()=>void send()} style={{backgroundColor:'#245EEA',borderRadius:12,padding: 12,opacity:busy||!draft.trim()?0.5:1}}><Ionicons name="send" size={21} color="#fff"/></Pressable></View>
+      <View style={{flexDirection:'row',gap:8,alignItems:'center'}}>{canOffer&&<Pressable accessibilityRole="button" accessibilityLabel="Share a ride" onPress={()=>setShare(v=>!v)} style={{padding:8}}><Ionicons name="attach-outline" size={25} color="#245EEA"/></Pressable>}<TextInput ref={composer} editable={!busy} accessibilityLabel="Message" placeholder="Message" value={draft} onChangeText={setDraft} multiline maxLength={1000} style={{flex:1,minHeight:44,maxHeight:100,padding:12,backgroundColor:'#fff',borderRadius:12,color:'#142D4E'}}/><Pressable accessibilityRole="button" accessibilityLabel={busy?'Sending…':'Send message'} disabled={busy||!draft.trim()} onPress={()=>void send()} style={{backgroundColor:'#245EEA',borderRadius:12,padding: 12,opacity:busy||!draft.trim()?0.5:1}}><Ionicons name="send" size={21} color="#fff"/></Pressable></View>
 
       {share&&<ScrollView style={{maxHeight:160}} keyboardShouldPersistTaps="handled">
       <Button label="Load my rides to share" onPress={()=>void loadOffers()} disabled={busy} />
       <ErrorText message={offerError} />
-      <Button label={'Message only'+(!rideId?' Ã¢Å““':'')} onPress={()=>setRideId('')} disabled={busy} />
-      {offers.map(ride=><Button key={ride.id} label={`${rideId===ride.id?'Ã¢Å““ ':''}${ride.origin} Ã¢â€ ’ ${ride.destination} Ã‚· ${date(ride.departureAt)}`}
+      <Button label={'Message only'+(!rideId?' ✓':'')} onPress={()=>setRideId('')} disabled={busy} />
+      {offers.map(ride=><Button key={ride.id} label={`${rideId===ride.id?'✓ ':''}${ride.origin} → ${ride.destination} · ${date(ride.departureAt)}`}
         onPress={()=>setRideId(ride.id)} disabled={busy} />)}
       <Button label="Publish a new ride" onPress={()=>go({kind:'rideForm'})} />
       </ScrollView>}
@@ -149,7 +149,7 @@ function Conversation({userId,go,groupId,onBack,draftStore,pendingStore,canOffer
     <Modal visible={!!selectedMember} transparent animationType="fade" onRequestClose={()=>setSelectedMember(null)}>
       <View style={{flex:1,justifyContent:'center',backgroundColor:'#0008',padding:24}}><View accessibilityViewIsModal style={{backgroundColor:'#fff',padding:24,borderRadius:18,gap:12}}>
         <Text accessibilityRole="header" style={{fontSize:21,fontWeight:'700'}}>Member details</Text>
-        {selectedMember && <><Copy>{selectedMember.member.fullName}</Copy><Copy>{selectedMember.mobileNumber}{!selectedMember.mobileVerified?' Ã‚· Unverified number':''}</Copy><Copy>Travel preference: {selectedMember.member.travelPreference==='BOTH'?'Drive and ride':selectedMember.member.travelPreference==='DRIVER'?'Drive':'Ride'}</Copy><Copy>Member since {new Intl.DateTimeFormat('en-IN',{month:'long',year:'numeric'}).format(new Date(selectedMember.member.memberSince))}</Copy></>}
+        {selectedMember && <><Copy>{selectedMember.member.fullName}</Copy><Copy>{selectedMember.mobileNumber}{!selectedMember.mobileVerified?' · Unverified number':''}</Copy><Copy>Travel preference: {selectedMember.member.travelPreference==='BOTH'?'Drive and ride':selectedMember.member.travelPreference==='DRIVER'?'Drive':'Ride'}</Copy><Copy>Member since {new Intl.DateTimeFormat('en-IN',{month:'long',year:'numeric'}).format(new Date(selectedMember.member.memberSince))}</Copy></>}
         <ErrorText message={error}/><Button label="Call member" onPress={()=>{if(selectedMember?.mobileNumber)void Linking.openURL(`tel:${selectedMember.mobileNumber}`).catch(()=>setError("Unable to open the phone app."));}}/><Button label="Close" onPress={()=>setSelectedMember(null)}/>
       </View></View>
     </Modal>

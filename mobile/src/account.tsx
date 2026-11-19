@@ -1,3 +1,4 @@
+import {DriverVerification} from './driverVerification';
 import {LegalChecks} from './LegalChecks';
 import {RegularRoutesEditor,TravelPreferencesSettings,type RegularRoute} from './regularRoutes';
 import { useEffect, useState } from 'react';
@@ -102,6 +103,7 @@ export function Vehicles({ go }: { go: Navigate }) {
         <Copy>{vehicle.make} {vehicle.model} · {vehicle.passengerCapacity} seats</Copy>
         <Copy>{vehicle.registrationNumber} · {vehicle.active ? 'Active' : 'Archived'}</Copy>
         <Button label="Edit vehicle" onPress={() => go({ kind: 'vehicleForm', id: vehicle.id })} />
+        <DriverVerification vehicleId={vehicle.id}/>
       </Card>)}
     </>}
   </>;

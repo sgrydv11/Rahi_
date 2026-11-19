@@ -12,7 +12,7 @@ import { errorMessage } from '../auth/auth';
 import { ridesApi, type RidePage } from './api';
 import { Pagination, RideCard } from './RideComponents';
 
-const seatOptions = [1, 2, 3, 4, 5, 6];
+const seatOptions = [1, 2, 3, 4];
 
 function day(offset = 0) {
   const date = new Date(); date.setDate(date.getDate() + offset);
@@ -28,6 +28,7 @@ export function RideSearchPage() {
   const [savedRoutes,setSavedRoutes]=useState<{origin:string;destination:string;period:string}[]>([]);
   useEffect(()=>{if(!user)return;const c=new AbortController();authenticatedRequest<{origin:string;destination:string;period:string}[]>('/travel-preferences',{signal:c.signal}).then(setSavedRoutes).catch(()=>{});return()=>c.abort();},[user?.id]);
   const rideChoices=[...namedRides,...savedRoutes.map((r,i)=>({value:'saved-'+i,label:`${r.period==='MORNING'?'Office':r.period==='EVENING'?'Home':'Saved'} · ${r.origin} → ${r.destination}`,origin:r.origin,destination:r.destination,routeType:''}))];
+  const [boardingPoint,setBoardingPoint]=useState(params.get('boardingPoint')||''),[droppingPoint,setDroppingPoint]=useState(params.get('droppingPoint')||'');
   const [calendar, setCalendar] = useState(false);
   const dateInput=useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<RidePage | null>(null);
@@ -58,7 +59,7 @@ export function RideSearchPage() {
     if(!navigator.geolocation){setLocationMessage('Location is unavailable. Enter your city manually.');return;}
     setLocating(true);setLocationMessage('');navigator.geolocation.getCurrentPosition(position=>{
       setLocating(false);const city=nearbyCity(position.coords.latitude,position.coords.longitude);
-      if(city){setOrigin(city);setLocationMessage(`Nearby city: ${city}. You can edit it.`);}else setLocationMessage('No supported city nearby. Enter your city manually.');
+      if(city){setOrigin(city);setBoardingPoint('');setLocationMessage(`Nearby city: ${city}. You can edit it.`);}else setLocationMessage('No supported city nearby. Enter your city manually.');
     },()=>{setLocating(false);setLocationMessage('Location was unavailable or not allowed. Enter your city manually.');},{enableHighAccuracy:false,timeout:12000,maximumAge:60000});
   }
   function search(event: FormEvent<HTMLFormElement>) {
@@ -89,14 +90,16 @@ export function RideSearchPage() {
   return <section className={`page ride-search-page ${selected&&!editing?'compact-results':''}`}>
     {(!selected||editing)&&<h1>Where are you headed?</h1>}
     {!selected||editing ? <form className="panel ride-search-compact" onSubmit={search}>
-      <div className="journey-fields"><div className="from-city-row"><label className="city-field"><span aria-hidden="true"><Icon name="location-outline"/></span><span>From City<input aria-label="From City" name="origin" value={origin} onChange={e=>setOrigin(e.target.value)} required maxLength={200} placeholder="Leaving from" /></span></label><button className="city-locate-icon" aria-label="Use current city" title="Use current city" type="button" disabled={locating} onClick={locateCity}><Icon name="locate-outline"/></button></div>
-      {locationMessage&&<p className="location-message" role="status">{locationMessage}</p>}<label className="city-field"><span aria-hidden="true"><Icon name="location-outline"/></span><span>To City<input aria-label="To City" name="destination" value={destination} onChange={e=>setDestination(e.target.value)} required maxLength={200} placeholder="Going to" /></span></label>
+      <label className="route-preference">Choose a ride<select aria-label="Choose a ride" value={rideChoices.find(r=>r.origin===origin&&r.destination===destination)?.value||''} onChange={e=>{const r=rideChoices.find(r=>r.value===e.target.value);if(r){setOrigin(r.origin);setDestination(r.destination);setRouteType(r.routeType);setBoardingPoint('');setDroppingPoint('');}}}><option value="">Choose a ride</option>{rideChoices.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}</select></label><input type="hidden" name="routeType" value={routeType}/>
+      <div className="journey-fields"><div className="from-city-row"><label className="city-field"><span aria-hidden="true"><Icon name="location-outline"/></span><span>From City<input aria-label="From City" name="origin" value={origin} onChange={e=>{setOrigin(e.target.value);setBoardingPoint('');}} required maxLength={200} placeholder="Leaving from" /></span></label><button className="city-locate-icon" aria-label="Use current city" title="Use current city" type="button" disabled={locating} onClick={locateCity}><Icon name="locate-outline"/></button></div>
+      {locationMessage&&<p className="location-message" role="status">{locationMessage}</p>}<label className="city-field"><span aria-hidden="true"><Icon name="location-outline"/></span><span>To City<input aria-label="To City" name="destination" value={destination} onChange={e=>{setDestination(e.target.value);setDroppingPoint('');}} required maxLength={200} placeholder="Going to" /></span></label>
       <div className="journey-date"><input type="hidden" name="departureDate" value={date} />
         <button className="calendar-trigger" type="button" aria-label="Calendar" onClick={()=>{setCalendar(true);try{dateInput.current?.showPicker();}catch{dateInput.current?.focus();}}}><Icon name="calendar-outline"/><span><small>Date of Journey</small><strong>{new Date(date+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</strong></span></button>
         <button className="date-chip" type="button" aria-pressed={date===day()} onClick={()=>{setDate(day());setCalendar(false);}}>Today</button><button className="date-chip" type="button" aria-pressed={date===day(1)} onClick={()=>{setDate(day(1));setCalendar(false);}}>Tomorrow</button>
       </div></div>
+      <div className="search-extras"><label>Boarding point<select name="boardingPoint" value={boardingPoint} onChange={e=>setBoardingPoint(e.target.value)}><option value="">Any boarding point</option>{cityPoints(origin).map(p=><option key={p}>{p}</option>)}</select></label><label>Dropping point<select name="droppingPoint" value={droppingPoint} onChange={e=>setDroppingPoint(e.target.value)}><option value="">Any dropping point</option>{cityPoints(destination).map(p=><option key={p}>{p}</option>)}</select></label></div>
       <label className={calendar?'calendar-input':'calendar-input visually-hidden'}>Custom date<input ref={dateInput} type="date" required min={day()} value={date} onChange={event=>{if(event.target.value){setDate(event.target.value);setCalendar(false);}}} /></label>
-      <label className="route-preference">Choose a ride<select aria-label="Choose a ride" value={rideChoices.find(r=>r.origin===origin&&r.destination===destination)?.value||''} onChange={e=>{const r=rideChoices.find(r=>r.value===e.target.value);if(r){setOrigin(r.origin);setDestination(r.destination);setRouteType(r.routeType);}}}><option value="">Choose a ride</option>{rideChoices.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}</select></label><input type="hidden" name="routeType" value={routeType}/>
+
       <label className="women-toggle"><span>Booking for women<small>Show women-only rides</small></span><input name="womenOnly" defaultChecked={params.get('womenOnly')==='true'} type="checkbox" role="switch" aria-label="Women-only rides" value="true" /></label>
       <div className="search-extras">
       <label>Return date (optional)<input type="date" name="returnDate" defaultValue={params.get('returnDate')||''} min={date} /></label>
@@ -105,7 +108,7 @@ export function RideSearchPage() {
       </select></label>
       </div><button className="button search-submit" type="submit" aria-label="Search rides">⌕ Search rides</button>
     </form> : <>
-      <div className="search-summary"><div><strong>{params.get('origin')} <span aria-hidden="true">→</span> {params.get('destination')}</strong><div className="search-summary-meta"><span>{new Date((params.get('departureDate')||day())+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} · {seats} {seats===1?'seat':'seats'}</span><button className="edit-search" aria-label="Edit search" onClick={()=>{setOrigin(params.get('origin')||'');setDestination(params.get('destination')||'');setRouteType(params.get('routeType')||'');setDate(params.get('departureDate')||day());setEditing(true);}}><Icon name="create-outline"/></button></div></div></div>
+      <div className="search-summary"><div><strong>{params.get('origin')} <span aria-hidden="true">→</span> {params.get('destination')}</strong><div className="search-summary-meta"><span>{new Date((params.get('departureDate')||day())+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} · {seats} {seats===1?'seat':'seats'}</span><button className="edit-search" aria-label="Edit search" onClick={()=>{setOrigin(params.get('origin')||'');setDestination(params.get('destination')||'');setRouteType(params.get('routeType')||'');setDate(params.get('departureDate')||day());setBoardingPoint(params.get('boardingPoint')||'');setDroppingPoint(params.get('droppingPoint')||'');setEditing(true);}}><Icon name="create-outline"/></button></div></div></div>
       {returnQuery && <p><Link to={`/rides?${returnQuery}`}>Find return rides on {returnDate}</Link></p>}
       <div className="ride-results-toolbar"><details className="panel filter-sort-panel sort-panel"><summary><Icon name="swap-vertical-outline"/>Sort</summary><div className="sort-toggles" role="group" aria-label="Sort rides">{[['TIME','Time'],['PRICE','Price'],['RATING','Rating']].map(([key,label])=>{const current=params.get('sort')||'TIME_ASC',selected=current.startsWith(key),descending=selected&&current.endsWith('DESC');return <button type="button" key={key} aria-pressed={selected} aria-label={`Sort by ${label.toLowerCase()} ${descending?'descending':'ascending'}`} onClick={()=>change('sort',key+(selected&&!descending?'_DESC':'_ASC'))}>{label} {descending?'↓':'↑'}</button>;})}</div></details><details className="panel filter-sort-panel"><summary><Icon name="options-outline"/>Filters</summary>
       <label>Seats<select value={seats} onChange={event => change('minimumSeats', event.target.value)}>

@@ -24,7 +24,7 @@ class RideServiceTest {
     Create body() { return new Create("Mumbai", "Pune", null, null, now.plusSeconds(86400), "Asia/Kolkata", 3, new BigDecimal("250.00"), "INR", "Blue car", null); }
     Update seats(long version, int seats) { return new Update(version, null, null, null, null, null, null, seats, null, null, null, null); }
     @BeforeEach void setup() {
-        service = new RideService(rides, users, jdbc, Clock.fixed(now, ZoneOffset.UTC), profiles, bookings);
+        service = new RideService(rides, users, jdbc, Clock.fixed(now, ZoneOffset.UTC), profiles, bookings, mock(com.hoopr.vehicle.DriverVerificationService.class));
         UserAccount account = new UserAccount(); account.id = owner; account.status = "ACTIVE";
         when(users.findById(owner)).thenReturn(Optional.of(account));
         ride = new Ride(); ride.id = UUID.randomUUID(); ride.driverId = owner; ride.origin = "Mumbai";

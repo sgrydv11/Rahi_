@@ -64,6 +64,11 @@ public class VehicleController {
                 """, Boolean.class, id, body.passengerCapacity());
         if (Boolean.TRUE.equals(conflict))
             throw new RideFailure(409, "Capacity cannot be reduced below the seats on a linked ride.");
+        jdbc.update("""
+                UPDATE driver_vehicle_verifications SET status='DRAFT',revision=revision+1,review_reason=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=now()
+                WHERE vehicle_id=? AND EXISTS(SELECT 1 FROM vehicles WHERE id=? AND
+                 (make IS DISTINCT FROM ? OR model IS DISTINCT FROM ? OR color IS DISTINCT FROM ? OR registration_number IS DISTINCT FROM ? OR passenger_capacity IS DISTINCT FROM ?))
+                """,id,id,body.make().strip(),body.model().strip(),color(body),body.registrationNumber().strip(),body.passengerCapacity());
         return jdbc.queryForObject("""
                 UPDATE vehicles SET make = ?, model = ?, color = ?, registration_number = ?,
                     passenger_capacity = ?, active = ?, updated_at = CURRENT_TIMESTAMP

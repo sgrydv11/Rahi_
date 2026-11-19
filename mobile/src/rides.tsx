@@ -32,7 +32,7 @@ const sortOptions = [
   { value: 'PRICE_ASC', label: 'Price ↑' }, { value: 'PRICE_DESC', label: 'Price ↓' },
   { value: 'RATING_ASC', label: 'Rating ↑' }, { value: 'RATING_DESC', label: 'Rating ↓' },
 ];
-const seatOptions = [1, 2, 3, 4, 5, 6].map(value => ({ value: String(value), label: String(value) }));
+const seatOptions = [1, 2, 3, 4].map(value => ({ value: String(value), label: String(value) }));
 const yesNo = [{ value: '', label: 'Any' }, { value: 'true', label: 'Yes' }];
 
 export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (page: number) => void }) {
@@ -76,7 +76,7 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
     setError(''); setPage(0);
     setQuery(Object.entries(values).filter(([key, value]) => key !== 'returnDate' && key !== 'ac' && key !== 'namedRide' && value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
   }
-  function update(key: string, value: string) { setDraft(previous => ({ ...previous, [key]: value,...(key==='origin'||key==='destination'?{namedRide:''}:{}) })); }
+  function update(key: string, value: string) { setDraft(previous => ({ ...previous, [key]: value,...(key==='origin'||key==='destination'?{namedRide:'',...(key==='origin'?{boardingPoint:''}:{droppingPoint:''})}:{}) })); }
   const travelDate = draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined;
   function timeField(key: string, label: string) {
     return <DateField label={label} mode="time" value={draft[key] && draft[key] !== '24:00' ? new Date(draft.departureDate + 'T' + draft[key]) : undefined}
@@ -84,16 +84,19 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
       clear={() => update(key, '')} />;
   }
   if (!mine && !query) return <View style={rideUI.form}>
+    <SelectField label="Choose a ride" options={[{value:'',label:'Choose a ride'},...rideChoices]} value={draft.namedRide||''} onChange={v=>{const r=rideChoices.find(r=>r.value===v);setDraft(p=>r?({...p,origin:r.origin,destination:r.destination,routeType:r.routeType,namedRide:v,boardingPoint:'',droppingPoint:''}):({...p,namedRide:v}));}}/>
     <Field label="From City" value={draft.origin || ''} change={value => update('origin', value)} labelAction={<Pressable accessibilityRole="button" accessibilityLabel="Use current city" disabled={locating} onPress={()=>void locateCity()} style={{padding:8}}><Ionicons name="locate-outline" size={20} color="#245EEA"/></Pressable>}/>
     {!!locationMessage&&<Text accessibilityRole="alert" style={rideUI.secondary}>{locationMessage}</Text>}
     <Field label="To City" value={draft.destination || ''} change={value => update('destination', value)} />
+    <Dropdown label="Boarding point" selected={draft.boardingPoint||''} values={points(draft.origin||'')} change={v=>update('boardingPoint',v)}/>
+    <Dropdown label="Dropping point" selected={draft.droppingPoint||''} values={points(draft.destination||'')} change={v=>update('droppingPoint',v)}/>
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap: 8}}>
       <DateField label="Date of Journey" mode="date" minimumDate={new Date(day()+'T00:00')} value={travelDate} change={value => update('departureDate', localDate(value.toISOString()).slice(0, 10))} />
       <View style={{flexDirection:'row',gap: 4}}>{[{label:'Today',offset:0},{label:'Tomorrow',offset:1}].map(item=><Pressable key={item.label} accessibilityRole="button" onPress={()=>update('departureDate',day(item.offset))} style={{borderRadius:20,padding:8,backgroundColor:draft.departureDate===day(item.offset)?'#245EEA':'#EDF3FF'}}><Text style={{fontSize:11,color:draft.departureDate===day(item.offset)?'#fff':'#142D4E'}}>{item.label}</Text></Pressable>)}</View>
     </View>
     <DateField label="Return date (optional)" mode="date" value={draft.returnDate ? new Date(draft.returnDate + 'T12:00') : undefined}
       change={value => update('returnDate', localDate(value.toISOString()).slice(0, 10))} clear={() => update('returnDate', '')} />
-    <SelectField label="Choose a ride" options={[{value:'',label:'Choose a ride'},...rideChoices]} value={draft.namedRide||''} onChange={v=>{const r=rideChoices.find(r=>r.value===v);setDraft(p=>r?({...p,origin:r.origin,destination:r.destination,routeType:r.routeType,namedRide:v}):({...p,namedRide:v}));}}/>
+
     <Choice label="Seats" values={seatOptions} selected={draft.minimumSeats} change={value => update('minimumSeats', value)} />
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:12,borderWidth:1,borderColor:'#D5DEEA',borderRadius:12}}><View><Copy>Booking for women</Copy><Text style={{color:'#4C5E75',fontSize:12}}>Show women-only rides</Text></View><Switch accessibilityLabel="Women-only rides" value={draft.womenOnly==='true'} onValueChange={value=>update('womenOnly',value?'true':'')} trackColor={{true:'#245EEA'}}/></View>
     <ErrorText message={error} />
@@ -183,12 +186,13 @@ export function RideDetails({ id, requestedSeats = 1, user, go }: { id: string; 
 
   return <>
     <Card><Copy>{ride.origin} → {ride.destination}</Copy><Copy>{date(ride.departureAt)} · {labelStatus(ride.status)}</Copy>
-      <Copy>Driver: {ride.driver.displayName}</Copy>
       <Copy>{ride.currency} {ride.pricePerSeat} per seat · {ride.availableSeats} of {ride.totalSeats} available</Copy>
       {message('Pickup', ride.pickupDescription)}{message('Drop-off', ride.dropoffDescription)}
-      {message('Vehicle', ride.vehicleDetails)}{message('Notes', ride.notes)}{message('Cancellation', ride.cancellationReason)}
+      {message('Notes', ride.notes)}{message('Cancellation', ride.cancellationReason)}
       {message('Started', ride.startedAt && date(ride.startedAt))}{message('Completed', ride.completedAt && date(ride.completedAt))}
     </Card>
+    <Card><Text accessibilityRole="header" style={{fontSize:18,fontWeight:'600'}}>Driver details</Text><Copy>{ride.driver.displayName}</Copy><Copy>{ride.driverRating ? `${ride.driverRating.toFixed(1)}/5 passenger rating` : 'No passenger ratings yet'}</Copy>{ride.reviews?.map((review,index)=><Copy key={index}>{review.score}/5{review.text?' · '+review.text:''}</Copy>)}</Card>
+    <Card><Text accessibilityRole="header" style={{fontSize:18,fontWeight:'600'}}>Vehicle details</Text><Copy>{ride.vehicleDetails?.trim()||'Vehicle details have not been provided by the driver.'}</Copy><Copy>{ride.totalSeats} passenger seats</Copy>{ride.preferences?.ac!=null&&<Copy>{ride.preferences.ac?'Air conditioned':'No AC'}</Copy>}</Card>
     {ride.route && <Route pins={ride.route} />}
     <ErrorText message={action.error} />
     {owner && <Card>
@@ -239,6 +243,7 @@ function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; 
   const action = useAction();
   function save() {
     void action.run(async () => {
+      if(!ride&&!vehicleId)throw new Error('Select an approved saved vehicle. Upload your driving licence, RC and insurance in My vehicles.');
       const departure = new Date(draft.departureAt);
       if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(draft.departureAt) || !Number.isFinite(departure.getTime()) ||
           localDate(departure.toISOString()) !== draft.departureAt || departure.getTime() <= Date.now())
@@ -287,14 +292,7 @@ function RideFields({ ride, vehicles, go }: { ride?: Ride; vehicles: Vehicle[]; 
       return <Field key={key} label={label} value={draft[key]} numeric={key === 'totalSeats' || key === 'pricePerSeat'}
         change={value => setDraft(previous => ({ ...previous, [key]: value }))} />;
     })}
-    {!ride && vehicles.length > 0 && <>
-      <Copy>Saved vehicle</Copy>
-      <View style={styles.row}>
-        <Button label={!vehicleId ? 'Manual details ✓' : 'Manual details'} onPress={() => setVehicle(undefined)} />
-        {vehicles.map(vehicle => <Button key={vehicle.id} label={`${vehicle.make} ${vehicle.model} (${vehicle.passengerCapacity})${vehicleId === vehicle.id ? ' ✓' : ''}`}
-          onPress={() => setVehicle(vehicle.id)} />)}
-      </View>
-    </>}
+    {!ride && <><SelectField label="Saved vehicle (verification required)" value={vehicleId||''} options={[{value:'',label:'Select your approved vehicle'},...vehicles.map(v=>({value:v.id,label:`${v.make} ${v.model} (${v.passengerCapacity} seats)`}))]} onChange={setVehicle}/><Copy>Driving licence, vehicle RC and insurance approval is required before offering rides.</Copy><Button variant="link" label="Manage vehicles and verification" onPress={()=>go({kind:'vehicles'})}/></>}
     <ErrorText message={action.error} />
     <Button label={ride ? 'Save changes' : 'Offer this ride'} disabled={action.busy} onPress={save} />
   </Card>;

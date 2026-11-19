@@ -15,20 +15,22 @@ import static com.hoopr.ride.RideDtos.*;
 
 @Service
 public class RideService {
+    private final com.hoopr.vehicle.DriverVerificationService verification;
     private final RideRepository rides;
     private final UserRepository users;
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final ProfileRepository profiles;
     private final com.hoopr.booking.BookingService bookings;
-    public RideService(RideRepository rides, UserRepository users, JdbcTemplate jdbc, Clock clock, ProfileRepository profiles, com.hoopr.booking.BookingService bookings) {
+    public RideService(RideRepository rides, UserRepository users, JdbcTemplate jdbc, Clock clock, ProfileRepository profiles, com.hoopr.booking.BookingService bookings, com.hoopr.vehicle.DriverVerificationService verification) {
         this.rides = rides; this.users = users; this.jdbc = jdbc; this.clock = clock; this.profiles = profiles;
-        this.bookings = bookings;
+        this.bookings = bookings; this.verification = verification;
     }
     @Transactional
     public View create(UUID driver, Create body) {
         active(driver);
         if(profiles.findById(driver).map(p->p.travelPreference==com.hoopr.user.TravelPreference.PASSENGER).orElse(false))throw new RideFailure(403,"Select Driver or Both in Account before offering a ride.");
+        verification.requireApproved(driver,body.vehicleId());
         validateDeparture(body.departureAt(), body.timeZone());
         validateLocations(body.origin(), body.destination());
         // PostgreSQL upsert also serializes simultaneous first offers by the same driver.
@@ -84,6 +86,7 @@ public class RideService {
     public View update(UUID id, UUID owner, Update body) {
         active(owner);
         Ride ride = editable(id, owner, body.version());
+        verification.requireApproved(owner,ride.vehicleId);
         requireUnreserved(ride);
         bookings.requireNoPendingRequests(ride.id);
         if ((body.origin() != null && !ride.origin.equals(body.origin().strip())) ||

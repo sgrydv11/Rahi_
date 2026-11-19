@@ -1,3 +1,4 @@
+import {Link} from 'react-router';
 import { useCityPoints } from './locations';
 import { useEffect, useState, type FormEvent } from 'react';
 import { listVehicles, type Vehicle } from '../vehicles/VehiclesPage';
@@ -66,8 +67,8 @@ export function RideForm({ ride, save }: { ride?: Ride; save: (body: RideInput) 
       <label>Currency<input name="currency" required pattern="[A-Za-z]{3}" maxLength={3} defaultValue={ride?.currency ?? 'INR'} /></label>
       <label>Pickup description (optional)<input name="pickupDescription" maxLength={500} defaultValue={ride?.pickupDescription ?? ''} /></label>
       <label>Drop-off description (optional)<input name="dropoffDescription" maxLength={500} defaultValue={ride?.dropoffDescription ?? ''} /></label>
-      {!ride && vehicles.length > 0 && <label>Saved vehicle<select name="vehicleId" defaultValue="">
-        <option value="">Enter vehicle details manually</option>
+      {!ride && <label>Saved vehicle (verification required)<select name="vehicleId" required defaultValue="">
+        <option value="">Select your approved vehicle</option>
         {vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>
           {vehicle.make} {vehicle.model} ({vehicle.passengerCapacity} seats)
         </option>)}

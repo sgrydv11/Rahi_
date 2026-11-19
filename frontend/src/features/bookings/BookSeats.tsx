@@ -10,7 +10,7 @@ import { bookingsApi, type JourneyDetails } from './api';
 export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedSeats?: number }) {
   const returnPath = `/rides/${ride.id}${requestedSeats > 1 ? `?seats=${requestedSeats}` : ''}`;
   const { user } = useAuth(); const navigate = useNavigate();
-  const [seats, setSeats] = useState(() => Math.max(1, Math.min(requestedSeats, ride.availableSeats))); const [confirm, setConfirm] = useState(false);
+  const [seats, setSeats] = useState(() => Math.max(1, Math.min(4,requestedSeats, ride.availableSeats))); const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const [demoPaymentMethod,setDemoPaymentMethod]=useState<'DIRECT'|'QR'|'OTHER'>('DIRECT');
   const [started, setStarted] = useState(false);
@@ -73,7 +73,7 @@ export function BookSeats({ ride, requestedSeats = 1 }: { ride: Ride; requestedS
   }
   return <form className="panel auth-form" onSubmit={submit} aria-busy={busy}>
     <h2>Book your seats</h2><label>Seats<select value={seats} disabled={busy || confirm} onChange={event => setSeats(Number(event.target.value))}>
-      {Array.from({ length: ride.availableSeats }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
+      {Array.from({ length: Math.min(4,ride.availableSeats) }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
     </select></label>
     <label>Boarding point<select name="boardingPoint" required disabled={busy || confirm} defaultValue=""><option value="">Select boarding point</option>{(ride.preferences?.boardingPoints || [ride.origin]).map(point => <option key={point}>{point}</option>)}</select></label>
     <label>Dropping point<select name="droppingPoint" required disabled={busy || confirm} defaultValue=""><option value="">Select dropping point</option>{(ride.preferences?.droppingPoints || [ride.destination]).map(point => <option key={point}>{point}</option>)}</select></label>

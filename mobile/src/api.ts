@@ -39,7 +39,7 @@ export interface Payment {
 }
 export interface Notice { id: string; kind: string; origin: string; destination: string; time: string; link: string }
 interface Session { accessToken: string; expiresIn: number; refreshToken: string; user: User }
-type Options = { method?: 'POST' | 'PATCH'; body?: unknown; key?: string; auth?: boolean; signal?: AbortSignal };
+type Options = { method?: 'POST' | 'PATCH' | 'PUT'; body?: unknown; key?: string; auth?: boolean; signal?: AbortSignal };
 class ApiError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }

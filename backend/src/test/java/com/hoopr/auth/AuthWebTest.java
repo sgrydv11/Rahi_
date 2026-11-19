@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 class AuthWebTest {
+    @MockitoBean com.hoopr.vehicle.DriverVerificationService driverVerification;
     @Autowired MockMvc mvc;
     @Autowired JwtEncoder encoder;
     @Autowired JwtDecoder decoder;

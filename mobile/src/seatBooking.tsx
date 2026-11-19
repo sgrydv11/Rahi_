@@ -1,3 +1,4 @@
+import {SelectField} from './SelectField';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
@@ -11,7 +12,7 @@ export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride
   const [payment,setPayment]=useState<'DIRECT'|'QR'|'OTHER'>('DIRECT');
   const [boarding, setBoarding] = useState('');
   const [dropping, setDropping] = useState('');
-  const [passengers, setPassengers] = useState<DraftPassenger[]>(() => Array.from({ length: Math.min(requestedSeats, ride.availableSeats) }, () => ({ name: '', age: '', gender: '' })));
+  const [passengers, setPassengers] = useState<DraftPassenger[]>(() => Array.from({ length: Math.max(1,Math.min(4,requestedSeats, ride.availableSeats)) }, () => ({ name: '', age: '', gender: '' })));
   const [recent, setRecent] = useState<Passenger[]>([]);
   const request = useRef<{ signature: string; key: string } | null>(null);
   const action = useAction();
@@ -47,15 +48,15 @@ export function SeatBooking({ ride, requestedSeats = 1, user, go }: { ride: Ride
   }
   return <Card>
     {stage === 'stops' && <>
-      <Choice label="Boarding point" selected={boarding} values={(ride.preferences?.boardingPoints || [ride.origin]).map(point => ({ value: point, label: point }))} change={setBoarding} />
-      <Choice label="Dropping point" selected={dropping} values={(ride.preferences?.droppingPoints || [ride.destination]).map(point => ({ value: point, label: point }))} change={setDropping} />
+      <SelectField label="Boarding point" value={boarding} options={[{value:'',label:'Select boarding point'},...(ride.preferences?.boardingPoints?.length?ride.preferences.boardingPoints:[ride.pickupDescription||ride.origin]).map(point=>({value:point,label:point}))]} onChange={setBoarding} />
+      <SelectField label="Dropping point" value={dropping} options={[{value:'',label:'Select dropping point'},...(ride.preferences?.droppingPoints?.length?ride.preferences.droppingPoints:[ride.dropoffDescription||ride.destination]).map(point=>({value:point,label:point}))]} onChange={setDropping} />
       {ride.preferences?.flexibleDropoff && <Copy>The driver accepts nearby drop-off requests by arrangement. Confirm any alternative with the driver.</Copy>}
       <Button label="Passenger details" onPress={() => void action.run(async () => {
         if (!boarding || !dropping) throw new Error('Select boarding and dropping points.'); setStage('passengers');
       })} />
     </>}
     {stage === 'passengers' && <>
-      <Choice label="Seats" selected={String(passengers.length)} values={Array.from({ length: Math.min(6, ride.availableSeats) }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))}
+      <Choice label="Seats" selected={String(passengers.length)} values={Array.from({ length: Math.min(4, ride.availableSeats) }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))}
         change={value => setPassengers(previous => Array.from({ length: Number(value) }, (_, index) => previous[index] || { name: '', age: '', gender: '' }))} />
       {passengers.map((person, index) => <View key={index} style={styles.field}>
         <Copy>Passenger {index + 1}</Copy>

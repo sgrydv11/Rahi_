@@ -14,12 +14,14 @@ class DemoSeedIT {
         String url = TestDatabase.required("TEST_DB_URL");
         String username = TestDatabase.required("TEST_DB_USERNAME");
         String password = TestDatabase.required("TEST_DB_PASSWORD");
-        Flyway.configure().dataSource(url, username, password).load().migrate();
+        String schema="demo_seed_it_"+java.util.UUID.randomUUID().toString().replace("-", "");
+        Flyway.configure().dataSource(url, username, password).schemas(schema).defaultSchema(schema).load().migrate();
         // Run the actual psql seed inside our rollback-only JDBC transaction.
         String sql = Files.readString(Path.of("seed/demo-data.sql"))
                 .replaceAll("(?m)^\\\\set[^\\r\\n]*", "")
                 .replaceAll("(?m)^(BEGIN|COMMIT);[\\t ]*\\r?$", "");
         try (Connection db = DriverManager.getConnection(url, username, password)) {
+            db.setSchema(schema);
             db.setAutoCommit(false);
             try {
                 execute(db, sql);
@@ -52,6 +54,12 @@ class DemoSeedIT {
                     """));
             } finally {
                 db.rollback();
+            }
+        } finally {
+            // Generated schema only, inside the guarded hoopr_test database.
+            if(!schema.matches("demo_seed_it_[a-f0-9]{32}")) throw new IllegalStateException("Unsafe test schema");
+            try(Connection cleanup=DriverManager.getConnection(url,username,password);var statement=cleanup.createStatement()) {
+                statement.execute("DROP SCHEMA "+schema+" CASCADE");
             }
         }
     }

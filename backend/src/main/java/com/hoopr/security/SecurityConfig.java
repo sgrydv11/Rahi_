@@ -36,7 +36,7 @@ public class SecurityConfig {
     @Bean CorsFilter corsFilter(AuthSettings settings) {
         var cors = new CorsConfiguration();
         cors.setAllowedOrigins(settings.origins()); cors.setAllowCredentials(true);
-        cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
+        cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "OPTIONS"));
         cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN", "Idempotency-Key"));
         var source = new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**", cors);
         var filter = new CorsFilter(source);
@@ -128,6 +128,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me", "/api/v1/vehicles/{id}").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/vehicles/{id}/verification", "/api/v1/vehicles/{id}/verification/documents/{kind}").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/vehicles/{id}/verification", "/api/v1/vehicles/{id}/verification/documents/{kind}").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/vehicles/{id}/verification/submit").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/vehicles").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/vehicles").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET,"/api/v1/push/config").hasAnyRole("USER","ADMIN")

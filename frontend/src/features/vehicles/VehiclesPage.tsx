@@ -1,3 +1,4 @@
+import {DriverVerification} from './DriverVerification';
 import { useEffect, useState, type FormEvent } from 'react';
 import { authenticatedRequest, errorMessage } from '../auth/auth';
 
@@ -65,6 +66,7 @@ export function VehiclesPage() {
       <button className="button button-secondary" disabled={busy} onClick={() => setEditing(vehicle)}>
         Edit {vehicle.make} {vehicle.model}
       </button>
+      <DriverVerification vehicleId={vehicle.id}/>
     </article>)}
     {vehicles && <form key={editing?.id ?? 'new'} className="panel auth-form" onSubmit={save}>
       <h2>{editing ? 'Edit vehicle' : 'Add a vehicle'}</h2>

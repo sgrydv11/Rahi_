@@ -29,3 +29,13 @@
 - Android OS permission dialogs, icon rendering, contact-name matching, gesture navigation/safe areas and background push delivery need verification on a freshly installed updated APK/device.
 - Browser mobile previews do not substitute for Android device verification. iOS permission behavior has not been tested on an iPhone.
 - Real users must supply their own missing phone numbers; no generated values were added to them.
+## Follow-up: ride search and details (19 November 2026)
+
+Implemented in source after release 0.2.7; not deployed or included in that APK yet:
+- Choose a ride is the first control in native/web search, with the six named routes available immediately.
+- Seat choices limited to 1–4 in search and booking, bounded further by actual remaining seats.
+- Boarding/drop dropdowns are visible before searching, not only under result filters. Indore: Aurobindo, Luv Kush, Vijay Nagar. Ujjain: Nanakheda, D-Mart, Lal Gate. City changes clear incompatible selected points; edit preserves current selections.
+- Native booking also uses boarding/drop dropdowns, restricted to points actually offered by that ride.
+- Ride details have explicit Driver details and Vehicle details sections showing existing public driver name, actual rating/reviews, vehicle description, seat capacity and supplied AC preference. Missing vehicle information is explicitly marked not provided; no personal information or vehicle details are invented.
+- Existing backend APIs already return public driver/vehicle information and city points and support boarding/drop filtering; no database migration needed.
+- Web build, TypeScript, 71 web tests and 37 native tests passed. Browser regression checks route visibility/order, 1–4 seats, city-point options and filtering, edit preservation, driver/vehicle panels and responsive layouts. Android UI still needs verification in a new APK.
