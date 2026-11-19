@@ -25,7 +25,7 @@
 - Phone-size browser previews: .local/layout-chat-phone.png, .local/ride-search-phone-form.png, .local/ride-search-phone-results.png.
 
 ## Not completed / release checks remaining
-- These source changes have not been deployed or included in a new APK. The previously built 0.2.6 APK predates this update.
+- Source commit 9f7df78 is deployed to the combined Render frontend/backend service. Android 0.2.7 (versionCode 9) finished successfully and passed APK artifact/signature checks; see release-0.2.7-2026-11-19.md for its download link and evidence.
 - Android OS permission dialogs, icon rendering, contact-name matching, gesture navigation/safe areas and background push delivery need verification on a freshly installed updated APK/device.
 - Browser mobile previews do not substitute for Android device verification. iOS permission behavior has not been tested on an iPhone.
 - Real users must supply their own missing phone numbers; no generated values were added to them.
