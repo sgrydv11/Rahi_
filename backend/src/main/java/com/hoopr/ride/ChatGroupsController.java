@@ -25,7 +25,7 @@ public class ChatGroupsController {
         return jdbc.query("""
             SELECT g.*,s.muted,s.pinned,s.left_at,s.joined_at,(SELECT count(*) FROM chat_group_preferences members JOIN users member_user ON member_user.id=members.user_id WHERE members.group_id=g.id AND members.left_at IS NULL AND member_user.status='ACTIVE') member_count,
              (SELECT count(*) FROM chat_messages m WHERE s.left_at IS NULL AND NOT m.hidden AND m.group_id=g.id AND m.id>s.last_read_id AND m.sender_id<>? AND m.created_at>=now()-interval '7 days') unread,
-             last.id latest_id,last.body latest_body,coalesce(p.mobile_number,'Number unavailable') latest_sender,last.sender_id,last.created_at latest_time,p.mobile_number latest_mobile
+             last.id latest_id,last.body latest_body,coalesce(nullif(btrim(p.mobile_number),''),p.chat_display_number,'Demo member') latest_sender,last.sender_id,last.created_at latest_time,coalesce(CASE WHEN p.email LIKE 'demo%@demo.hoopr.test' OR p.email LIKE '%@qa.example.test' THEN right(nullif(btrim(p.mobile_number),''),10) ELSE nullif(btrim(p.mobile_number),'') END,p.chat_display_number) latest_mobile
             FROM chat_groups g JOIN chat_group_preferences s ON s.group_id=g.id AND s.user_id=?
             LEFT JOIN LATERAL (SELECT m.id,m.body,m.sender_id,m.created_at FROM chat_messages m WHERE s.left_at IS NULL AND NOT m.hidden AND m.group_id=g.id AND m.created_at>=now()-interval '7 days' ORDER BY m.id DESC LIMIT 1) last ON true
             LEFT JOIN users p ON p.id=last.sender_id ORDER BY s.pinned DESC,g.id
@@ -36,11 +36,11 @@ public class ChatGroupsController {
     @PostMapping("/{group}/pin") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT) @Transactional
     public void pin(@AuthenticationPrincipal Jwt jwt,@PathVariable long group,@RequestBody Pin body){UUID id=user(jwt);initialize(id);if(jdbc.update("UPDATE chat_group_preferences SET pinned=? WHERE user_id=? AND group_id=?",body.pinned(),id,group)!=1)throw new RideFailure(404,"Group not found.");}
     public record Membership(boolean joined) { }
-    public record Member(UUID id,String fullName,String mobileNumber,java.time.Instant joinedAt) { }
+    public record Member(UUID id,String fullName,String mobileNumber,java.time.Instant joinedAt,boolean mobilePlaceholder) { }
     @GetMapping("/{group}/members") @Transactional
     public List<Member> members(@AuthenticationPrincipal Jwt jwt,@PathVariable long group){UUID id=user(jwt);initialize(id);
         if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM chat_group_preferences WHERE user_id=? AND group_id=? AND left_at IS NULL)",Boolean.class,id,group)))throw new RideFailure(403,"Join this group to see its members.");
-        return jdbc.query("SELECT u.id,p.full_name,u.mobile_number,g.joined_at FROM chat_group_preferences g JOIN users u ON u.id=g.user_id JOIN user_profiles p ON p.user_id=u.id WHERE g.group_id=? AND g.left_at IS NULL AND u.status='ACTIVE' ORDER BY g.joined_at,u.id",(r,n)->new Member(r.getObject("id",UUID.class),r.getString("full_name"),r.getString("mobile_number"),r.getTimestamp("joined_at").toInstant()),group);
+        return jdbc.query("SELECT u.id,p.full_name,coalesce(CASE WHEN u.email LIKE 'demo%@demo.hoopr.test' OR u.email LIKE '%@qa.example.test' THEN right(nullif(btrim(u.mobile_number),''),10) ELSE nullif(btrim(u.mobile_number),'') END,u.chat_display_number) AS mobile_number,g.joined_at,((nullif(btrim(u.mobile_number),'') IS NULL AND u.chat_display_number IS NOT NULL) OR u.email LIKE 'demo%@demo.hoopr.test' OR u.email LIKE '%@qa.example.test') AS mobile_placeholder FROM chat_group_preferences g JOIN users u ON u.id=g.user_id JOIN user_profiles p ON p.user_id=u.id WHERE g.group_id=? AND g.left_at IS NULL AND u.status='ACTIVE' ORDER BY g.joined_at,u.id",(r,n)->new Member(r.getObject("id",UUID.class),r.getString("full_name"),r.getString("mobile_number"),r.getTimestamp("joined_at").toInstant(),r.getBoolean("mobile_placeholder")),group);
     }
     @PostMapping("/{group}/membership") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT) @Transactional
     public void membership(@AuthenticationPrincipal Jwt jwt,@PathVariable long group,@RequestBody Membership body){UUID id=user(jwt);initialize(id);

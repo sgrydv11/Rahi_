@@ -20,20 +20,22 @@ public class ChatController {
         public Send(UUID clientId,String body,UUID rideId,boolean sharePhone) { this(clientId,body,rideId,sharePhone,null,null); }
         public Send(UUID clientId,String body,UUID rideId,boolean sharePhone,Long replyToId) { this(clientId,body,rideId,sharePhone,replyToId,null); }
     }
-    public record Reply(long id, UUID senderId, String senderName, String body,String mobileNumber) { }
+    public record Reply(long id, UUID senderId, String senderName, String body,String mobileNumber,boolean mobilePlaceholder) { }
     public record Member(String fullName, String travelPreference, Instant memberSince) { }
     public record Offer(UUID id, String origin, String destination, Instant departureAt, String timeZone,
                         int availableSeats, BigDecimal pricePerSeat, String currency, String status) { }
     public record Message(long id, UUID senderId, String senderName, String body, Instant createdAt, Offer ride,
-                          boolean phoneShared, String mobileNumber, boolean mobileVerified, Reply replyTo, Member member, long groupId) { }
+                          boolean phoneShared, String mobileNumber, boolean mobileVerified, Reply replyTo, Member member, long groupId,boolean mobilePlaceholder) { }
     public record Messages(List<Message> content, long nextCursor, boolean hasMore, long olderCursor, boolean hasOlder) { }
     private final JdbcTemplate jdbc;
     public ChatController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     private static final String SELECT = """
         SELECT m.*, p.full_name, p.travel_preference, u.created_at AS member_since,
-               parent.id AS parent_id, parent.sender_id AS parent_sender, CASE WHEN parent.hidden THEN 'Message removed by moderation' ELSE parent.body END AS parent_body, parent_profile.full_name AS parent_name,parent_user.mobile_number AS parent_mobile,
-               u.mobile_number AS sender_mobile,
+               parent.id AS parent_id, parent.sender_id AS parent_sender, CASE WHEN parent.hidden THEN 'Message removed by moderation' ELSE parent.body END AS parent_body, parent_profile.full_name AS parent_name,coalesce(CASE WHEN parent_user.email LIKE 'demo%@demo.hoopr.test' OR parent_user.email LIKE '%@qa.example.test' THEN right(nullif(btrim(parent_user.mobile_number),''),10) ELSE nullif(btrim(parent_user.mobile_number),'') END,parent_user.chat_display_number) AS parent_mobile,
+               ((nullif(btrim(parent_user.mobile_number),'') IS NULL AND parent_user.chat_display_number IS NOT NULL) OR parent_user.email LIKE 'demo%@demo.hoopr.test' OR parent_user.email LIKE '%@qa.example.test') AS parent_placeholder,
+               coalesce(CASE WHEN u.email LIKE 'demo%@demo.hoopr.test' OR u.email LIKE '%@qa.example.test' THEN right(nullif(btrim(u.mobile_number),''),10) ELSE nullif(btrim(u.mobile_number),'') END,u.chat_display_number) AS sender_mobile,
+               ((nullif(btrim(u.mobile_number),'') IS NULL AND u.chat_display_number IS NOT NULL) OR u.email LIKE 'demo%@demo.hoopr.test' OR u.email LIKE '%@qa.example.test') AS sender_placeholder,
                u.mobile_verified AS sender_mobile_verified,
                r.source_name, r.destination_name, r.departure_at, r.departure_time_zone,
                r.currency, r.price_per_seat, r.status AS ride_status,
@@ -108,7 +110,7 @@ public class ChatController {
             rs.getBigDecimal("price_per_seat"),rs.getString("currency"),rs.getString("ride_status"));
         return new Message(rs.getLong("id"),rs.getObject("sender_id",UUID.class),rs.getString("full_name"),
             (rs.getBoolean("hidden") ? "Message removed by moderation" : rs.getString("body")),rs.getTimestamp("created_at").toInstant(),ride,true,rs.getString("sender_mobile"),rs.getBoolean("sender_mobile_verified"),
-            rs.getObject("parent_id")==null ? null : new Reply(rs.getLong("parent_id"),rs.getObject("parent_sender",UUID.class),rs.getString("parent_name"),rs.getString("parent_body"),rs.getString("parent_mobile")),
-            new Member(rs.getString("full_name"),rs.getString("travel_preference"),rs.getTimestamp("member_since").toInstant()),rs.getLong("group_id"));
+            rs.getObject("parent_id")==null ? null : new Reply(rs.getLong("parent_id"),rs.getObject("parent_sender",UUID.class),rs.getString("parent_name"),rs.getString("parent_body"),rs.getString("parent_mobile"),rs.getBoolean("parent_placeholder")),
+            new Member(rs.getString("full_name"),rs.getString("travel_preference"),rs.getTimestamp("member_since").toInstant()),rs.getLong("group_id"),rs.getBoolean("sender_placeholder"));
     }
 }

@@ -34,7 +34,7 @@ class ChatIT {
     @Autowired JdbcTemplate jdbc;
     List<UUID> members=new ArrayList<>();
     Jwt member() {
-        var id=auth.register(UUID.randomUUID()+"@chat.test","test-password-long","Chat Member").id();
+        var id=auth.register(UUID.randomUUID()+"@qa.example.test","test-password-long","Chat Member").id();
         members.add(id);
         return Jwt.withTokenValue("test").header("alg","HS256").subject(id.toString()).build();
     }
@@ -60,12 +60,12 @@ class ChatIT {
     }
     @Test void registeredMobileIsAlwaysVisibleWithoutSharingFlag() {
         var a=member();var b=member();var id=UUID.fromString(a.getSubject());
-        assertNull(chat.send(a,new ChatController.Send(UUID.randomUUID(),"No number",null)).mobileNumber());
+        var placeholder=chat.send(a,new ChatController.Send(UUID.randomUUID(),"No number",null));assertTrue(placeholder.mobileNumber().matches("[6-9][0-9]{9}"));assertTrue(placeholder.mobilePlaceholder());
         jdbc.update("UPDATE users SET mobile_number='+919876543210',mobile_verified=false WHERE id=?",id);
         var key=UUID.randomUUID();var sent=chat.send(a,new ChatController.Send(key,"Contact me",null,false));
-        assertEquals("+919876543210",sent.mobileNumber());assertFalse(sent.mobileVerified());assertTrue(sent.phoneShared());
+        assertEquals("9876543210",sent.mobileNumber());assertFalse(sent.mobileVerified());assertTrue(sent.phoneShared());
         assertEquals(sent.id(),chat.send(a,new ChatController.Send(key,"Contact me",null,true)).id());
-        assertEquals("+919876543210",chat.list(b,0).content().stream().filter(m->m.id()==sent.id()).findFirst().orElseThrow().mobileNumber());
+        assertEquals("9876543210",chat.list(b,0).content().stream().filter(m->m.id()==sent.id()).findFirst().orElseThrow().mobileNumber());
     }
     @Test void repliesPersistOriginalMessageAndRetryTargetCannotChange() {
         var a=member();var b=member();
@@ -81,7 +81,7 @@ class ChatIT {
         assertEquals(400,assertThrows(RideFailure.class,()->chat.send(b,new ChatController.Send(UUID.randomUUID(),"Missing",null,false,Long.MAX_VALUE))).status);
         var persisted=chat.list(a,original.id()).content().stream().filter(m->m.id()==reply.id()).findFirst().orElseThrow();
         assertEquals(original.body(),persisted.replyTo().body());
-        assertNull(persisted.mobileNumber());
+        assertTrue(persisted.mobileNumber().matches("[6-9][0-9]{9}"));assertTrue(persisted.mobilePlaceholder());
         assertEquals("Chat Member",persisted.member().fullName());
         assertEquals("BOTH",persisted.member().travelPreference());
         assertNotNull(persisted.member().memberSince());
@@ -192,4 +192,19 @@ class ChatIT {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/chat/groups/2/members").with(identity)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
     }
     @Test void pinsArePrivateAndLastMessagePreviewSurvivesRead(){var a=member();var b=member();groups.groups(a);groups.groups(b);groups.pin(a,4,new ChatGroupsController.Pin(true));assertEquals(4,groups.groups(a).getFirst().id());assertTrue(groups.groups(a).getFirst().pinned());assertFalse(groups.groups(b).stream().anyMatch(ChatGroupsController.Group::pinned));var sent=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Preview after read",null,false,null,4L));groups.read(b,4,new ChatGroupsController.Read(sent.id()));var preview=groups.groups(b).stream().filter(g->g.id()==4).findFirst().orElseThrow();assertEquals(0,preview.unreadCount());assertEquals(sent.id(),preview.latest().id());}
+    @Test void chatDisplayNumbersAreStableUniqueAndNotLoginIdentifiers(){
+        var a=member();var b=member();var first=chat.send(a,new ChatController.Send(UUID.randomUUID(),"Display number one",null));var second=chat.send(b,new ChatController.Send(UUID.randomUUID(),"Display number two",null));
+        assertTrue(first.mobileNumber().matches("[6-9][0-9]{9}"));assertNotEquals(first.mobileNumber(),second.mobileNumber());assertTrue(first.mobilePlaceholder());assertFalse(first.mobileVerified());
+        assertNull(jdbc.queryForObject("SELECT mobile_number FROM users WHERE id=?",String.class,UUID.fromString(a.getSubject())));
+        assertEquals(first.mobileNumber(),chat.list(b,0).content().stream().filter(m->m.id()==first.id()).findFirst().orElseThrow().mobileNumber());
+        var listed=groups.members(b,1).stream().filter(m->m.id().toString().equals(a.getSubject())).findFirst().orElseThrow();assertEquals(first.mobileNumber(),listed.mobileNumber());assertTrue(listed.mobilePlaceholder());
+        assertEquals(401,assertThrows(com.hoopr.auth.AuthFailure.class,()->auth.login(first.mobileNumber(),"test-password-long")).status);
+    }
+
+    @Test void realAccountsNeverReceiveGeneratedChatNumbers(){
+        var real=auth.register(UUID.randomUUID()+"@personal.example","test-password-long","Real account");members.add(real.id());
+        assertNull(jdbc.queryForObject("SELECT chat_display_number FROM users WHERE id=?",String.class,real.id()));
+        var who=Jwt.withTokenValue("test").header("alg","HS256").subject(real.id().toString()).build();var sent=chat.send(who,new ChatController.Send(UUID.randomUUID(),"No generated personal contact",null));assertNull(sent.mobileNumber());assertFalse(sent.mobilePlaceholder());
+    }
+
 }

@@ -14,11 +14,11 @@ import { ridesApi, type Ride } from '../rides/api';
 import { useSearchParams } from 'react-router';
 import { useCommunity,chatDay } from './Community';
 import { SwipeReply } from './SwipeReply';
-interface Reply {id:number;senderId:string;senderName:string;mobileNumber?:string|null;body:string}
+interface Reply {id:number;senderId:string;senderName:string;mobileNumber?:string|null;mobilePlaceholder?:boolean;body:string}
 interface Message {
   groupId:number;
   replyTo:Reply|null; member:{fullName:string;travelPreference:string;memberSince:string};
-  phoneShared:boolean; mobileNumber:string|null; mobileVerified:boolean;
+  phoneShared:boolean; mobileNumber:string|null; mobilePlaceholder?:boolean;mobileVerified:boolean;
   id: number; senderId: string; senderName: string; body: string; createdAt: string;
   ride: null | { id: string; origin: string; destination: string; departureAt: string; timeZone: string;
     availableSeats: number; pricePerSeat: number; currency: string; status: string };
@@ -28,7 +28,7 @@ const when = (value: string, timeZone = 'Asia/Kolkata') => new Intl.DateTimeForm
 }).format(new Date(value));
 
 export function ChatPage() {
- const contacts=useContactNames();const label=(phone?:string|null)=>senderLabel(phone,contacts.names);
+ const contacts=useContactNames();const label=(phone?:string|null,placeholder=false)=>placeholder?(phone||'Demo number'):senderLabel(phone,contacts.names);
  const {user}=useAuth(),community=useCommunity();const[params,setParams]=useSearchParams();const groupId=params.has('group')?Number(params.get('group')):0;
  const selected=useRef(groupId);selected.current=groupId;
  const[messages,setMessages]=useState<Message[]>([]),[offers,setOffers]=useState<Ride[]>([]),[error,setError]=useState(''),[feedError,setFeedError]=useState(''),[offerError,setOfferError]=useState(''),[notice,setNotice]=useState(''),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[olderBusy,setOlderBusy]=useState(false),[hasOlder,setHasOlder]=useState(false);
@@ -61,17 +61,17 @@ if(!groupId||group?.joined===false)return <section className="page narrow channe
  {hasOlder&&<button type="button" disabled={olderBusy} onClick={()=>void older()}>{olderBusy?'Loading…':'Load earlier messages (last 7 days)'}</button>}
  {!loaded&&!feedError&&<p role="status">Loading chat…</p>}{loaded&&!messages.length&&<p>No messages in the last 7 days. Start the conversation.</p>}
  {messages.map((m,i)=><Fragment key={m.id}>{(!i||chatDay(messages[i-1].createdAt)!==chatDay(m.createdAt))&&<div className="chat-date" role="separator">{chatDay(m.createdAt)}</div>}<SwipeReply disabled={busy} reply={()=>reply(m)}><article className={`chat-message${m.senderId===user?.id?' chat-own':''}`} data-message-id={m.id}>
- {m.senderId!==user?.id&&<button className="chat-contact" type="button" aria-label={`View member details for ${m.mobileNumber||'member'}`} onClick={()=>setMember(m)}>{label(m.mobileNumber)}</button>}
- {m.replyTo&&<blockquote className="chat-quote"><strong>{m.replyTo.senderId===user?.id?'You':label(m.replyTo.mobileNumber)}</strong><p>{m.replyTo.body}</p></blockquote>}<p className="chat-body">{m.body}</p>
+ {m.senderId!==user?.id&&<button className="chat-contact" type="button" aria-label={`View member details for ${m.mobileNumber||'member'}`} onClick={()=>setMember(m)}>{label(m.mobileNumber,m.mobilePlaceholder)}</button>}
+ {m.replyTo&&<blockquote className="chat-quote"><strong>{m.replyTo.senderId===user?.id?'You':label(m.replyTo.mobileNumber,m.replyTo.mobilePlaceholder)}</strong><p>{m.replyTo.body}</p></blockquote>}<p className="chat-body">{m.body}</p>
  {m.ride&&<div className="chat-offer"><strong>{m.ride.origin} → {m.ride.destination}</strong><p>{when(m.ride.departureAt,m.ride.timeZone)}</p><p>{m.ride.availableSeats} seats available · {m.ride.currency} {m.ride.pricePerSeat} per seat</p>{m.ride.status==='SCHEDULED'&&Date.parse(m.ride.departureAt)>Date.now()&&m.ride.availableSeats>0?<Link className="button button-small" to={`/rides/${m.ride.id}`}>{canBook(user)?'View ride / book seats':'View ride'}</Link>:<p>This ride is no longer available to book.</p>}</div>}
- <div className="chat-message-footer"><button type="button" disabled={busy} aria-label={`Reply to ${m.senderId===user?.id?'your message':label(m.mobileNumber)}`} onClick={()=>reply(m)}><Icon name="return-up-back-outline"/>Reply</button><small>{new Date(m.createdAt).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'})}</small></div>
+ <div className="chat-message-footer"><button type="button" disabled={busy} aria-label={`Reply to ${m.senderId===user?.id?'your message':label(m.mobileNumber,m.mobilePlaceholder)}`} onClick={()=>reply(m)}><Icon name="return-up-back-outline"/>Reply</button><small>{new Date(m.createdAt).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'})}</small></div>
  </article></SwipeReply></Fragment>)}
  </div>
  {!following.current&&(group?.unreadCount||0)>0&&<button type="button" onClick={()=>{following.current=true;if(feed.current)feed.current.scrollTop=feed.current.scrollHeight;if(messages.length)void mark(messages.at(-1)!.id);}}>New messages · Jump to latest</button>}
- <form className="chat-composer" onSubmit={send}>{notice&&<small role="status">{notice}</small>}{draft.reply&&<div className="chat-reply-draft"><div><strong>Replying to {draft.reply.senderId===user?.id?'You':label(draft.reply.mobileNumber)}</strong><p>{draft.reply.body}</p></div><button type="button" aria-label="Cancel reply" disabled={busy} onClick={()=>update({reply:null})}><Icon name="close-outline"/></button></div>}
+ <form className="chat-composer" onSubmit={send}>{notice&&<small role="status">{notice}</small>}{draft.reply&&<div className="chat-reply-draft"><div><strong>Replying to {draft.reply.senderId===user?.id?'You':label(draft.reply.mobileNumber,draft.reply.mobilePlaceholder)}</strong><p>{draft.reply.body}</p></div><button type="button" aria-label="Cancel reply" disabled={busy} onClick={()=>update({reply:null})}><Icon name="close-outline"/></button></div>}
  <div className="chat-compose-row"><textarea ref={composer} aria-label="Message" maxLength={1000} rows={2} value={draft.body} disabled={busy} onChange={e=>update({body:e.target.value})} placeholder="Message"/><button className="chat-send" aria-label={busy?'Sending…':'Send message'} disabled={busy||!draft.body.trim()}><Icon name="send-outline"/></button></div>
  {canOffer(user)&&<details className="chat-attachments"><summary>＋ Share a ride</summary><button type="button" onClick={()=>void loadOffers()}>Load my rides to share</button>{offerError&&<p role="alert">{offerError}</p>}<label>Attach one of your upcoming rides<select value={draft.rideId} disabled={busy} onChange={e=>update({rideId:e.target.value})}><option value="">Message only</option>{offers.map(r=><option key={r.id} value={r.id}>{r.origin} → {r.destination} · {when(r.departureAt,r.timeZone)}</option>)}</select></label><Link to="/rides/new">Publish a new ride</Link></details>}
  </form>
- <dialog ref={dialog} className="chat-member-dialog" aria-labelledby="chat-member-title" onClose={()=>setMember(null)} onCancel={()=>setMember(null)}>{member&&<><h2 id="chat-member-title">Member details</h2><p><strong>{member.member.fullName}</strong></p><p>{member.mobileNumber||'Mobile number not added'}{member.mobileNumber&&!member.mobileVerified&&' · Unverified number'}</p><p>Travel preference: {member.member.travelPreference==='BOTH'?'Drive and ride':member.member.travelPreference==='DRIVER'?'Drive':'Ride'}</p><p>Member since {new Date(member.member.memberSince).toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</p>{member.mobileNumber&&<p><a className="button button-small" href={`tel:${member.mobileNumber}`}>Call {member.member.fullName}</a></p>}<button type="button" onClick={()=>dialog.current?.close()}>Close</button></>}</dialog>
+ <dialog ref={dialog} className="chat-member-dialog" aria-labelledby="chat-member-title" onClose={()=>setMember(null)} onCancel={()=>setMember(null)}>{member&&<><h2 id="chat-member-title">Member details</h2><p><strong>{member.member.fullName}</strong></p><p>{member.mobileNumber||'Mobile number not added'}{member.mobilePlaceholder?' · Demo placeholder (not callable)':member.mobileNumber&&!member.mobileVerified?' · Unverified number':''}</p><p>Travel preference: {member.member.travelPreference==='BOTH'?'Drive and ride':member.member.travelPreference==='DRIVER'?'Drive':'Ride'}</p><p>Member since {new Date(member.member.memberSince).toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</p>{member.mobileNumber&&!member.mobilePlaceholder&&<p><a className="button button-small" href={`tel:${member.mobileNumber}`}>Call {member.member.fullName}</a></p>}<button type="button" onClick={()=>dialog.current?.close()}>Close</button></>}</dialog>
  </section>;
 }

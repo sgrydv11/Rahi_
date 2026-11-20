@@ -12,8 +12,8 @@ export const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   field: { gap: 8 },
   input: { borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: '#fff', padding: 16, minHeight: 52, color: colors.ink, fontSize: 16 },
-  button: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, paddingHorizontal: 20, minHeight: 48, justifyContent: 'center' },
-  buttonText: { color: '#fff', fontSize: 14, fontWeight: '600', textAlign:'center' },
+  button: { backgroundColor: '#E7EEFF', borderRadius: 12, paddingVertical: 16, paddingHorizontal: 20, minHeight: 48, justifyContent: 'center' },
+  buttonText: { color: colors.ink, fontSize: 14, fontWeight: '600', textAlign:'center' },
   error: { color: '#B42336', fontSize: 15 },
 });
 
@@ -21,8 +21,8 @@ export function Copy({ children }: { children: ReactNode }) { return <Text style
 export function Card({ children }: { children: ReactNode }) { return <View style={styles.card}>{children}</View>; }
 export function Button({ label, onPress, disabled = false, selected, variant='primary' }: { label: string; onPress: () => void; disabled?: boolean; selected?:boolean; variant?:'primary'|'secondary'|'link' }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled,selected }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, variant==='link'?{backgroundColor:'transparent',borderWidth:0,alignSelf:'flex-start',paddingHorizontal:0,paddingVertical:6,minHeight:36}:null, {borderWidth:variant==='link'?0:1,borderColor:variant==='secondary'?colors.line:colors.accent,backgroundColor:variant==='link'?'transparent':variant==='secondary'?'#fff':colors.accent,flexDirection:'row',alignItems:'center',gap:8}, { opacity: disabled ? 0.45 : pressed ? 0.75 : 1 }]}>
-    <Text style={[styles.buttonText,variant==='link'?{color:colors.accent,textAlign:'left',fontSize:13}:variant==='secondary'?{color:colors.accent}:{}]}>{label}</Text>{selected&&<Ionicons accessible={false} name="checkmark-outline" size={18} color={variant==='secondary'?colors.accent:'#fff'}/>}
+    style={({ pressed }) => [styles.button, variant==='link'?{backgroundColor:'transparent',borderWidth:0,alignSelf:'flex-start',paddingHorizontal:0,paddingVertical:6,minHeight:36}:null, {borderWidth:variant==='link'?0:1,borderStyle:disabled?'dashed':'solid',borderColor:variant==='secondary'?colors.line:colors.accent,backgroundColor:variant==='link'?'transparent':variant==='secondary'?'#fff':'#E7EEFF',flexDirection:'row',alignItems:'center',gap:8}, { opacity: disabled ? 1 : pressed ? 0.9 : 1 }]}>
+    <Text style={[styles.buttonText,variant==='link'?{color:colors.accent,textAlign:'left',fontSize:13}:variant==='secondary'?{color:colors.accent}:{}]}>{label}</Text>{selected&&<Ionicons accessible={false} name="checkmark-outline" size={18} color={colors.ink}/>}
   </Pressable>;
 }
 export function Field({ label, value, change, secret, numeric, multiline, trailing,labelAction }: {

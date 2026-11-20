@@ -144,3 +144,16 @@ summary {min-height:44px;cursor:pointer;align-content:center;font-weight:600}
 
 /* Chat groups begin directly below the header without a separator above the box. */
 .chat-shell .site-header{border-bottom:0}
+
+/* Explicit light surfaces and dark text, including platform dropdowns and dialogs. */
+:root{color-scheme:light;--text-muted:#142D4E}
+body,body :is(h1,h2,h3,h4,h5,p,small,span,strong,label,legend,li,dt,dd,a,button,input,textarea,select,option,summary,th,td,blockquote){color:#142D4E!important}
+input::placeholder,textarea::placeholder{color:#142D4E!important;opacity:1}
+select,option{background:#fff!important;color:#142D4E!important;color-scheme:light}
+body :is(button,.button,.chat-send,.search-submit,.date-chip[aria-pressed="true"],.unread-badge){color:#142D4E!important;background-color:#E7EEFF!important}
+body :is(button:disabled,.button[aria-disabled="true"]){opacity:1!important;border-style:dashed}
+.app-version{font-size:13px;margin-bottom:12px}
+
+body :is(.channel-open,.channel-options button,.chat-message-footer button,.menu-toggle,.edit-search,.city-locate-icon,.calendar-trigger,.chat-contact,.button-link){background-color:transparent!important}
+
+body *{color:#142D4E!important}

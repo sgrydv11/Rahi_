@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import {DriverVerification} from './driverVerification';
 import {LegalChecks} from './LegalChecks';
 import {RegularRoutesEditor,TravelPreferencesSettings,type RegularRoute} from './regularRoutes';
@@ -78,6 +79,7 @@ export function Profile({ user, onUser, go }: { user: User; onUser: (user: User)
   const [saved, setSaved] = useState(false);
   const action = useAction();
   return <Card>
+    <Copy>App version {Constants.expoConfig?.version||'Unknown'}</Copy>
     <Button label={user.email} onPress={()=>void action.run(async()=>{await Linking.openURL(`mailto:${user.email}`);})}/>
     <Field label="Full name" value={name} change={value => { setName(value); setSaved(false); }} />
     <Preferences value={preference} change={value => { setPreference(value); setSaved(false); }} />

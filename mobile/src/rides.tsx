@@ -44,7 +44,6 @@ export function Pagination({ data, setPage }: { data: Page<unknown>; setPage: (p
 
 export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolean; go: Navigate;user?:User|null;onResultsChange?:(value:boolean)=>void }) {
   const canOffer=!!user&&user.travelPreference!=='PASSENGER',canBook=!user||user.travelPreference!=='DRIVER';
-  const points=useCityPoints();
   const [savedRoutes,setSavedRoutes]=useState<{origin:string;destination:string;period:string}[]>([]);
   useEffect(()=>{if(!user)return;const c=new AbortController();api<{origin:string;destination:string;period:string}[]>('/travel-preferences',{signal:c.signal}).then(setSavedRoutes).catch(()=>{});return()=>c.abort();},[user?.id]);
   const rideChoices=[...namedRides,...savedRoutes.map((r,i)=>({value:'saved-'+i,label:`${r.period==='MORNING'?'Office':r.period==='EVENING'?'Home':'Saved'} · ${r.origin} → ${r.destination}`,origin:r.origin,destination:r.destination,routeType:''}))];
@@ -74,7 +73,7 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
     if (values.returnDate && values.returnDate < values.departureDate) { setError('Choose a return date on or after departure.'); return; }
     if (values.departureTime && (values.timeFrom || values.timeTo)) { setError('Choose a direct time or a range, not both.'); return; }
     setError(''); setPage(0);
-    setQuery(Object.entries(values).filter(([key, value]) => key !== 'returnDate' && key !== 'ac' && key !== 'namedRide' && value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
+    setQuery(Object.entries(values).filter(([key, value]) => key !== 'returnDate' && key !== 'ac' && key !== 'namedRide' && key !== 'boardingPoint' && key !== 'droppingPoint' && value.trim()).map(([key, value]) => key + '=' + encodeURIComponent(value.trim())).join('&'));
   }
   function update(key: string, value: string) { setDraft(previous => ({ ...previous, [key]: value,...(key==='origin'||key==='destination'?{namedRide:'',...(key==='origin'?{boardingPoint:''}:{droppingPoint:''})}:{}) })); }
   const travelDate = draft.departureDate ? new Date(draft.departureDate + 'T12:00') : undefined;
@@ -88,11 +87,9 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
     <Field label="From City" value={draft.origin || ''} change={value => update('origin', value)} labelAction={<Pressable accessibilityRole="button" accessibilityLabel="Use current city" disabled={locating} onPress={()=>void locateCity()} style={{padding:8}}><Ionicons name="locate-outline" size={20} color="#245EEA"/></Pressable>}/>
     {!!locationMessage&&<Text accessibilityRole="alert" style={rideUI.secondary}>{locationMessage}</Text>}
     <Field label="To City" value={draft.destination || ''} change={value => update('destination', value)} />
-    <Dropdown label="Boarding point" selected={draft.boardingPoint||''} values={points(draft.origin||'')} change={v=>update('boardingPoint',v)}/>
-    <Dropdown label="Dropping point" selected={draft.droppingPoint||''} values={points(draft.destination||'')} change={v=>update('droppingPoint',v)}/>
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap: 8}}>
       <DateField label="Date of Journey" mode="date" minimumDate={new Date(day()+'T00:00')} value={travelDate} change={value => update('departureDate', localDate(value.toISOString()).slice(0, 10))} />
-      <View style={{flexDirection:'row',gap: 4}}>{[{label:'Today',offset:0},{label:'Tomorrow',offset:1}].map(item=><Pressable key={item.label} accessibilityRole="button" onPress={()=>update('departureDate',day(item.offset))} style={{borderRadius:20,padding:8,backgroundColor:draft.departureDate===day(item.offset)?'#245EEA':'#EDF3FF'}}><Text style={{fontSize:11,color:draft.departureDate===day(item.offset)?'#fff':'#142D4E'}}>{item.label}</Text></Pressable>)}</View>
+      <View style={{flexDirection:'row',gap: 4}}>{[{label:'Today',offset:0},{label:'Tomorrow',offset:1}].map(item=><Pressable key={item.label} accessibilityRole="button" onPress={()=>update('departureDate',day(item.offset))} style={{borderRadius:20,padding:8,backgroundColor:draft.departureDate===day(item.offset)?'#DCE8FF':'#FFFFFF'}}><Text style={{fontSize:11,color:draft.departureDate===day(item.offset)?'#fff':'#142D4E'}}>{item.label}</Text></Pressable>)}</View>
     </View>
     <DateField label="Return date (optional)" mode="date" value={draft.returnDate ? new Date(draft.returnDate + 'T12:00') : undefined}
       change={value => update('returnDate', localDate(value.toISOString()).slice(0, 10))} clear={() => update('returnDate', '')} />
@@ -123,8 +120,6 @@ export function Rides({ mine = false, go,user,onResultsChange }: { mine?: boolea
             { value: '12:00,16:00', label: '12 PM – 4 PM' }, { value: '16:00,20:00', label: '4 PM – 8 PM' }, { value: '20:00,24:00', label: '8 PM – 12 AM' }]}
           change={value => { const [from, to] = value.split(','); setDraft(previous => ({ ...previous, departureTime: '', timeFrom: from, timeTo: to })); }} />
         {timeField('timeFrom', 'From time')}{timeField('timeTo', 'To time')}
-        <Dropdown label="Boarding point" selected={draft.boardingPoint||''} values={[...points(draft.origin||''),...(result.data?.content.flatMap(r=>r.preferences?.boardingPoints||[])||[]),...(draft.boardingPoint?[draft.boardingPoint]:[])]} change={v=>update('boardingPoint',v)}/>
-        <Dropdown label="Dropping point" selected={draft.droppingPoint||''} values={[...points(draft.destination||''),...(result.data?.content.flatMap(r=>r.preferences?.droppingPoints||[])||[]),...(draft.droppingPoint?[draft.droppingPoint]:[])]} change={v=>update('droppingPoint',v)}/>
         <Choice label="Flexible nearby drop-off" values={yesNo} selected={draft.flexibleDropoff || ''} change={value => update('flexibleDropoff', value)} />
         <Button label="Apply filters" onPress={() => {
           const next = { ...draft, timeTo: draft.timeTo === '00:00' ? '24:00' : draft.timeTo || '' }; setDraft(next); apply(next); result.reload();
@@ -335,5 +330,5 @@ export function PinsForm({ id, back }: { id: string; back: () => void }) {
 }
 
 const rideUI=StyleSheet.create({
- form:{padding:16,gap:12,borderRadius:16,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},location:{flexDirection:'row',alignItems:'center',gap:8,minHeight:40},link:{fontSize:14,color:'#245EEA',fontWeight:'600'},summary:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:4},route:{fontSize:15,fontWeight:'700',color:'#142D4E',flexShrink:1},meta:{flexDirection:'row',alignItems:'center',gap:4},secondary:{fontSize:13,lineHeight:19,color:'#4C5E75'},edit:{padding:6,minHeight:36,minWidth:32,justifyContent:'center'},toolbar:{flexDirection:'row',gap:8,flexWrap:'wrap'},control:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:12,minHeight:44,borderRadius:10,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},controlText:{fontSize:13,color:'#142D4E',fontWeight:'600'},card:{padding:14,gap:6,borderRadius:14,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},cardTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},time:{fontSize:22,fontWeight:'700',color:'#142D4E'},price:{fontSize:22,fontWeight:'700',color:'#142D4E',textAlign:'right'},perSeat:{fontSize:11,color:'#4C5E75',textAlign:'right'},cardRoute:{fontSize:14,fontWeight:'600',color:'#142D4E'},cardBottom:{flexDirection:'row',gap:8,alignItems:'center'},view:{backgroundColor:'#245EEA',paddingHorizontal:10,minHeight:36,borderRadius:10,justifyContent:'center'}
+ form:{padding:16,gap:12,borderRadius:16,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},location:{flexDirection:'row',alignItems:'center',gap:8,minHeight:40},link:{fontSize:14,color:'#245EEA',fontWeight:'600'},summary:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:4},route:{fontSize:15,fontWeight:'700',color:'#142D4E',flexShrink:1},meta:{flexDirection:'row',alignItems:'center',gap:4},secondary:{fontSize:13,lineHeight:19,color:'#4C5E75'},edit:{padding:6,minHeight:36,minWidth:32,justifyContent:'center'},toolbar:{flexDirection:'row',gap:8,flexWrap:'wrap'},control:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:12,minHeight:44,borderRadius:10,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},controlText:{fontSize:13,color:'#142D4E',fontWeight:'600'},card:{padding:14,gap:6,borderRadius:14,borderWidth:1,borderColor:'#D5DEEA',backgroundColor:'#fff'},cardTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},time:{fontSize:22,fontWeight:'700',color:'#142D4E'},price:{fontSize:22,fontWeight:'700',color:'#142D4E',textAlign:'right'},perSeat:{fontSize:11,color:'#4C5E75',textAlign:'right'},cardRoute:{fontSize:14,fontWeight:'600',color:'#142D4E'},cardBottom:{flexDirection:'row',gap:8,alignItems:'center'},view:{backgroundColor:'#E7EEFF',paddingHorizontal:10,minHeight:36,borderRadius:10,justifyContent:'center'}
 });
